@@ -44,9 +44,7 @@ class GitLabProvider(CIProvider):
 
     def _connect(self):
         if not self.cfg.base_url:
-            raise ValueError(
-                "gitlab.base_url is required (an air-gapped tool has no default host)"
-            )
+            raise ValueError("gitlab.base_url must not be empty")
         ssl_verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
         gl = gitlab.Gitlab(
             url=self.cfg.base_url,

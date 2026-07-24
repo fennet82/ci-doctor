@@ -23,9 +23,9 @@ export CI_DOCTOR_GITLAB_TOKEN="glpat-xxxxxxxxxxxxxxxxxxxx"
   <p>A read-scoped API token, from an environment variable <em>or</em> a file:</p>
   <Code code={token} lang="bash" theme="github-dark" />
   <p>
-    Self-hosted GitLab and GitHub Enterprise are first-class: set <code>base_url</code> explicitly
-    (there is no default host). Custom CA bundles, self-signed certs, and the standard
-    <code>HTTPS_PROXY</code> / <code>NO_PROXY</code> / <code>REQUESTS_CA_BUNDLE</code> env vars are honoured.
+    <code>base_url</code> defaults to the public host (<code>gitlab.com</code> / <code>api.github.com</code>);
+    override it for self-hosted GitLab or GitHub Enterprise. Custom CA bundles, self-signed certs, and the
+    standard <code>HTTPS_PROXY</code> / <code>NO_PROXY</code> / <code>REQUESTS_CA_BUNDLE</code> env vars are honoured.
   </p>
 
   <h3>Predefined CI variables it reads</h3>

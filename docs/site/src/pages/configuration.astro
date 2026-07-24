@@ -16,7 +16,7 @@ const full = `# .ci-doctor.yml — every knob, with defaults shown.
 provider: gitlab                 # gitlab | github
 
 gitlab:
-  base_url: https://gitlab.internal.example.com   # REQUIRED — no default host
+  base_url: https://gitlab.com   # default; override for a self-hosted instance
   api_version: v4
   token_env: CI_DOCTOR_GITLAB_TOKEN
   token_file: null               # e.g. /run/secrets/gitlab_token (wins over token_env)
@@ -25,7 +25,7 @@ gitlab:
   timeout_seconds: 30
 
 github:                          # used when provider: github
-  base_url: https://api.github.com     # REQUIRED — or a GHE base, e.g. https://ghe/api/v3
+  base_url: https://api.github.com     # default; override with a GHE base, e.g. https://ghe/api/v3
   token_env: CI_DOCTOR_GITHUB_TOKEN
   token_file: null
   ca_bundle: null
@@ -92,11 +92,12 @@ redaction:
   <Code code={envExample} lang="bash" theme="github-dark" />
 
   <h2>Full reference</h2>
-  <p>Drop a <code>.ci-doctor.yml</code> at your repo root. Everything below is optional except the provider <code>base_url</code>.</p>
+  <p>Drop a <code>.ci-doctor.yml</code> at your repo root. Everything below is optional — every key has a default.</p>
   <Code code={full} lang="yaml" theme="github-dark" />
 
   <div class="note">
-    <strong>base_url is never defaulted to a host.</strong> It must be set explicitly — a hardcoded
-    <code>gitlab.com</code> is a silent breakage waiting to happen in a self-hosted, air-gapped environment.
+    <strong><code>base_url</code> defaults to the public host</strong> (<code>gitlab.com</code> /
+    <code>api.github.com</code>). Override it for a self-hosted GitLab or GitHub Enterprise instance.
+    Custom CA bundles and proxies are honoured either way.
   </div>
 </Base>

@@ -13,9 +13,8 @@ class _Strict(BaseModel):
 
 
 class GitLabConfig(_Strict):
-    # No default host, ever (air-gap requirement). None means "unset"; the GitLab
-    # provider (M1) raises a clear error if it is still None at connect time.
-    base_url: str | None = None
+    # Defaults to the public host; override for a self-hosted / internal instance.
+    base_url: str = "https://gitlab.com"
     api_version: str = "v4"
     token_env: str = "CI_DOCTOR_GITLAB_TOKEN"
     token_file: str | None = None            # takes precedence over token_env if present
@@ -25,9 +24,9 @@ class GitLabConfig(_Strict):
 
 
 class GitHubConfig(_Strict):
-    # No default host (GitHub.com api.github.com OR a GHE base like
-    # https://ghe.internal/api/v3). Same air-gap rule as GitLab.
-    base_url: str | None = None
+    # Defaults to public GitHub's API; override for GitHub Enterprise
+    # (e.g. https://ghe.internal/api/v3).
+    base_url: str = "https://api.github.com"
     token_env: str = "CI_DOCTOR_GITHUB_TOKEN"
     token_file: str | None = None
     ca_bundle: str | None = None

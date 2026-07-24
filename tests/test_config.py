@@ -11,7 +11,7 @@ def test_defaults_load_and_validate():
     assert cfg.provider == "gitlab"
     assert cfg.phases["step_script"] == "script"  # from defaults.yml
     assert cfg.gitlab.timeout_seconds == 30       # scalar default from schema
-    assert cfg.gitlab.base_url is None            # never defaults to a host
+    assert cfg.gitlab.base_url == "https://gitlab.com"   # official default, overridable
 
 
 def test_shipped_matchers_parse():

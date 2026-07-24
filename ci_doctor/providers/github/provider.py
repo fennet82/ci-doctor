@@ -36,7 +36,7 @@ class GitHubApi:
 
     def __init__(self, cfg: GitHubConfig, environ: dict[str, str]):
         if not cfg.base_url:
-            raise ValueError("github.base_url is required (no default host; use api.github.com or a GHE base)")
+            raise ValueError("github.base_url must not be empty")
         self.base = cfg.base_url.rstrip("/")
         self.token = _read_token(cfg, environ)
         self.verify = cfg.ca_bundle or cfg.verify_ssl

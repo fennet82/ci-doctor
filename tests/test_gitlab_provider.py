@@ -71,9 +71,14 @@ def test_fetch_job_log_and_empty_is_none():
     assert prov.fetch_job_log(run.jobs[1]) is None  # never-got-a-runner case
 
 
-def test_base_url_required_when_connecting():
+def test_default_base_url_is_public_host():
+    cfg = load_config(environ={})
+    assert cfg.gitlab.base_url == "https://gitlab.com"
+
+
+def test_blank_base_url_raises_on_connect():
     import pytest
 
-    cfg = load_config(environ={})  # base_url None
+    cfg = load_config(environ={}, overrides={"gitlab": {"base_url": ""}})
     with pytest.raises(ValueError, match="base_url"):
         GitLabProvider(cfg, environ={})  # no injected client -> _connect() runs

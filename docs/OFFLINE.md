@@ -25,7 +25,7 @@ pip install --no-index --find-links ./wheels ci-doctor
 
 ## Minimum config
 
-- `gitlab.base_url` — your instance (there is no default host).
+- `gitlab.base_url` — defaults to `https://gitlab.com`; override for your instance.
 - A token: `CI_DOCTOR_GITLAB_TOKEN` env, or `gitlab.token_file` (k8s/Vault mount).
 - LLM is optional: leave it unset or set `llm.enabled: false` for the deterministic
   report. To enable, set `llm.model` + `llm.api_base` (any OpenAI-compatible endpoint).
