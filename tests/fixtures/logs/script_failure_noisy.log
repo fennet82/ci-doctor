@@ -1,0 +1,24 @@
+Running with gitlab-runner 16.8.0 (hash)
+Preparing the "docker" executor
+section_start:1735689600:restore_cache
+Checking cache for default-protected...
+WARNING: file does not exist
+WARNING: Failed to extract cache
+section_end:1735689610:restore_cache
+section_start:1735689610:download_artifacts
+Downloading artifacts for compile (5123)...
+WARNING: Downloading artifacts from coordinator... not found  id=5123 responseStatus=404 Not Found
+section_end:1735689615:download_artifacts
+section_start:1735689615:step_script
+$ pip install -e .
+$ pytest -q
+============================= FAILURES =============================
+_________________________ test_add ________________________________
+E   assert 1 == 2
+========================= short test summary info =================
+FAILED tests/test_math.py::test_add - assert 1 == 2
+section_end:1735689660:step_script
+section_start:1735689660:after_script
+$ echo cleanup
+section_end:1735689661:after_script
+ERROR: Job failed: exit code 1

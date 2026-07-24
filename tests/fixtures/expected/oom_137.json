@@ -1,0 +1,5 @@
+{
+  "note": "No reliable metadata; exit code 137 (SIGKILL/OOM) parsed from the trailer. Died in SCRIPT, but the cause is resource/infra.",
+  "job": {"status": "failed", "failure_reason": "unknown", "raw_failure_reason": ""},
+  "expect": {"phase": "script", "reason": "runner_system", "rule_id": "oom_137"}
+}

@@ -1,0 +1,5 @@
+{
+  "note": "runner_system_failure during executor prepare => PREPARE via authoritative metadata.",
+  "job": {"status": "failed", "failure_reason": "runner_system", "raw_failure_reason": "runner_system_failure"},
+  "expect": {"phase": "prepare", "reason": "runner_system", "rule_id": "reason_runner_system"}
+}

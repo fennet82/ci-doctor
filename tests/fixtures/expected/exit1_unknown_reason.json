@@ -1,0 +1,5 @@
+{
+  "note": "No metadata; trailer 'exit code 1' parsed => SCRIPT (rule 5, general case).",
+  "job": {"status": "failed", "failure_reason": "unknown", "raw_failure_reason": ""},
+  "expect": {"phase": "script", "reason": "script_failure", "rule_id": "trailer_exit_code"}
+}

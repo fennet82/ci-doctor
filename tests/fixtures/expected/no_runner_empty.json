@@ -1,0 +1,5 @@
+{
+  "note": "Empty log + stuck_or_timeout metadata => never got a runner. Attribution overrides the ambiguous TIMEOUT reason to NO_RUNNER.",
+  "job": {"status": "failed", "failure_reason": "timeout", "raw_failure_reason": "stuck_or_timeout_failure"},
+  "expect": {"phase": "provision", "reason": "no_runner", "rule_id": "empty_log_no_runner"}
+}

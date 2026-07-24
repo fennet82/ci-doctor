@@ -1,0 +1,6 @@
+Running with gitlab-runner 16.8.0 (hash)
+section_start:1735689600:step_script
+$ ./build_big.sh
+Compiling everything at once...
+section_end:1735689660:step_script
+ERROR: Job failed: exit code 137

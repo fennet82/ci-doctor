@@ -1,0 +1,11 @@
+Running with gitlab-runner 16.8.0 (hash)
+section_start:1735689600:restore_cache
+Checking cache for default...
+WARNING: file does not exist
+WARNING: Failed to extract cache
+section_end:1735689610:restore_cache
+section_start:1735689610:step_script
+$ ./run.sh
+ERROR: custom tool reported a fatal problem and stopped
+section_end:1735689660:step_script
+ERROR: Job failed

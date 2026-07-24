@@ -49,7 +49,8 @@ def analyze(
     cfg = load_config(repo_config=config_path)
 
     if from_file is not None:
-        _summarize(_run_from_file(from_file))
+        for job in _run_from_file(from_file).jobs:
+            _diagnose(job, cfg)
         return
 
     if run_id is not None:
@@ -78,7 +79,7 @@ def _analyze_live(run_id: str, cfg, job_id: str | None) -> None:
 
     for job in jobs[: cfg.analysis.max_jobs_analyzed]:
         job.log = provider.fetch_job_log(job)
-        _summarize_job(job)
+        _diagnose(job, cfg)
 
 
 def _run_from_file(path: Path) -> Run:
@@ -89,14 +90,29 @@ def _run_from_file(path: Path) -> Run:
     return Run(id="local", jobs=[job])
 
 
-def _summarize(run: Run) -> None:
-    for job in run.jobs:
-        _summarize_job(job)
+def _diagnose(job: Job, cfg) -> None:
+    """Segment + phase-map + classify one job, then print the deterministic verdict.
 
+    This is the M2 output: useful with no LLM at all. GitLab log format is assumed
+    (the only provider today); a provider-driven segmenter comes with M6.
+    """
+    from ci_doctor.core.attribution import attribute
+    from ci_doctor.core.phases import assign_phases
+    from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
 
-def _summarize_job(job: Job) -> None:
+    job.sections = GitLabSegmenter().segment(job.log or "")
+    assign_phases(job.sections, cfg.phases)
+    attr = attribute(job, job.sections)
+
     lines = 0 if job.log is None else job.log.count("\n") + 1
-    typer.echo(f"job={job.name} status={job.status} reason={job.failure_reason} log_lines={lines}")
+    typer.echo(
+        f"job={job.name} phase={attr.phase} reason={attr.reason} "
+        f"rule={attr.rule_id} confidence={attr.confidence} log_lines={lines}"
+    )
+    if attr.terminal_evidence:
+        typer.echo(f"  terminal: {attr.terminal_evidence}")
+    if attr.secondary_phases:
+        typer.echo(f"  secondary (non-causal): {', '.join(str(p) for p in attr.secondary_phases)}")
 
 
 def main() -> None:

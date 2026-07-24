@@ -1,0 +1,5 @@
+{
+  "note": "Regression test: script exit 1 with a loud cache-miss/artifact-404 block above it must attribute to SCRIPT, never FETCH.",
+  "job": {"status": "failed", "failure_reason": "script_failure", "raw_failure_reason": "script_failure"},
+  "expect": {"phase": "script", "reason": "script_failure", "rule_id": "script_failure_is_script"}
+}

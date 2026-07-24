@@ -1,0 +1,5 @@
+{
+  "note": "WARNING-never-fatal at the fallback: fetch has only WARNING lines, so it cannot be blamed; the real ERROR is in step_script.",
+  "job": {"status": "failed", "failure_reason": "unknown", "raw_failure_reason": ""},
+  "expect": {"phase": "script", "reason": "script_failure", "rule_id": "last_error_section"}
+}

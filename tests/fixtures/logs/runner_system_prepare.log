@@ -1,0 +1,6 @@
+Running with gitlab-runner 16.8.0 (hash)
+section_start:1735689600:prepare_executor
+Using Docker executor with image internal.registry/build:latest ...
+Pulling docker image internal.registry/build:latest ...
+section_end:1735689610:prepare_executor
+ERROR: Job failed (system failure): prepare environment: exit status 1

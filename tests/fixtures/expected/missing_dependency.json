@@ -1,0 +1,5 @@
+{
+  "note": "Upstream artifact absent => FETCH via authoritative metadata (cascade root detection is M7/cluster).",
+  "job": {"status": "failed", "failure_reason": "missing_dependency", "raw_failure_reason": "missing_dependency_failure"},
+  "expect": {"phase": "fetch", "reason": "missing_dependency", "rule_id": "reason_missing_dependency"}
+}

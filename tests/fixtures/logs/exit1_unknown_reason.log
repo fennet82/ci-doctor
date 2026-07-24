@@ -1,0 +1,7 @@
+Running with gitlab-runner 16.8.0 (hash)
+section_start:1735689600:step_script
+$ make test
+gcc -c main.c
+make: *** [Makefile:12: test] Error 1
+section_end:1735689660:step_script
+ERROR: Job failed: exit code 1
