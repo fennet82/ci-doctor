@@ -78,7 +78,7 @@ Hard requirements.
 - **No telemetry, analytics, update checks, or license phone-home.**
 - `detect-secrets` optional plugins must not fetch; default to the local regex set.
 - **Ship a self-contained Docker image**; offline wheel path too
-  (`pip install --no-index --find-links ./wheels ci-doctor`).
+  (`pip install --no-index --find-links ./wheels ci-doctorr`).
 - **Test for it:** run the suite with sockets patched to raise on any connection
   except the test doubles.
 

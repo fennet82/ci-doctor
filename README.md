@@ -71,6 +71,8 @@ acquire → segment → attribute → denoise → extract → budget → (LLM) �
 
 ## Install
 
+> On PyPI the distribution is **`ci-doctorr`** (the `ci-doctor` name was taken); the import package is `ci_doctor` and the command stays `ci-doctor`.
+
 ```sh
 git clone https://github.com/fennet82/ci-doctor
 cd ci-doctor
@@ -168,7 +170,7 @@ ci-doctor:
 
 ci-doctor makes no network calls except to the GitLab/GitHub and LLM endpoints you
 configure. Build once where there is internet, then ship inside — a Docker image, or an
-offline wheel bundle (`pip install --no-index --find-links ./wheels ci-doctor`). See
+offline wheel bundle (`pip install --no-index --find-links ./wheels ci-doctorr`). See
 [docs/OFFLINE.md](docs/OFFLINE.md).
 
 ## Documentation

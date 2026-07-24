@@ -285,7 +285,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ci-doctor"
+name = "ci-doctorr"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

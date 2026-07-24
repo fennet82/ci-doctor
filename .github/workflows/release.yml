@@ -1,0 +1,58 @@
+name: release
+
+# On every push to master: analyze conventional commits, bump the version + tag,
+# generate a GitHub Release from the commits, attach the Docker image as a gzipped
+# tar, and publish to PyPI. If no releasable commit (feat/fix/BREAKING) is found, it no-ops.
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # push the version-bump commit + tag, create/upload the Release
+  id-token: write   # PyPI Trusted Publishing (OIDC) — no stored token needed
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so commit analysis works
+
+      # Bump version (pyproject), update CHANGELOG.md, commit, tag vX.Y.Z, push,
+      # create the GitHub Release from the commits, and build the sdist+wheel into dist/.
+      - name: Python Semantic Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image and save as gzipped tar
+        if: ${{ steps.release.outputs.released == 'true' }}
+        run: |
+          IMAGE="ci-doctor:${{ steps.release.outputs.version }}"
+          docker build -t "$IMAGE" .
+          docker save "$IMAGE" | gzip -9 > "ci-doctor-${{ steps.release.outputs.version }}-image.tar.gz"
+
+      - name: Attach Docker image to the release
+        if: ${{ steps.release.outputs.released == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.release.outputs.tag }}" "ci-doctor-${{ steps.release.outputs.version }}-image.tar.gz" --clobber
+
+      # Trusted Publishing: authenticates via OIDC (id-token: write above). No token/secret.
+      # Requires a matching publisher on PyPI (repo fennet82/ci-doctor, workflow release.yml).
+      - name: Publish distributions to PyPI
+        if: ${{ steps.release.outputs.released == 'true' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Upload the built distributions to the GitHub Release
+        if: ${{ steps.release.outputs.released == 'true' }}
+        uses: python-semantic-release/publish-action@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.release.outputs.tag }}

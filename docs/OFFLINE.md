@@ -20,7 +20,7 @@ Reference it from `.gitlab-ci.yml` — see `examples/gitlab-ci.example.yml`.
 # where there IS internet:
 pip wheel . -w ./wheels
 # copy ./wheels inside, then on the air-gapped host:
-pip install --no-index --find-links ./wheels ci-doctor
+pip install --no-index --find-links ./wheels ci-doctorr
 ```
 
 ## Minimum config
