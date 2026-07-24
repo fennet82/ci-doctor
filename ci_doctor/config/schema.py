@@ -48,7 +48,7 @@ class LLMConfig(_Strict):
 
 class AnalysisConfig(_Strict):
     include_allowed_failures: bool = False
-    max_jobs_analyzed: int = 3
+    max_jobs_analyzed: int = 10
     skip_llm_for: list[str] = Field(
         default_factory=lambda: ["no_runner", "missing_dependency", "cancelled"]
     )

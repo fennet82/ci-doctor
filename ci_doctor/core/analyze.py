@@ -8,6 +8,7 @@ the already-segmented job plus its Attribution.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from ci_doctor.config.schema import Config
@@ -16,6 +17,8 @@ from ci_doctor.core.budget import estimate_tokens, fit
 from ci_doctor.core.denoise import denoise
 from ci_doctor.core.extract import extract
 from ci_doctor.core.models import Job, Phase, Section
+
+log = logging.getLogger("ci_doctor.analyze")
 
 
 @dataclass
@@ -60,6 +63,8 @@ def build_bundle(
     excerpt = extract(clean, cfg.extraction.matchers, cfg.extraction.tail_lines)
     blamed_budget = int(cfg.llm.max_input_tokens * 0.7)
     fitted, truncated = fit(excerpt, blamed_budget)
+    log.debug("blamed phase %s: denoise %d->%d, extract ->%d, fit ->%d lines (truncated=%s)",
+              attr.phase, len(raw), len(clean), len(excerpt), len(fitted), truncated)
 
     secondary = [f"{phase}: warnings present (non-causal)" for phase in attr.secondary_phases]
     metadata = {

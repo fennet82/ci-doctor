@@ -11,6 +11,7 @@ catches everything and always exits 0.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -21,6 +22,17 @@ from ci_doctor.config.loader import load_config
 from ci_doctor.core.models import FailureReason, Job, Run
 
 app = typer.Typer(add_completion=False, help="Explain why a CI pipeline failed (read-only postmortem).")
+
+log = logging.getLogger("ci_doctor.cli")
+
+
+def _configure_logging(verbose: bool) -> None:
+    """`--verbose` (or CI_DOCTOR_LOG_LEVEL=DEBUG) turns on debug logs across ci_doctor.*."""
+    level_name = os.environ.get("CI_DOCTOR_LOG_LEVEL", "").upper()
+    level = logging.DEBUG if verbose else getattr(logging, level_name, logging.INFO)
+    logging.getLogger("ci_doctor").setLevel(level)
+    if verbose:
+        log.debug("verbose logging enabled")
 
 
 def _version_callback(value: bool) -> None:
@@ -47,8 +59,11 @@ def analyze(
     job_id: str = typer.Option(None, "--job-id", help="Analyze a single job id."),
     config_path: Path = typer.Option(None, "--config", help="Path to .ci-doctor.yml."),
     no_color: bool = typer.Option(False, "--no-color", help="Disable coloured terminal output."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging."),
 ) -> None:
+    _configure_logging(verbose)
     cfg = load_config(repo_config=config_path)
+    log.debug("provider=%s from_file=%s run_id=%s job_id=%s", cfg.provider, from_file, run_id, job_id)
 
     run = provider = None
     if from_file is not None:
@@ -94,9 +109,12 @@ def _analyze_live(run_id: str, cfg, job_id: str | None):
     jobs = select_failed_jobs(run.jobs, cfg.analysis.include_allowed_failures)
     if job_id is not None:
         jobs = [j for j in jobs if j.id == job_id]
+    log.debug("run %s: %d jobs, %d failed and selected", run_id, len(run.jobs), len(jobs))
 
+    selected = jobs[: cfg.analysis.max_jobs_analyzed]
+    log.info("analyzing %d failed job(s) from run %s", len(selected), run_id)
     results = []
-    for job in jobs[: cfg.analysis.max_jobs_analyzed]:
+    for job in selected:
         job.log = provider.fetch_job_log(job)
         results.append(_process(job, cfg))
     return run, provider, results
@@ -123,10 +141,15 @@ def _process(job: Job, cfg):
     from ci_doctor.llm.report import produce_report
 
     job.sections = _make_segmenter(cfg).segment(job.log or "")
+    log.debug("job %s: %d top-level sections", job.name, len(job.sections))
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
+    log.debug("job %s: attribution phase=%s reason=%s rule=%s confidence=%s",
+              job.name, attr.phase, attr.reason, attr.rule_id, attr.confidence)
     bundle = build_bundle(job, attr, job.sections, cfg)
     report = produce_report(job, attr, bundle, cfg)
+    log.debug("job %s: report category=%s confidence=%s infra=%s",
+              job.name, report.category, report.confidence, report.is_infra_not_code)
     return job, attr, report
 
 
@@ -173,7 +196,7 @@ def _maybe_post_mr(provider, run, results, cfg) -> None:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="ci-doctor: %(message)s")
+    logging.basicConfig(level=logging.INFO, format="ci-doctor [%(levelname)s] %(message)s")
     try:
         app()
     except SystemExit:

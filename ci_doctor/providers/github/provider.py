@@ -99,6 +99,7 @@ class GitHubProvider(CIProvider):
 
     def fetch_run(self, run_ref: str) -> Run:
         jobs = [self._to_job(j) for j in self.client.run_jobs(self._repo(), run_ref)]
+        log.debug("run %s: %d jobs", run_ref, len(jobs))
         return Run(
             id=str(run_ref),
             ref=self.environ.get("GITHUB_REF", ""),

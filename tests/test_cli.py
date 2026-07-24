@@ -14,6 +14,15 @@ def test_main_always_exits_zero_on_error(monkeypatch):
     assert exc.value.code == 0
 
 
+def test_verbose_enables_debug_logging():
+    import logging
+
+    cli._configure_logging(True)
+    assert logging.getLogger("ci_doctor").level == logging.DEBUG
+    cli._configure_logging(False)  # default INFO when not verbose and no env override
+    assert logging.getLogger("ci_doctor").level == logging.INFO
+
+
 def test_from_file_replay_smoke(monkeypatch, capsys, tmp_path):
     monkeypatch.chdir(tmp_path)  # report.md/report.json land here, not in the repo
     log = str((Path(__file__).parent / "fixtures" / "sample.log").resolve())

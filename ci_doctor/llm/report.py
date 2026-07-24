@@ -43,6 +43,7 @@ _CATEGORY = {
 
 def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None) -> Report:
     if not (cfg.llm.enabled and cfg.llm.model and cfg.llm.api_base):
+        log.debug("LLM disabled/unconfigured -> deterministic report")
         return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
 
     if client is None:
@@ -52,9 +53,13 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
 
     schema = Report.model_json_schema()
     prompt = redact_text(_render_prompt(job, attr, bundle, schema), cfg.redaction, environ)
+    log.debug("calling LLM model=%s api_base=%s prompt=%d chars", cfg.llm.model, cfg.llm.api_base, len(prompt))
     report = _call_and_validate(client, prompt, schema)
     if report is None:
+        log.info("no valid LLM report; using deterministic fallback")
         report = deterministic_report(job, attr, bundle, degraded=True)
+    else:
+        log.debug("LLM returned a valid report")
     return redact_report(report, cfg.redaction, environ)
 
 
@@ -65,6 +70,7 @@ def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
             data = client.complete_structured(prompt + hint, schema)
             return Report.model_validate(data)
         except (ValidationError, ValueError, json.JSONDecodeError) as exc:
+            log.debug("LLM reply invalid, repair retry: %s", exc)
             hint = f"\n\nYour previous reply was invalid ({exc}). Reply with ONLY a JSON object matching the schema."
         except Exception as exc:  # noqa: BLE001 - network/LLM failure -> deterministic fallback
             log.warning("LLM call failed, using deterministic fallback: %s", exc)

@@ -76,6 +76,7 @@ class GitLabProvider(CIProvider):
         project = self._project()
         pipeline = project.pipelines.get(int(run_ref))
         jobs = [self._to_job(pj) for pj in pipeline.jobs.list(all=True)]
+        log.debug("pipeline %s: %d jobs", run_ref, len(jobs))
         return Run(
             id=str(getattr(pipeline, "id", run_ref)),
             ref=getattr(pipeline, "ref", "") or "",
@@ -102,6 +103,7 @@ class GitLabProvider(CIProvider):
         if not raw:
             return None
         text = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        log.debug("job %s trace: %d chars", job.id, len(text))
         return text or None
 
     def post_note(self, mr: MergeRequestRef, body: str, marker: str) -> None:
