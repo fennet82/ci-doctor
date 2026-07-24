@@ -1,0 +1,42 @@
+# Shipped baseline config.
+#
+# Scalar defaults live in schema.py; this file carries the data-heavy baseline
+# (phase map, starter matchers, noise patterns) that is awkward to express as
+# Python defaults. Layer order (lowest -> highest precedence):
+#   schema defaults  <  this file  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags
+# List values REPLACE across layers; mappings deep-merge.
+
+# GitLab section name -> phase. Users add their own custom sections under `phases:`
+# in the repo config (deep-merged onto this map).
+phases:
+  resolve_secrets: prepare
+  prepare_executor: prepare
+  prepare_script: prepare
+  get_sources: fetch
+  restore_cache: fetch
+  download_artifacts: fetch
+  step_script: script
+  after_script: post
+  archive_cache: post
+  archive_cache_on_failure: post
+  upload_artifacts_on_success: post
+  upload_artifacts_on_failure: post
+  cleanup_file_variables: post
+
+extraction:
+  # Starter matchers. The full catalogue (jest, go test, maven/gradle, tsc, npm,
+  # docker, OOM) lands in M3 alongside the extractor that consumes them.
+  matchers:
+    - id: pytest
+      start: '^=+ FAILURES =+'
+      end: '^=+ short test summary'
+      priority: 90
+    - id: generic_error
+      pattern: '^(ERROR|FATAL)\b'
+      before: 5
+      after: 20
+      priority: 50
+
+denoise:
+  noise_patterns:
+    - '^\s*$'

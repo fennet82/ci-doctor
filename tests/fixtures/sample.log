@@ -1,0 +1,6 @@
+Running with gitlab-runner 16.8.0
+section_start:1735689600:step_script
+$ pytest -q
+E   assert 1 == 2
+section_end:1735689660:step_script
+ERROR: Job failed: exit code 1

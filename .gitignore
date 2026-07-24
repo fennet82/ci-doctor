@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+# ci-doctor's own artifacts
+report.md
+report.json
+# local Claude Code settings / temp
+.claude/settings.local.json
+.claude/*.tmp*
