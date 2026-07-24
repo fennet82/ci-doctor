@@ -34,8 +34,9 @@ github:                          # used when provider: github
 
 llm:
   enabled: true                  # false => deterministic-only report
-  model: null                    # any model string, e.g. "qwen2.5-coder:32b"
-  api_base: null                 # any OpenAI-compatible endpoint
+  backend: openai                # openai | litellm | anthropic | claude_code
+  model: null                    # e.g. "qwen2.5-coder:32b" or "claude-opus-4-8"
+  api_base: null                 # OpenAI-compatible / litellm / anthropic base URL
   api_key_env: null              # optional; local servers often need none
   ca_bundle: null                # LLM endpoint's own CA, independent of the provider's
   max_input_tokens: 12000
@@ -90,6 +91,24 @@ redaction:
 
   <h2>Environment variables</h2>
   <Code code={envExample} lang="bash" theme="github-dark" />
+
+  <h2>LLM backends</h2>
+  <p>The LLM step is bring-your-own. Pick one with <code>llm.backend</code>:</p>
+  <table>
+    <thead><tr><th>backend</th><th>What it calls</th><th>Needs</th></tr></thead>
+    <tbody>
+      <tr><td><code>openai</code> (default)</td><td>Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, internal gateway)</td><td><code>model</code> + <code>api_base</code></td></tr>
+      <tr><td><code>litellm</code></td><td>Any <a href="https://docs.litellm.ai/">litellm</a> provider (OpenAI, Anthropic, Gemini, Bedrock, Vertex, Ollama, …)</td><td><code>model</code>; <code>pip install ci-doctor[litellm]</code></td></tr>
+      <tr><td><code>anthropic</code></td><td>Claude via the official Anthropic SDK (defaults to <code>claude-opus-4-8</code>)</td><td>API key (env or <code>ant</code> profile); <code>pip install ci-doctor[anthropic]</code></td></tr>
+      <tr><td><code>claude_code</code></td><td>The local <code>claude</code> CLI, headless (<code>claude -p</code>)</td><td>the <code>claude</code> binary on PATH; uses its own auth</td></tr>
+    </tbody>
+  </table>
+  <div class="note">
+    Only the <code>openai</code> path is in the base install (no extra deps, no runtime
+    downloads). <code>litellm</code> may pull <code>tiktoken</code> (which fetches vocab at
+    runtime) — avoid it in strict air-gapped setups. When the LLM is disabled or unavailable,
+    ci-doctor emits the deterministic report instead of failing.
+  </div>
 
   <h2>Full reference</h2>
   <p>Drop a <code>.ci-doctor.yml</code> at your repo root. Everything below is optional — every key has a default.</p>

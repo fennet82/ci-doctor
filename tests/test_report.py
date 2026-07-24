@@ -76,6 +76,13 @@ def test_repair_retry_on_invalid_then_valid():
     assert client.calls == 2  # one repair retry happened
 
 
+def test_anthropic_backend_needs_no_api_base():
+    # backend=anthropic is "ready" without api_base (model defaults, auth from env).
+    job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides={"llm": {"backend": "anthropic"}})
+    report = produce_report(job, attr, bundle, cfg, client=FakeClient([_GOOD]))
+    assert report.summary == "unit tests failed on assert"
+
+
 def test_degraded_fallback_on_llm_error():
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([RuntimeError("endpoint down")])

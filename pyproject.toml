@@ -11,6 +11,13 @@ dependencies = [
     "openai>=2.48.0",
 ]
 
+[project.optional-dependencies]
+# Optional LLM backends (base install stays lean/air-gap-clean). openai is included
+# in the base deps; claude_code needs only the `claude` CLI on PATH.
+litellm = ["litellm>=1.40"]
+anthropic = ["anthropic>=0.40"]
+all = ["litellm>=1.40", "anthropic>=0.40"]
+
 [project.scripts]
 ci-doctor = "ci_doctor.cli:main"
 

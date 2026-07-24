@@ -5,6 +5,8 @@ error, not a silent typo. Scalar defaults live here; the data-heavy baseline
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -36,8 +38,11 @@ class GitHubConfig(_Strict):
 
 class LLMConfig(_Strict):
     enabled: bool = True                     # false => deterministic-only report
-    model: str | None = None                 # any litellm model string
-    api_base: str | None = None              # any OpenAI-compatible endpoint
+    # openai: OpenAI-compatible endpoint (api_base). litellm: any litellm provider.
+    # anthropic: official Anthropic SDK. claude_code: the local `claude` CLI.
+    backend: Literal["openai", "litellm", "anthropic", "claude_code"] = "openai"
+    model: str | None = None                 # model string (defaults to claude-opus-4-8 for anthropic)
+    api_base: str | None = None              # OpenAI-compatible / litellm / anthropic base URL
     api_key_env: str | None = None           # optional; local servers often need none
     ca_bundle: str | None = None
     max_input_tokens: int = 12000

@@ -42,18 +42,22 @@ _CATEGORY = {
 
 
 def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None) -> Report:
-    if not (cfg.llm.enabled and cfg.llm.model and cfg.llm.api_base):
-        log.debug("LLM disabled/unconfigured -> deterministic report")
+    from ci_doctor.llm.backends import backend_ready, make_client
+
+    if not (cfg.llm.enabled and (client is not None or backend_ready(cfg.llm))):
+        log.debug("LLM disabled/not ready (backend=%s) -> deterministic report", cfg.llm.backend)
         return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
 
     if client is None:
-        from ci_doctor.llm.client import OpenAILLMClient
-
-        client = OpenAILLMClient(cfg.llm, environ=environ)
+        try:
+            client = make_client(cfg.llm, environ=environ)
+        except Exception as exc:  # noqa: BLE001 - never crash on a bad backend
+            log.info("LLM backend %s unavailable (%s); deterministic report", cfg.llm.backend, exc)
+            return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
 
     schema = Report.model_json_schema()
     prompt = redact_text(_render_prompt(job, attr, bundle, schema), cfg.redaction, environ)
-    log.debug("calling LLM model=%s api_base=%s prompt=%d chars", cfg.llm.model, cfg.llm.api_base, len(prompt))
+    log.debug("calling LLM backend=%s model=%s prompt=%d chars", cfg.llm.backend, cfg.llm.model, len(prompt))
     report = _call_and_validate(client, prompt, schema)
     if report is None:
         log.info("no valid LLM report; using deterministic fallback")
