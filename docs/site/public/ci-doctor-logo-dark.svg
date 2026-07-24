@@ -1,0 +1,37 @@
+<svg viewBox="0 0 780 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=JetBrains+Mono:wght@600&amp;display=swap');
+      .doctor { font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif; font-weight: 700; }
+      .ci { font-family: 'JetBrains Mono', 'Consolas', monospace; font-weight: 600; }
+    </style>
+    <radialGradient id="badgeFill2" cx="35%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#153A52"/>
+      <stop offset="100%" stop-color="#0A2030"/>
+    </radialGradient>
+  </defs>
+
+  <!-- icon mark -->
+  <g transform="translate(10,10)">
+    <circle cx="100" cy="100" r="94" fill="url(#badgeFill2)"/>
+    <circle cx="100" cy="100" r="94" fill="none" stroke="#2DD4C4" stroke-opacity="0.35" stroke-width="2"/>
+
+    <path d="M36,108 L60,108" fill="none" stroke="#7C93A3" stroke-width="6" stroke-linecap="round"/>
+    <path d="M60,108 L76,108" fill="none" stroke="#7C93A3" stroke-width="6" stroke-linecap="round"/>
+    <path d="M76,108 L86,64 L96,150 L108,108" fill="none" stroke="#FF6B57" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M108,108 L134,108" fill="none" stroke="#7C93A3" stroke-width="6" stroke-linecap="round"/>
+    <path d="M134,108 L146,122 L172,84" fill="none" stroke="#1FB8A6" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <circle cx="60" cy="108" r="6.5" fill="#1FB8A6"/>
+    <circle cx="86" cy="64" r="7.5" fill="#FF6B57" stroke="#0A2030" stroke-width="3"/>
+    <circle cx="134" cy="108" r="6.5" fill="#1FB8A6"/>
+  </g>
+
+  <!-- wordmark (light text for dark backgrounds) -->
+  <rect x="248" y="66" width="66" height="42" rx="9" fill="none" stroke="#2DD4C4" stroke-width="2.5"/>
+  <text x="281" y="94" class="ci" font-size="24" fill="#2DD4C4" text-anchor="middle" letter-spacing="1">CI</text>
+
+  <text x="330" y="112" class="doctor" font-size="62" fill="#E6EDF3" letter-spacing="-1">Doctor</text>
+
+  <text x="250" y="150" class="ci" font-size="15" fill="#9DB0BF" letter-spacing="2">ROOT&#8211;CAUSE ANALYSIS FOR CI/CD</text>
+</svg>

@@ -3,6 +3,8 @@ name = "ci-doctor"
 version = "0.1.0"
 description = "Postmortem CI failure analyzer: deterministic phase attribution plus one LLM explanation. Read-only, air-gap friendly."
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "typer>=0.12",
     "pydantic>=2.5",

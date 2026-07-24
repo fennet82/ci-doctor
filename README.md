@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/site/public/ci-doctor-logo.png" alt="ci-doctor" width="540">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/site/public/ci-doctor-logo-dark.svg">
+    <img src="docs/site/public/ci-doctor-logo.png" alt="ci-doctor" width="540">
+  </picture>
 </p>
 
 <p align="center">
@@ -213,4 +216,4 @@ Dockerfile
 
 ## License
 
-No license file is included yet — add a `LICENSE` before distributing externally.
+[MIT](LICENSE) © Elad Cohen

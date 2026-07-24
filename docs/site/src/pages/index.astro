@@ -18,9 +18,8 @@ ci-doctor analyze --from-file failing-job.log
 ci-doctor analyze "$CI_PIPELINE_ID"`;
 ---
 <Base title="Overview">
-  <div class="logo-card">
-    <img class="hero-logo" src="/ci-doctor-logo.svg" alt="ci-doctor — root-cause analysis for CI/CD" />
-  </div>
+  <img class="hero-logo light" src="/ci-doctor-logo.svg" alt="ci-doctor — root-cause analysis for CI/CD" />
+  <img class="hero-logo dark" src="/ci-doctor-logo-dark.svg" alt="ci-doctor — root-cause analysis for CI/CD" />
   <p class="pill">read-only · air-gap friendly · GitLab + GitHub</p>
   <h1>Know <em>why</em> your pipeline failed.</h1>
   <p class="lead">
@@ -78,13 +77,11 @@ ci-doctor analyze "$CI_PIPELINE_ID"`;
 </Base>
 
 <style>
-  .logo-card {
-    display: inline-block;
-    background: #ffffff;
-    padding: 1.15rem 1.6rem;
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    margin: 0 0 1.75rem;
+  .hero-logo { width: 100%; max-width: 460px; height: auto; margin: 0 0 1.75rem; }
+  .hero-logo.light { display: block; }
+  .hero-logo.dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    .hero-logo.light { display: none; }
+    .hero-logo.dark { display: block; }
   }
-  .hero-logo { display: block; width: 100%; max-width: 430px; height: auto; }
 </style>
