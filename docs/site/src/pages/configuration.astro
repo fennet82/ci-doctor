@@ -1,0 +1,102 @@
+---
+import { Code } from 'astro:components';
+import Base from '../layouts/Base.astro';
+
+const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags`;
+
+const envExample = `# Nested keys use a double underscore:
+export CI_DOCTOR_LLM__MODEL="qwen2.5-coder:32b"
+export CI_DOCTOR_LLM__API_BASE="http://vllm.internal:8000/v1"
+export CI_DOCTOR_PROVIDER="github"
+
+# Secret-looking single-underscore vars (e.g. CI_DOCTOR_GITLAB_TOKEN) are
+# referenced by NAME (token_env) and ignored by the config loader.`;
+
+const full = `# .ci-doctor.yml — every knob, with defaults shown.
+provider: gitlab                 # gitlab | github
+
+gitlab:
+  base_url: https://gitlab.internal.example.com   # REQUIRED — no default host
+  api_version: v4
+  token_env: CI_DOCTOR_GITLAB_TOKEN
+  token_file: null               # e.g. /run/secrets/gitlab_token (wins over token_env)
+  ca_bundle: null                # path to a custom/internal CA bundle
+  verify_ssl: true
+  timeout_seconds: 30
+
+github:                          # used when provider: github
+  base_url: https://api.github.com     # REQUIRED — or a GHE base, e.g. https://ghe/api/v3
+  token_env: CI_DOCTOR_GITHUB_TOKEN
+  token_file: null
+  ca_bundle: null
+  verify_ssl: true
+  timeout_seconds: 30
+
+llm:
+  enabled: true                  # false => deterministic-only report
+  model: null                    # any model string, e.g. "qwen2.5-coder:32b"
+  api_base: null                 # any OpenAI-compatible endpoint
+  api_key_env: null              # optional; local servers often need none
+  ca_bundle: null                # LLM endpoint's own CA, independent of the provider's
+  max_input_tokens: 12000
+  temperature: 0.1
+  timeout_seconds: 120
+
+analysis:
+  include_allowed_failures: false   # allow_failure jobs are noise by default
+  max_jobs_analyzed: 10
+  skip_llm_for: [no_runner, missing_dependency, cancelled]  # fully-determined -> templated
+  known_flaky_tests: []             # substrings that short-circuit to likely_flaky
+
+phases:                          # section/step name -> phase (merged onto the shipped map)
+  my_custom_deploy_section: script
+
+extraction:
+  tail_lines: 120
+  matchers:                      # anchored windows; higher priority survives budget pressure
+    - id: pytest
+      start: '^=+ FAILURES =+'
+      end: '^=+ short test summary'
+      priority: 90
+    - id: generic_error
+      pattern: '^(ERROR|FATAL)\\b'
+      before: 5
+      after: 20
+      priority: 50
+
+denoise:
+  collapse_carriage_returns: true   # collapse \\r progress bars to their final state
+  dedupe_repeats: true              # repeated lines -> "<line>  (×47)"
+  noise_patterns:
+    - '^\\s*$'
+
+output:
+  terminal: true
+  markdown_path: report.md
+  json_path: report.json
+  mr_note: false                 # post/update a note on the MR/PR (needs a live pipeline)
+
+redaction:
+  enabled: true
+  extra_patterns: []             # additional regexes to scrub`;
+---
+<Base title="Configuration">
+  <h1>Configuration</h1>
+  <p class="lead">One layered, pydantic-validated config. Unknown keys are an error, not a silent typo.</p>
+
+  <h2>How layers combine</h2>
+  <Code code={layering} lang="text" theme="github-dark" />
+  <p>Mappings deep-merge; lists and scalars replace. Point at a specific file with <code>--config path/to/.ci-doctor.yml</code>.</p>
+
+  <h2>Environment variables</h2>
+  <Code code={envExample} lang="bash" theme="github-dark" />
+
+  <h2>Full reference</h2>
+  <p>Drop a <code>.ci-doctor.yml</code> at your repo root. Everything below is optional except the provider <code>base_url</code>.</p>
+  <Code code={full} lang="yaml" theme="github-dark" />
+
+  <div class="note">
+    <strong>base_url is never defaulted to a host.</strong> It must be set explicitly — a hardcoded
+    <code>gitlab.com</code> is a silent breakage waiting to happen in a self-hosted, air-gapped environment.
+  </div>
+</Base>

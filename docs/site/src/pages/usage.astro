@@ -1,0 +1,72 @@
+---
+import { Code } from 'astro:components';
+import Base from '../layouts/Base.astro';
+
+const cli = `ci-doctor analyze [RUN_ID] [OPTIONS]
+
+Arguments:
+  RUN_ID                 Pipeline/run id. Omit when using --from-file.
+
+Options:
+  --from-file PATH       Replay a raw job log offline (no network, no LLM).
+  --job-id TEXT          Analyze a single job id.
+  --config PATH          Path to .ci-doctor.yml.
+  --no-color             Disable coloured terminal output (also honours NO_COLOR).
+  -v, --verbose          Enable debug logging.
+  --version              Show version and exit.`;
+
+const deterministic = `# Deterministic report, no model required:
+ci-doctor analyze --config .ci-doctor.yml "$CI_PIPELINE_ID"
+#   with llm.enabled: false (or llm.model/api_base unset)
+
+# It prints the verdict, writes report.md + report.json, and (if configured
+# and confidence >= medium) posts/updates one idempotent MR/PR note.`;
+
+const verbose = `ci-doctor analyze -v --from-file failing-job.log
+
+ci-doctor [DEBUG] provider=gitlab from_file=failing-job.log ...
+ci-doctor [DEBUG] job failing-job: 6 top-level sections
+ci-doctor [DEBUG] job failing-job: attribution phase=script reason=script_failure rule=trailer_exit_code confidence=high
+ci-doctor [DEBUG] blamed phase script: denoise 812->190, extract ->140, fit ->140 lines (truncated=False)
+ci-doctor [DEBUG] LLM disabled/unconfigured -> deterministic report`;
+
+const output = `╭─ ci-doctor ─────────────────────────────────────────────────╮
+│ build failed in the script phase (script_failure).          │
+│ phase=script  category=test  confidence=high                │
+╰─────────────────────────────────────────────────────────────╯
+Root cause
+  test_add asserted 1 == 2
+Evidence
+  ╭─ script ────────────────────────╮
+  │ E   assert 1 == 2               │
+  ╰─────────────────────────────────╯
+Remediation
+  1. Inspect the failing assertion in tests/test_math.py`;
+---
+<Base title="Usage">
+  <h1>Usage</h1>
+  <p class="lead">One command, <code>analyze</code>. It always exits 0.</p>
+
+  <h2>Command line</h2>
+  <Code code={cli} lang="text" theme="github-dark" />
+
+  <h2>What you get</h2>
+  <ul class="tight">
+    <li><strong>Terminal report</strong> — readable in the job log, collapsible inside GitLab CI, colour-aware.</li>
+    <li><strong><code>report.md</code> + <code>report.json</code></strong> — job artifacts. The JSON includes a self-contained <code>handoff_prompt</code> you can paste into a coding agent to perform the fix.</li>
+    <li><strong>MR/PR note</strong> — one idempotent comment, updated in place, only when <code>output.mr_note: true</code> and confidence is medium or high.</li>
+  </ul>
+  <Code code={output} lang="text" theme="github-dark" />
+
+  <h2>Deterministic mode (no LLM)</h2>
+  <Code code={deterministic} lang="bash" theme="github-dark" />
+
+  <h2>Debugging with <code>--verbose</code></h2>
+  <p>Turn on debug logs across the whole pipeline (or set <code>CI_DOCTOR_LOG_LEVEL=DEBUG</code>):</p>
+  <Code code={verbose} lang="text" theme="github-dark" />
+
+  <div class="note">
+    <strong>Offline replay.</strong> <code>--from-file</code> runs the full pipeline against a captured
+    log with zero network and zero LLM — ideal for testing your config or reproducing an attribution.
+  </div>
+</Base>

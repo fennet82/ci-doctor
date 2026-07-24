@@ -1,0 +1,52 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = 'Postmortem CI failure analyzer — deterministic phase attribution plus an optional LLM explanation.' } = Astro.props;
+
+const links = [
+  { href: '/', label: 'Overview' },
+  { href: '/requirements/', label: 'Requirements' },
+  { href: '/configuration/', label: 'Configuration' },
+  { href: '/usage/', label: 'Usage' },
+  { href: '/cicd/', label: 'CI/CD Examples' },
+];
+const here = Astro.url.pathname.replace(/\/+$/, '') || '/';
+const isActive = (href: string) => (href === '/' ? here === '/' : here.startsWith(href.replace(/\/+$/, '')));
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} · ci-doctor</title>
+    <meta name="description" content={description} />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav">
+        <a class="brand" href="/">
+          <img src="/favicon.svg" alt="" />
+          <span>ci-doctor</span>
+        </a>
+        <div class="nav-links">
+          {links.map((l) => (
+            <a href={l.href} class={isActive(l.href) ? 'active' : ''}>{l.label}</a>
+          ))}
+        </div>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="inner">
+        ci-doctor — read-only CI postmortem. It never edits code and always exits 0.
+      </div>
+    </footer>
+  </body>
+</html>

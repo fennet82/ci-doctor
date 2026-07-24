@@ -22,6 +22,15 @@ All six milestones complete · 66 tests · no network, no LLM in the suite · `g
 
 > **Note:** the plan named `litellm`; ci-doctor uses the lighter `openai` SDK instead because litellm can pull `tiktoken`, which downloads vocab at runtime (breaks the air-gap rule). The `LLMClient` port keeps a litellm-backed client a drop-in for hosted multi-provider use.
 
+## Docs
+
+A full documentation site (overview, requirements, configuration, usage, CI/CD
+examples) lives in [`docs/site/`](docs/site/) — built with Astro:
+
+```sh
+cd docs/site && npm install && npm run dev   # or: npm run build -> dist/
+```
+
 ## Develop
 
 ```sh

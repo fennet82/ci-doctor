@@ -1,0 +1,75 @@
+---
+import { Code } from 'astro:components';
+import Base from '../layouts/Base.astro';
+
+const install = `# with uv (from a checkout)
+uv sync
+
+# or pip
+pip install ci-doctor
+
+# or the self-contained image
+docker run --rm ci-doctor:latest --version`;
+
+const tryIt = `# Replay a captured log offline — no network, no LLM:
+ci-doctor analyze --from-file failing-job.log
+
+# Against a live pipeline (reads $CI_PIPELINE_ID etc. in CI):
+ci-doctor analyze "$CI_PIPELINE_ID"`;
+---
+<Base title="Overview">
+  <p class="pill">read-only · air-gap friendly · GitLab + GitHub</p>
+  <h1>Know <em>why</em> your pipeline failed.</h1>
+  <p class="lead">
+    ci-doctor is a postmortem CI step that runs only when a pipeline fails, pulls the
+    failed jobs' logs, works out where and why they broke, and emits a structured report —
+    to the job log, to <code>report.md</code>/<code>report.json</code>, and optionally as a
+    single idempotent note on the merge/pull request.
+  </p>
+
+  <div class="btn-row">
+    <a class="btn primary" href="/usage/">Get started</a>
+    <a class="btn" href="/cicd/">CI/CD examples</a>
+    <a class="btn" href="/configuration/">Configuration</a>
+  </div>
+
+  <h2>The core idea</h2>
+  <p>
+    <strong>Deterministic code decides <em>where</em> the job failed; the LLM only explains <em>why</em>.</strong>
+    Phase attribution is a pure function of job metadata and log structure, computed before any
+    model is called — so a loud, non-fatal cache-restore warning can never get blamed over the
+    real <code>exit code 1</code> in your script. If the classifier is wrong, that's a bug with a
+    failing test, not a prompt to tune.
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Never masks the failure</h3>
+      <p>Read-only and always exits 0 — it can't change your pipeline's status or hide the real error.</p>
+    </div>
+    <div class="card">
+      <h3>Works with no LLM</h3>
+      <p>Deterministic report out of the box: phase, reason, terminal command, evidence, remediation.</p>
+    </div>
+    <div class="card">
+      <h3>Bring your own model</h3>
+      <p>Any OpenAI-compatible endpoint via <code>api_base</code> — Ollama, vLLM, llama.cpp, an internal gateway.</p>
+    </div>
+    <div class="card">
+      <h3>Air-gapped</h3>
+      <p>No runtime downloads, no telemetry, no hardcoded hosts. Ship as a Docker image or offline wheels.</p>
+    </div>
+  </div>
+
+  <h2>Install</h2>
+  <Code code={install} lang="bash" theme="github-dark" />
+
+  <h2>Try it</h2>
+  <Code code={tryIt} lang="bash" theme="github-dark" />
+
+  <div class="note">
+    New here? <a href="/requirements/">Requirements</a> covers what it needs, then
+    <a href="/configuration/">Configuration</a> and <a href="/cicd/">CI/CD Examples</a> get it
+    running in your pipeline.
+  </div>
+</Base>

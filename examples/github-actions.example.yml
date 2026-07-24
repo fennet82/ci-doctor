@@ -1,0 +1,36 @@
+# .github/workflows/ci-doctor.yml
+# Explains failures of your "CI" workflow. Read-only; always exits 0.
+name: ci-doctor
+on:
+  workflow_run:
+    workflows: ["CI"]            # the workflow whose failures you want explained
+    types: [completed]
+
+jobs:
+  explain:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write       # only needed if you enable PR notes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - name: Analyze the failed run
+        env:
+          CI_DOCTOR_PROVIDER: github
+          CI_DOCTOR_GITHUB__BASE_URL: https://api.github.com
+          CI_DOCTOR_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # Optional LLM (any OpenAI-compatible endpoint):
+          # CI_DOCTOR_LLM__MODEL: qwen2.5-coder:32b
+          # CI_DOCTOR_LLM__API_BASE: http://vllm.internal:8000/v1
+        run: uv run ci-doctor analyze "${{ github.event.workflow_run.id }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-doctor-report
+          path: |
+            report.md
+            report.json
