@@ -18,6 +18,9 @@ ci-doctor analyze --from-file failing-job.log
 ci-doctor analyze "$CI_PIPELINE_ID"`;
 ---
 <Base title="Overview">
+  <div class="logo-card">
+    <img class="hero-logo" src="/ci-doctor-logo.svg" alt="ci-doctor — root-cause analysis for CI/CD" />
+  </div>
   <p class="pill">read-only · air-gap friendly · GitLab + GitHub</p>
   <h1>Know <em>why</em> your pipeline failed.</h1>
   <p class="lead">
@@ -73,3 +76,15 @@ ci-doctor analyze "$CI_PIPELINE_ID"`;
     running in your pipeline.
   </div>
 </Base>
+
+<style>
+  .logo-card {
+    display: inline-block;
+    background: #ffffff;
+    padding: 1.15rem 1.6rem;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    margin: 0 0 1.75rem;
+  }
+  .hero-logo { display: block; width: 100%; max-width: 430px; height: auto; }
+</style>

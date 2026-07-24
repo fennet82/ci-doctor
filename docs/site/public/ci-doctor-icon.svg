@@ -1,0 +1,30 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="badgeFill" cx="35%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#153A52"/>
+      <stop offset="100%" stop-color="#0A2030"/>
+    </radialGradient>
+  </defs>
+
+  <!-- badge -->
+  <circle cx="100" cy="100" r="94" fill="url(#badgeFill)"/>
+  <circle cx="100" cy="100" r="94" fill="none" stroke="#2DD4C4" stroke-opacity="0.28" stroke-width="2"/>
+
+  <!-- pipeline baseline, pre-spike -->
+  <path d="M36,108 L60,108" fill="none" stroke="#7C93A3" stroke-width="6" stroke-linecap="round"/>
+  <path d="M60,108 L76,108" fill="none" stroke="#7C93A3" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- diagnostic spike (root cause found) -->
+  <path d="M76,108 L86,64 L96,150 L108,108" fill="none" stroke="#FF6B57" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- pipeline baseline, post-spike -->
+  <path d="M108,108 L134,108" fill="none" stroke="#7C93A3" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- resolution checkmark -->
+  <path d="M134,108 L146,122 L172,84" fill="none" stroke="#1FB8A6" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- stage nodes -->
+  <circle cx="60" cy="108" r="6.5" fill="#1FB8A6"/>
+  <circle cx="86" cy="64" r="7.5" fill="#FF6B57" stroke="#0A2030" stroke-width="3"/>
+  <circle cx="134" cy="108" r="6.5" fill="#1FB8A6"/>
+</svg>

@@ -1,48 +1,216 @@
-# ci-doctor
+<p align="center">
+  <img src="docs/site/public/ci-doctor-logo.png" alt="ci-doctor" width="540">
+</p>
 
-A postmortem CI step that runs **only when a pipeline fails**, works out *where*
-and *why* it broke, and emits a structured report. Read-only: it never edits
-code, never opens MRs, and **always exits 0** so it can't mask the real failure.
+<p align="center">
+  <strong>Root-cause analysis for CI/CD.</strong><br>
+  A postmortem step that runs when a pipeline fails, works out <em>where</em> and <em>why</em> it broke,
+  and emits a structured report — without ever touching your code.
+</p>
 
-Central principle: **deterministic code decides *where* the job failed; the LLM
-only explains *why*.** Phase attribution is a pure function of job metadata and
-log structure, computed before any LLM call. See [docs/PLAN.md](docs/PLAN.md).
+<p align="center">
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Providers: GitLab | GitHub" src="https://img.shields.io/badge/providers-GitLab%20%7C%20GitHub-fc6d26">
+  <img alt="Read-only, always exit 0" src="https://img.shields.io/badge/read--only-always%20exit%200-2dd4bf">
+  <img alt="LLM: bring your own (optional)" src="https://img.shields.io/badge/LLM-bring%20your%20own%20·%20optional-1f6feb">
+</p>
 
-## Status
+---
 
-- **M0 — skeleton** ✅ CLI, layered config, domain model, ports, `--from-file` replay. No network, no LLM.
-- **M1 — GitLab acquisition** ✅ python-gitlab adapter (self-hosted base_url/CA/proxy/token_file, version detect, empty-log handling), job selection, air-gap network guard in tests.
-- **M2 — segmenter + classifier** ✅ section parsing (nesting, preamble/trailer), config phase-map, the full precedence ladder + WARNING-never-fatal rule, golden-file fixture suite (incl. the noisy-log regression). Useful with no LLM: `--from-file` prints phase/reason/rule.
-- **M3 — denoise + extract + budget** ✅ ANSI/CR/dedup/noise denoising (>70% cut on noisy logs, anchors retained), tail + anchored-window extraction with visible elision, token budgeting; `build_bundle` assembles the evidence the LLM will consume.
-- **M4 — LLM + structured output + redaction** ✅ pluggable backends (`openai` / `litellm` / `anthropic` / `claude_code`, selected by `llm.backend`) behind one port, JSON parse + pydantic validation + one repair retry, deterministic report when LLM disabled/unconfigured/unreachable, twice-run redaction (prompt + report) with a planted-secret round-trip test. `llm.enabled: false` is a first-class mode.
-- **M5 — render + deliver** ✅ rich terminal (NO_COLOR/non-TTY/`--no-color`, collapsible inside GitLab CI), `report.md` + `report.json` artifacts, idempotent MR note (marker-based update, gated on confidence ≥ medium). Ships `Dockerfile`, `examples/gitlab-ci.example.yml`, `docs/OFFLINE.md`, and a full-pipeline no-network test.
-- **M6 — GitHub adapter** ✅ `##[group]`/`##[endgroup]` segmenter (canonical section names), conclusion→reason mapping, REST provider mapping into the shared domain model — added with **zero `core/` edits** (the abstraction audit). Selected via `provider: github`.
+When a pipeline fails, the logs are long and loud. An LLM handed the whole trace will
+confidently blame the runner or a missing cache — because that text is alarming — even
+when the real failure was an `exit code 1` three sections down. ci-doctor fixes that with
+one rule:
 
-All six milestones complete · 66 tests · no network, no LLM in the suite · `grep -riE 'gitlab|github' core/` clean.
+> **Deterministic code decides *where* the job failed. The LLM only explains *why*.**
 
-> **LLM backends** (`llm.backend`): `openai` (default, any OpenAI-compatible `api_base` — base install, no runtime downloads) · `litellm` (any litellm provider — `pip install ci-doctor[litellm]`; may pull `tiktoken`, so avoid in strict air-gap) · `anthropic` (official SDK, defaults to `claude-opus-4-8` — `ci-doctor[anthropic]`) · `claude_code` (the local `claude` CLI). All behind one `LLMClient` port.
+Phase attribution is a pure function of job metadata and log structure, computed **before**
+any model is called. A loud, non-fatal `WARNING:` can never outrank the actual failure. If
+the classifier is wrong, that's a bug with a failing test — not a prompt to tune.
 
-## Docs
+## Features
 
-A full documentation site (overview, requirements, configuration, usage, CI/CD
-examples) lives in [`docs/site/`](docs/site/) — built with Astro:
+- **Deterministic phase attribution** — a pure, fully-tested classifier decides where a job
+  broke (`provision` · `prepare` · `fetch` · `script` · `post`) from metadata and log
+  structure. Non-fatal `WARNING:` lines can never be blamed.
+- **Read-only and safe** — never edits code, commits, or opens MRs, and **always exits 0**,
+  so it can't change your pipeline's status or hide the real failure.
+- **Useful with no LLM** — ships a deterministic report out of the box: phase, reason,
+  terminal command, evidence excerpt, and templated remediation.
+- **Bring-your-own model** — optional LLM step via `openai` (any OpenAI-compatible endpoint),
+  `litellm`, `anthropic`, or the local `claude` CLI, selected by config.
+- **GitLab & GitHub** — one provider-neutral core; the GitHub adapter was added with *zero*
+  changes to core.
+- **Air-gap friendly** — no telemetry, no update checks, no runtime downloads; ship as a
+  self-contained Docker image or an offline wheel bundle.
+- **Secret redaction** — scrubs secrets from the prompt *and* the report (round-trip tested).
+- **Structured output** — a rich terminal report, `report.md` + `report.json` artifacts (with
+  a self-contained `handoff_prompt` you can paste into a coding agent), and one idempotent
+  MR/PR note.
 
-```sh
-cd docs/site && npm install && npm run dev   # or: npm run build -> dist/
+## How it works
+
+```
+acquire → segment → attribute → denoise → extract → budget → (LLM) → render / deliver
+          └── deterministic: decides WHERE it failed ──┘        └── explains WHY ──┘
 ```
 
-## Develop
+1. **Acquire** the failed jobs and their logs (a missing log is valid data — the
+   "never got a runner" case).
+2. **Segment** the trace into sections (GitLab `section_*` markers / GitHub `##[group]`).
+3. **Attribute** the failure to a phase — the pure classifier, first-match-wins precedence
+   ladder with a `WARNING:`-is-never-fatal rule.
+4. **Denoise / extract / budget** the blamed section into a small, high-signal evidence slice
+   (ANSI/CR/dedup denoising, anchored windows, token budgeting — every truncation is visible).
+5. **LLM (optional)** explains the cause *within* the already-decided phase, returning a
+   validated JSON report. Disabled or unreachable → deterministic report instead.
+6. **Render / deliver** to the terminal, `report.md`/`report.json`, and an idempotent MR/PR note.
+
+## Install
 
 ```sh
-uv sync            # create venv, install deps + dev tools
-uv run pytest      # run the suite
+git clone https://github.com/fennet82/ci-doctor
+cd ci-doctor
+uv sync                       # or: pip install .
+
+# optional LLM backends:
+uv sync --extra anthropic     # or: pip install '.[anthropic]'  /  '.[litellm]'  /  '.[all]'
 ```
 
-## Try it (offline replay)
+Or build the self-contained image:
 
 ```sh
-uv run ci-doctor analyze --from-file tests/fixtures/sample.log
+docker build -t ci-doctor .
 ```
 
-M0 loads the log into the domain model and prints a summary. The same
-`--from-file` path grows real segmentation/attribution/analysis as milestones land.
+## Quickstart
+
+```sh
+# Replay a captured log offline — no network, no LLM:
+uv run ci-doctor analyze --from-file failing-job.log
+
+# Against a live pipeline (reads $CI_PIPELINE_ID etc. inside CI):
+uv run ci-doctor analyze "$CI_PIPELINE_ID"
+```
+
+```
+ci-doctor analyze [RUN_ID] [OPTIONS]
+
+  --from-file PATH   Replay a raw job log offline (no network, no LLM).
+  --job-id TEXT      Analyze a single job id.
+  --config PATH      Path to .ci-doctor.yml.
+  --no-color         Disable coloured output (also honours NO_COLOR).
+  -v, --verbose      Enable debug logging.
+  --version          Show version and exit.
+```
+
+## Configuration
+
+Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_DOCTOR_*` env
+< CLI flags. Unknown keys are an error. Minimal config:
+
+```yaml
+provider: gitlab
+
+gitlab:
+  base_url: https://gitlab.com        # default; override for self-hosted
+  token_env: CI_DOCTOR_GITLAB_TOKEN   # or gitlab.token_file for a secret mount
+
+llm:
+  enabled: true                       # false => deterministic-only report
+  backend: openai                     # openai | litellm | anthropic | claude_code
+  model: qwen2.5-coder:32b
+  api_base: http://vllm.internal:8000/v1
+```
+
+Nested env vars use `__`: `CI_DOCTOR_LLM__MODEL=…`. See the full reference in
+[docs/site](docs/site) or [docs/PLAN.md §9](docs/PLAN.md).
+
+### LLM backends
+
+| `llm.backend` | Calls | Needs |
+|---|---|---|
+| `openai` *(default)* | any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, gateway) | `model` + `api_base` — base install |
+| `litellm` | any [litellm](https://docs.litellm.ai/) provider | `model`; `pip install '.[litellm]'` |
+| `anthropic` | Claude via the official SDK (defaults to `claude-opus-4-8`) | API key / `ant` profile; `'.[anthropic]'` |
+| `claude_code` | the local `claude` CLI, headless | `claude` on PATH |
+
+The LLM step is optional throughout — when it's disabled, unconfigured, or unreachable,
+ci-doctor emits the deterministic report instead of failing.
+
+## Use it in CI
+
+**GitLab** (`.gitlab-ci.yml`) — runs only on failure, always exits 0:
+
+```yaml
+ci-doctor:
+  stage: .post
+  image: registry.internal.example.com/ci-doctor:latest
+  rules:
+    - when: on_failure
+  allow_failure: true
+  variables:
+    CI_DOCTOR_GITLAB_TOKEN: "$CI_DOCTOR_TOKEN"
+  script:
+    - ci-doctor analyze "$CI_PIPELINE_ID"
+  artifacts:
+    when: always
+    paths: [report.md, report.json]
+```
+
+**GitHub Actions** — triggered on a failed workflow run. Full examples in
+[`examples/`](examples/).
+
+## Air-gapped / offline
+
+ci-doctor makes no network calls except to the GitLab/GitHub and LLM endpoints you
+configure. Build once where there is internet, then ship inside — a Docker image, or an
+offline wheel bundle (`pip install --no-index --find-links ./wheels ci-doctor`). See
+[docs/OFFLINE.md](docs/OFFLINE.md).
+
+## Documentation
+
+A full documentation site (overview, requirements, configuration, usage, CI/CD examples)
+lives in [`docs/site/`](docs/site) — built with Astro:
+
+```sh
+cd docs/site && npm install && npm run dev    # or: npm run build -> dist/
+```
+
+The original design spec is [docs/PLAN.md](docs/PLAN.md).
+
+## Development
+
+```sh
+uv sync
+uv run pytest        # 77 tests, no network, no LLM
+```
+
+```
+ci_doctor/
+  cli.py            typer entrypoint (always exits 0)
+  config/           pydantic schema + defaults.yml + layered loader
+  core/             provider-neutral: models, ports, attribution (pure), denoise,
+                    extract, budget, redact, analyze
+  llm/              Report schema, prompt templates, backends (openai/litellm/anthropic/claude_code)
+  render/           terminal (rich), markdown, json
+  providers/
+    gitlab/         python-gitlab adapter + segmenter + reasons
+    github/         GitHub Actions adapter + segmenter + reasons
+tests/              fixtures + golden-file attribution suite
+docs/site/          Astro documentation site
+examples/           .gitlab-ci.yml + GitHub Actions snippets
+Dockerfile
+```
+
+### Design guardrails
+
+- The LLM never selects the failure phase — that lives in `core/attribution.py`.
+- `core/` depends on no provider or vendor SDK — `grep -riE 'gitlab|github|openai' ci_doctor/core/`
+  is clean. Adding the GitHub adapter required no core changes.
+- `attribution.py` is a pure function — no I/O, network, or clock.
+- Always exits 0 · never emits unredacted log content · every truncation is visible.
+
+## License
+
+No license file is included yet — add a `LICENSE` before distributing externally.
