@@ -24,13 +24,47 @@ phases:
   cleanup_file_variables: post
 
 extraction:
-  # Starter matchers. The full catalogue (jest, go test, maven/gradle, tsc, npm,
-  # docker, OOM) lands in M3 alongside the extractor that consumes them.
+  # Anchored matchers, highest priority survives budget pressure. `start`/`end`
+  # capture a block; `pattern` captures a single line plus before/after context.
   matchers:
     - id: pytest
       start: '^=+ FAILURES =+'
       end: '^=+ short test summary'
       priority: 90
+    - id: jest
+      start: '^\s*●|^FAIL '
+      end: '^Tests:'
+      priority: 90
+    - id: go_test
+      pattern: '^--- FAIL'
+      before: 2
+      after: 15
+      priority: 85
+    - id: maven_gradle
+      pattern: '\[ERROR\]|FAILURE: Build failed|BUILD FAILURE'
+      before: 3
+      after: 15
+      priority: 80
+    - id: tsc
+      pattern: 'error TS\d+:'
+      before: 1
+      after: 3
+      priority: 80
+    - id: npm
+      pattern: 'npm ERR!'
+      before: 2
+      after: 10
+      priority: 75
+    - id: docker_build
+      pattern: 'failed to solve|executor failed running'
+      before: 3
+      after: 8
+      priority: 75
+    - id: oom
+      pattern: 'exit code 137|Killed|Out of memory'
+      before: 5
+      after: 2
+      priority: 95
     - id: generic_error
       pattern: '^(ERROR|FATAL)\b'
       before: 5
