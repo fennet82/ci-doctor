@@ -11,7 +11,8 @@ log structure, computed before any LLM call. See [docs/PLAN.md](docs/PLAN.md).
 ## Status
 
 - **M0 — skeleton** ✅ CLI, layered config, domain model, ports, `--from-file` replay. No network, no LLM.
-- M1 GitLab acquisition · M2 segmenter + classifier · M3 denoise/extract/budget · M4 LLM + redaction · M5 render/deliver · M6 GitHub adapter — not started.
+- **M1 — GitLab acquisition** ✅ python-gitlab adapter (self-hosted base_url/CA/proxy/token_file, version detect, empty-log handling), job selection, air-gap network guard in tests.
+- M2 segmenter + classifier · M3 denoise/extract/budget · M4 LLM + redaction · M5 render/deliver · M6 GitHub adapter — not started.
 
 ## Develop
 

@@ -9,6 +9,7 @@ catches everything and always exits 0.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -45,16 +46,39 @@ def analyze(
     job_id: str = typer.Option(None, "--job-id", help="Analyze a single job id."),
     config_path: Path = typer.Option(None, "--config", help="Path to .ci-doctor.yml."),
 ) -> None:
-    load_config(repo_config=config_path)  # validates config even when unused in M0
+    cfg = load_config(repo_config=config_path)
 
     if from_file is not None:
         _summarize(_run_from_file(from_file))
         return
 
-    typer.echo(
-        "ci-doctor M0 skeleton: only --from-file is wired up. GitLab acquisition lands in M1.",
-        err=True,
-    )
+    if run_id is not None:
+        _analyze_live(run_id, cfg, job_id)
+        return
+
+    typer.echo("nothing to do: pass a pipeline id, or --from-file to replay a log.", err=True)
+
+
+def _analyze_live(run_id: str, cfg, job_id: str | None) -> None:
+    # Import the adapter lazily so `core` and the offline path never pull a provider in.
+    from ci_doctor.core.select import select_failed_jobs
+    from ci_doctor.providers.gitlab.provider import GitLabProvider
+
+    if cfg.provider != "gitlab":
+        raise ValueError(f"unsupported provider: {cfg.provider}")
+
+    provider = GitLabProvider(cfg)
+    run = provider.fetch_run(run_id)
+    jobs = select_failed_jobs(run.jobs, cfg.analysis.include_allowed_failures)
+    if job_id is not None:
+        jobs = [j for j in jobs if j.id == job_id]
+    if not jobs:
+        typer.echo("no failed jobs to analyze.")
+        return
+
+    for job in jobs[: cfg.analysis.max_jobs_analyzed]:
+        job.log = provider.fetch_job_log(job)
+        _summarize_job(job)
 
 
 def _run_from_file(path: Path) -> Run:
@@ -67,11 +91,16 @@ def _run_from_file(path: Path) -> Run:
 
 def _summarize(run: Run) -> None:
     for job in run.jobs:
-        lines = 0 if job.log is None else job.log.count("\n") + 1
-        typer.echo(f"job={job.name} status={job.status} reason={job.failure_reason} log_lines={lines}")
+        _summarize_job(job)
+
+
+def _summarize_job(job: Job) -> None:
+    lines = 0 if job.log is None else job.log.count("\n") + 1
+    typer.echo(f"job={job.name} status={job.status} reason={job.failure_reason} log_lines={lines}")
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="ci-doctor: %(message)s")
     try:
         app()
     except SystemExit:
