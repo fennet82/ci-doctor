@@ -15,7 +15,7 @@ from pathlib import Path
 import gitlab
 
 from ci_doctor.config.schema import Config
-from ci_doctor.core.models import FailureReason, Job, RunnerInfo, Run
+from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, RunnerInfo, Run
 from ci_doctor.core.ports import CIProvider
 from ci_doctor.providers.gitlab.reasons import to_failure_reason
 
@@ -81,9 +81,16 @@ class GitLabProvider(CIProvider):
             ref=getattr(pipeline, "ref", "") or "",
             sha=getattr(pipeline, "sha", "") or "",
             web_url=getattr(pipeline, "web_url", "") or "",
-            mr=None,  # MR resolution lands in M5 (idempotent note)
+            mr=self._merge_request_ref(),
             jobs=jobs,
         )
+
+    def _merge_request_ref(self) -> MergeRequestRef | None:
+        # Resolve from the predefined CI var — reliable, no guessing from branch/sha.
+        iid = self.environ.get("CI_MERGE_REQUEST_IID")
+        if not iid:
+            return None
+        return MergeRequestRef(iid=iid, project_id=self.environ.get("CI_PROJECT_ID"))
 
     def fetch_job_log(self, job: Job) -> str | None:
         # A missing/empty trace is valid data (the "never got a runner" case), not an error.
@@ -97,8 +104,19 @@ class GitLabProvider(CIProvider):
         text = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
         return text or None
 
-    def post_note(self, mr, body, marker) -> None:
-        raise NotImplementedError("idempotent MR notes land in M5")
+    def post_note(self, mr: MergeRequestRef, body: str, marker: str) -> None:
+        """Idempotent: update our own previous note (found by marker) or create one.
+
+        Nothing spams an MR faster than a bot that can't find its last comment.
+        """
+        mr_obj = self._project().mergerequests.get(int(mr.iid))
+        full = f"{body}\n\n{marker}"
+        for note in mr_obj.notes.list(all=True):
+            if marker in (getattr(note, "body", "") or ""):
+                note.body = full
+                note.save()
+                return
+        mr_obj.notes.create({"body": full})
 
     # --- mapping ----------------------------------------------------------
 

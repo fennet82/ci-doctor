@@ -1,7 +1,8 @@
 """ci-doctor CLI (typer).
 
-M0: only `--from-file` offline replay is wired up. Segment/attribute/analyze come
-online in later milestones and reuse the same `--from-file` path.
+`analyze <pipeline_id>` against live GitLab, or `--from-file` to replay a raw log
+offline. Both run the same pipeline: segment -> classify -> evidence -> report ->
+render/deliver.
 
 Guardrail #3: the analyzer must never change a pipeline's outcome, so `main()`
 catches everything and always exits 0.
@@ -45,22 +46,24 @@ def analyze(
     ),
     job_id: str = typer.Option(None, "--job-id", help="Analyze a single job id."),
     config_path: Path = typer.Option(None, "--config", help="Path to .ci-doctor.yml."),
+    no_color: bool = typer.Option(False, "--no-color", help="Disable coloured terminal output."),
 ) -> None:
     cfg = load_config(repo_config=config_path)
 
+    run = provider = None
     if from_file is not None:
-        for job in _run_from_file(from_file).jobs:
-            _diagnose(job, cfg)
+        results = [_process(job, cfg) for job in _run_from_file(from_file).jobs]
+    elif run_id is not None:
+        run, provider, results = _analyze_live(run_id, cfg, job_id)
+    else:
+        typer.echo("nothing to do: pass a pipeline id, or --from-file to replay a log.", err=True)
         return
 
-    if run_id is not None:
-        _analyze_live(run_id, cfg, job_id)
-        return
-
-    typer.echo("nothing to do: pass a pipeline id, or --from-file to replay a log.", err=True)
+    _deliver(results, cfg, no_color=no_color)
+    _maybe_post_mr(provider, run, results, cfg)
 
 
-def _analyze_live(run_id: str, cfg, job_id: str | None) -> None:
+def _analyze_live(run_id: str, cfg, job_id: str | None):
     # Import the adapter lazily so `core` and the offline path never pull a provider in.
     from ci_doctor.core.select import select_failed_jobs
     from ci_doctor.providers.gitlab.provider import GitLabProvider
@@ -73,13 +76,12 @@ def _analyze_live(run_id: str, cfg, job_id: str | None) -> None:
     jobs = select_failed_jobs(run.jobs, cfg.analysis.include_allowed_failures)
     if job_id is not None:
         jobs = [j for j in jobs if j.id == job_id]
-    if not jobs:
-        typer.echo("no failed jobs to analyze.")
-        return
 
+    results = []
     for job in jobs[: cfg.analysis.max_jobs_analyzed]:
         job.log = provider.fetch_job_log(job)
-        _diagnose(job, cfg)
+        results.append(_process(job, cfg))
+    return run, provider, results
 
 
 def _run_from_file(path: Path) -> Run:
@@ -90,12 +92,12 @@ def _run_from_file(path: Path) -> Run:
     return Run(id="local", jobs=[job])
 
 
-def _diagnose(job: Job, cfg) -> None:
+def _process(job: Job, cfg):
     """Segment + classify + assemble evidence + produce the report for one job.
 
     Deterministic when the LLM is disabled/unconfigured; one LLM call otherwise.
     GitLab log format is assumed (the only provider today); a provider-driven
-    segmenter comes with M6. Rich rendering + artifacts + MR note land in M5.
+    segmenter arrives with M6.
     """
     from ci_doctor.core.analyze import build_bundle
     from ci_doctor.core.attribution import attribute
@@ -108,19 +110,49 @@ def _diagnose(job: Job, cfg) -> None:
     attr = attribute(job, job.sections)
     bundle = build_bundle(job, attr, job.sections, cfg)
     report = produce_report(job, attr, bundle, cfg)
+    return job, attr, report
 
-    typer.echo(
-        f"job={job.name} phase={report.failure_phase} category={report.category} "
-        f"confidence={report.confidence} reason={attr.reason} rule={attr.rule_id}"
-    )
-    typer.echo(f"summary: {report.summary}")
-    typer.echo(f"root cause: {report.root_cause}")
-    if report.remediation:
-        typer.echo("remediation:")
-        for step in report.remediation:
-            typer.echo(f"  {step.order}. {step.action}")
-    if attr.secondary_phases:
-        typer.echo(f"secondary (non-causal): {', '.join(str(p) for p in attr.secondary_phases)}")
+
+def _deliver(results, cfg, *, no_color: bool) -> None:
+    import json
+    import os
+
+    from ci_doctor.render.markdown import MarkdownRenderer
+    from ci_doctor.render.terminal import render_terminal
+
+    if not results:
+        typer.echo("no failed jobs to analyze.")
+        return
+
+    reports = [report for *_, report in results]
+    if cfg.output.terminal:
+        wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
+        for report in reports:
+            render_terminal(report, no_color=no_color, wrap_section=wrap)
+
+    md = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
+    Path(cfg.output.markdown_path).write_text(md)
+    Path(cfg.output.json_path).write_text(json.dumps([r.model_dump(mode="json") for r in reports], indent=2))
+    typer.echo(f"wrote {cfg.output.markdown_path} and {cfg.output.json_path}", err=True)
+
+
+def _maybe_post_mr(provider, run, results, cfg) -> None:
+    if not cfg.output.mr_note or provider is None or run is None or run.mr is None:
+        return
+    reports = [report for *_, report in results]
+    if not any(r.confidence in ("medium", "high") for r in reports):  # user's gate
+        typer.echo("MR note skipped: confidence below medium.", err=True)
+        return
+
+    from ci_doctor.render.markdown import MarkdownRenderer
+
+    body = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
+    marker = f"<!-- ci-doctor:pipeline:{run.id} -->"
+    try:
+        provider.post_note(run.mr, body, marker)
+        typer.echo("posted/updated MR note.", err=True)
+    except Exception as exc:  # noqa: BLE001 - delivery must never break the run
+        typer.echo(f"MR note failed (ignored): {exc}", err=True)
 
 
 def main() -> None:

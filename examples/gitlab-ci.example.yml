@@ -1,0 +1,21 @@
+# Add to your .gitlab-ci.yml. Runs only when the pipeline fails, and always exits 0
+# (allow_failure is belt-and-braces) so it can never change the pipeline's outcome.
+ci-doctor:
+  stage: .post
+  image: registry.internal.example.com/ci-doctor:latest
+  rules:
+    - when: on_failure
+  allow_failure: true
+  variables:
+    CI_DOCTOR_GITLAB_TOKEN: "$CI_DOCTOR_TOKEN"      # a read-scoped API token (or use token_file)
+    # Optional LLM (omit for the deterministic report):
+    # CI_DOCTOR_LLM__MODEL: "qwen2.5-coder:32b"
+    # CI_DOCTOR_LLM__API_BASE: "http://vllm.internal:8000/v1"
+  script:
+    - ci-doctor analyze "$CI_PIPELINE_ID"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - report.md
+      - report.json

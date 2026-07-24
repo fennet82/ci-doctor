@@ -19,7 +19,7 @@ from ci_doctor.core.models import FailureReason, Job, Phase, Section
 
 _SYNTHETIC = {"__preamble__", "__trailer__"}
 
-# Conservative error anchors for the structural fallback. The rich matcher
+# Conservative error anchors for the structural fallback. The full matcher
 # catalogue (jest, go, maven, ...) is M3's extractor, not the classifier's job.
 _ERROR_RE = re.compile(r"\b(ERROR|FATAL)\b|Traceback \(most recent call last\)|exit code \d+|npm ERR!")
 
