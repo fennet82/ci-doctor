@@ -1,0 +1,53 @@
+Running with gitlab-runner 16.8.2 (fb8f5c11)
+  on jvm-runner-11 Qp7Zx2Wm, system ID: s_ddeeff001122
+Preparing the "docker" executor
+  Using Docker executor with image maven:3.9-eclipse-temurin-21 ...
+section_start:1736400000:prepare_executor
+Using Docker executor with image maven:3.9-eclipse-temurin-21 ...
+Using docker image sha256:5566778899aa for maven:3.9-eclipse-temurin-21 with digest maven@sha256:9911...
+section_end:1736400013:prepare_executor
+section_start:1736400013:prepare_script
+Preparing environment
+Running on runner-qp7zx2wm-project-31-concurrent-2...
+section_end:1736400014:prepare_script
+section_start:1736400014:get_sources
+Fetching changes with git depth set to 20...
+Checking out e2d19a77 as detached HEAD...
+Skipping Git submodules setup
+section_end:1736400022:get_sources
+section_start:1736400022:restore_cache
+Checking cache for maven-repo-21...
+Successfully extracted cache
+section_end:1736400051:restore_cache
+section_start:1736400051:step_script
+$ mvn -B -T 1C verify
+[INFO] Scanning for projects...
+[INFO] Reactor Build Order:
+[INFO]   payments-core
+[INFO]   payments-api
+[INFO]   payments-integration-tests
+[INFO] Building payments-core 4.7.0
+[INFO] Tests run: 214, Failures: 0, Errors: 0, Skipped: 3
+[INFO] Building payments-api 4.7.0
+[INFO] Tests run: 96, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Building payments-integration-tests 4.7.0
+[INFO] Running com.acme.payments.it.SettlementReconciliationIT
+[INFO] Starting embedded Postgres on port 54993
+[INFO] Seeding 1,200,000 ledger rows...
+[INFO] Waiting for async settlement worker to drain queue...
+[INFO] ... still draining (queue depth 41932)
+[INFO] ... still draining (queue depth 41928)
+[INFO] ... still draining (queue depth 41927)
+[INFO] ... still draining (queue depth 41927)
+[INFO] worker heartbeat ok (lag 0ms), last committed offset 1044912
+[INFO] ... still draining (queue depth 41927)
+[INFO] ... still draining (queue depth 41927)
+[INFO] ... still draining (queue depth 41927)
+[INFO] worker heartbeat ok (lag 0ms), last committed offset 1044912
+[INFO] ... still draining (queue depth 41927)
+[INFO] ... still draining (queue depth 41927)
+[INFO] ... still draining (queue depth 41927)
+[INFO] worker heartbeat ok (lag 0ms), last committed offset 1044912
+[INFO] ... still draining (queue depth 41927)
+[INFO] ... still draining (queue depth 41927)
+ERROR: Job failed: execution took longer than 1h0m0s

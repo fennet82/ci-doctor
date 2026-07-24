@@ -1,0 +1,5 @@
+{
+  "note": "Job timeout while an integration test hangs; step_script left open => phase of the open section = SCRIPT.",
+  "job": {"status": "failed", "failure_reason": "timeout", "raw_failure_reason": "job_execution_timeout"},
+  "expect": {"phase": "script", "reason": "timeout", "rule_id": "reason_timeout_open_section"}
+}

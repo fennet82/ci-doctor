@@ -1,0 +1,5 @@
+{
+  "note": "Upstream compile:assets artifact absent; missing_dependency_failure => FETCH via authoritative metadata.",
+  "job": {"status": "failed", "failure_reason": "missing_dependency", "raw_failure_reason": "missing_dependency_failure"},
+  "expect": {"phase": "fetch", "reason": "missing_dependency", "rule_id": "reason_missing_dependency"}
+}

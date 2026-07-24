@@ -1,0 +1,5 @@
+{
+  "note": "Docker build OOM-killed (cc1plus), trailer 'exit code 137' => SCRIPT phase, infra cause (rule oom_137).",
+  "job": {"status": "failed", "failure_reason": "unknown", "raw_failure_reason": ""},
+  "expect": {"phase": "script", "reason": "runner_system", "rule_id": "oom_137"}
+}

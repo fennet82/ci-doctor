@@ -1,0 +1,5 @@
+{
+  "note": "tsc/vite build fails (exit code 2), script_failure metadata => SCRIPT. The upload WARNING is non-causal.",
+  "job": {"status": "failed", "failure_reason": "script_failure", "raw_failure_reason": "script_failure"},
+  "expect": {"phase": "script", "reason": "script_failure", "rule_id": "script_failure_is_script"}
+}

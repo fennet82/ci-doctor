@@ -1,0 +1,54 @@
+Running with gitlab-runner 16.11.0 (a1b2c3d4)
+  on heavy-builder-02 Mn3Bv6Cx, system ID: s_112233445566
+Preparing the "docker" executor
+  Using Docker executor with image docker:26 ...
+section_start:1736300000:prepare_executor
+Using Docker executor with image docker:26 ...
+Starting service docker:26-dind ...
+Waiting for services to be up and running (timeout 30 seconds)...
+Using docker image sha256:aabb11223344 for docker:26 with digest docker@sha256:beef...
+section_end:1736300021:prepare_executor
+section_start:1736300021:prepare_script
+Preparing environment
+Running on runner-mn3bv6cx-project-9-concurrent-0...
+section_end:1736300022:prepare_script
+section_start:1736300022:get_sources
+Fetching changes...
+Checking out c40a91bb as detached HEAD...
+section_end:1736300030:get_sources
+section_start:1736300030:step_script
+$ docker info >/dev/null
+$ docker build -t registry.internal/app:$CI_COMMIT_SHORT_SHA .
+#5 [build 2/7] RUN apk add --no-cache build-base cmake
+#5 12.4 (1/24) Installing ...
+#5 DONE 18.2s
+#6 [build 3/7] COPY . /src
+#6 DONE 2.1s
+#7 [build 4/7] RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+#7 3.4 -- The CXX compiler identification is GNU 13.2.0
+#7 8.9 -- Configuring done
+#7 9.1 -- Generating done
+#7 DONE 9.3s
+#9 [build 6/7] RUN cmake --build build --parallel 16
+#9 41.7 [ 62%] Building CXX object src/CMakeFiles/engine.dir/tensor.cpp.o
+#9 88.3 [ 74%] Building CXX object src/CMakeFiles/engine.dir/graph.cpp.o
+#9 132.9 c++: fatal error: Killed signal terminated program cc1plus
+#9 132.9 compilation terminated.
+#9 133.0 make[2]: *** [src/CMakeFiles/engine.dir/build.make:118: graph.cpp.o] Error 1
+#9 ERROR: process "/bin/sh -c cmake --build build --parallel 16" did not complete successfully: exit code: 137
+------
+ > [build 6/7] RUN cmake --build build --parallel 16:
+133.0 c++: fatal error: Killed signal terminated program cc1plus
+------
+Dockerfile:19
+ERROR: failed to solve: process "/bin/sh -c cmake --build build --parallel 16" did not complete successfully: exit code: 137
+section_end:1736300171:step_script
+section_start:1736300171:after_script
+Running after_script
+$ docker logout registry.internal
+Removing login credentials for registry.internal
+section_end:1736300173:after_script
+section_start:1736300173:cleanup_file_variables
+Cleaning up project directory and file based variables
+section_end:1736300174:cleanup_file_variables
+ERROR: Job failed: exit code 137

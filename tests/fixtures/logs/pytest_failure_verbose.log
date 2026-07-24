@@ -1,0 +1,65 @@
+Running with gitlab-runner 16.11.0 (a1b2c3d4)
+  on shared-runners-manager-3 xY9kLmNp, system ID: s_1a2b3c4d5e6f
+Preparing the "docker+machine" executor
+  Using Docker executor with image python:3.11-slim ...
+section_start:1735689600:resolve_secrets
+Resolving secrets
+section_end:1735689603:resolve_secrets
+section_start:1735689603:prepare_executor
+Using Docker executor with image python:3.11-slim ...
+Pulling docker image python:3.11-slim ...
+Using docker image sha256:9f8e7d6c5b4a for python:3.11-slim with digest python@sha256:abcd...
+section_end:1735689619:prepare_executor
+section_start:1735689619:prepare_script
+Preparing environment
+Running on runner-xy9klmnp-project-42-concurrent-0 via runner-manager-3...
+section_end:1735689620:prepare_script
+section_start:1735689620:get_sources
+Fetching changes with git depth set to 20...
+Initialized empty Git repository in /builds/team/app/.git/
+Created fresh repository.
+Checking out 9f3a1c2e as detached HEAD...
+Skipping Git submodules setup
+section_end:1735689628:get_sources
+section_start:1735689628:restore_cache
+Checking cache for pip-3.11-default-protected...
+Downloading cache.zip from https://storage.internal/runner/cache/...
+Successfully extracted cache
+section_end:1735689635:restore_cache
+section_start:1735689635:step_script
+Using docker image sha256:9f8e7d6c5b4a for python:3.11-slim ...
+$ python -V
+Python 3.11.9
+$ python -m pip install -e '.[test]' --quiet
+Obtaining file:///builds/team/app
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+Successfully installed app-0.4.2 coverage-7.5.1 pytest-8.2.0 pytest-cov-5.0.0
+$ pytest -q --maxfail=1
+............................F
+=================================== FAILURES ===================================
+________________________________ test_discount ________________________________
+
+    def test_discount():
+        cart = Cart(items=[Item("book", 30_00)])
+>       assert cart.total_with_discount(0.10) == 27_00
+E       assert 3000 == 2700
+E        +  where 3000 = <Cart items=[Item(name='book', cents=3000)]>.total_with_discount(0.1)
+
+tests/test_cart.py:41: AssertionError
+--------------------------- Captured stdout call ---------------------------
+applying discount 0.1 to subtotal 3000
+=========================== short test summary info ============================
+FAILED tests/test_cart.py::test_discount - assert 3000 == 2700
+1 failed, 42 passed in 3.18s
+section_end:1735689701:step_script
+section_start:1735689701:after_script
+Running after_script
+$ ./ci/collect_coverage.sh
+Coverage report written to coverage.xml
+section_end:1735689705:after_script
+section_start:1735689705:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created  id=98812 responseStatus=201 Created
+section_end:1735689709:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

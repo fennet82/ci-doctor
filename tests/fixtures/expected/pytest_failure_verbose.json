@@ -1,0 +1,5 @@
+{
+  "note": "Verbose pytest failure with full prepare/fetch sections; script_failure metadata => SCRIPT.",
+  "job": {"status": "failed", "failure_reason": "script_failure", "raw_failure_reason": "script_failure"},
+  "expect": {"phase": "script", "reason": "script_failure", "rule_id": "script_failure_is_script"}
+}

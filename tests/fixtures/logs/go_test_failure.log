@@ -1,0 +1,52 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on private-runner-07 Zx4Qw8Er, system ID: s_aabbccddeeff
+Preparing the "docker" executor
+  Using Docker executor with image golang:1.22 ...
+section_start:1736200000:prepare_executor
+Using Docker executor with image golang:1.22 ...
+Using docker image sha256:77aa88bb99cc for golang:1.22 with digest golang@sha256:1234...
+section_end:1736200011:prepare_executor
+section_start:1736200011:prepare_script
+Preparing environment
+Running on runner-zx4qw8er-project-15-concurrent-1...
+section_end:1736200012:prepare_script
+section_start:1736200012:get_sources
+Fetching changes with git depth set to 50...
+Checking out 71c0aa3d as detached HEAD...
+section_end:1736200019:get_sources
+section_start:1736200019:restore_cache
+Checking cache for go-mod-1.22...
+Successfully extracted cache
+section_end:1736200025:restore_cache
+section_start:1736200025:step_script
+$ go version
+go version go1.22.3 linux/amd64
+$ go build ./...
+$ go test ./... -count=1
+ok   example.com/svc/internal/config   0.014s
+ok   example.com/svc/internal/store    0.221s
+ok   example.com/svc/internal/telemetry 0.008s
+ok   example.com/svc/internal/httpx     0.052s
+ok   example.com/svc/internal/queue     0.190s
+ok   example.com/svc/internal/auth      0.077s
+--- FAIL: TestReconcile_DetectsDrift (0.00s)
+    reconcile_test.go:112: drift not detected
+        expected: []string{"replicas"}
+        actual:   []string{}
+--- FAIL: TestReconcile_IgnoresManaged (0.00s)
+    reconcile_test.go:145: unexpected change for managed field "annotations"
+FAIL
+FAIL example.com/svc/internal/reconcile   0.038s
+ok   example.com/svc/internal/api       0.101s
+FAIL
+section_end:1736200061:step_script
+section_start:1736200061:after_script
+Running after_script
+$ go tool cover -func=cover.out | tail -1
+total:  (statements)   74.3%
+section_end:1736200063:after_script
+section_start:1736200063:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736200065:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1
