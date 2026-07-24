@@ -91,28 +91,36 @@ def _run_from_file(path: Path) -> Run:
 
 
 def _diagnose(job: Job, cfg) -> None:
-    """Segment + phase-map + classify one job, then print the deterministic verdict.
+    """Segment + classify + assemble evidence + produce the report for one job.
 
-    This is the M2 output: useful with no LLM at all. GitLab log format is assumed
-    (the only provider today); a provider-driven segmenter comes with M6.
+    Deterministic when the LLM is disabled/unconfigured; one LLM call otherwise.
+    GitLab log format is assumed (the only provider today); a provider-driven
+    segmenter comes with M6. Rich rendering + artifacts + MR note land in M5.
     """
+    from ci_doctor.core.analyze import build_bundle
     from ci_doctor.core.attribution import attribute
     from ci_doctor.core.phases import assign_phases
+    from ci_doctor.llm.report import produce_report
     from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
 
     job.sections = GitLabSegmenter().segment(job.log or "")
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
+    bundle = build_bundle(job, attr, job.sections, cfg)
+    report = produce_report(job, attr, bundle, cfg)
 
-    lines = 0 if job.log is None else job.log.count("\n") + 1
     typer.echo(
-        f"job={job.name} phase={attr.phase} reason={attr.reason} "
-        f"rule={attr.rule_id} confidence={attr.confidence} log_lines={lines}"
+        f"job={job.name} phase={report.failure_phase} category={report.category} "
+        f"confidence={report.confidence} reason={attr.reason} rule={attr.rule_id}"
     )
-    if attr.terminal_evidence:
-        typer.echo(f"  terminal: {attr.terminal_evidence}")
+    typer.echo(f"summary: {report.summary}")
+    typer.echo(f"root cause: {report.root_cause}")
+    if report.remediation:
+        typer.echo("remediation:")
+        for step in report.remediation:
+            typer.echo(f"  {step.order}. {step.action}")
     if attr.secondary_phases:
-        typer.echo(f"  secondary (non-causal): {', '.join(str(p) for p in attr.secondary_phases)}")
+        typer.echo(f"secondary (non-causal): {', '.join(str(p) for p in attr.secondary_phases)}")
 
 
 def main() -> None:

@@ -20,4 +20,5 @@ def test_from_file_replay_smoke(monkeypatch, capsys):
     assert exc.value.code == 0
     out = capsys.readouterr().out
     assert "job=sample" in out
-    assert "log_lines=" in out
+    assert "phase=" in out
+    assert "summary:" in out

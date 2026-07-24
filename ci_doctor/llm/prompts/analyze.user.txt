@@ -1,0 +1,8 @@
+Job: $job (stage: $stage)
+Failure reason: $failure_reason (raw: $raw_failure_reason)
+Duration: $duration   Needs: $needs
+Terminal evidence: $terminal
+Secondary (non-causal) phases with warnings: $secondary
+
+--- Blamed phase ($phase) log excerpt ---
+$excerpt
