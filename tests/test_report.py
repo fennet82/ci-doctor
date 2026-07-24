@@ -2,6 +2,8 @@
 retry, degraded fallback, and the end-to-end secret round-trip. No network.
 """
 
+import pytest
+
 from ci_doctor.config.loader import load_config
 from ci_doctor.core.analyze import build_bundle
 from ci_doctor.core.attribution import attribute
@@ -74,6 +76,36 @@ def test_repair_retry_on_invalid_then_valid():
     report = produce_report(job, attr, bundle, cfg, client=client)
     assert report.summary == "unit tests failed on assert"
     assert client.calls == 2  # one repair retry happened
+
+
+def test_infer_category_from_evidence():
+    from ci_doctor.llm.report import _infer_category
+
+    # reason map wins when it can classify
+    assert _infer_category(FailureReason.RUNNER_SYSTEM, "") == "infrastructure"
+    assert _infer_category(FailureReason.TIMEOUT, "") == "timeout"
+    assert _infer_category(FailureReason.MISSING_DEPENDENCY, "") == "dependency"
+    # script_failure -> guess from the evidence
+    assert _infer_category(FailureReason.SCRIPT_FAILURE, "==== FAILURES ====\nE assert 1 == 2\nFAILED tests/x.py") == "test"
+    assert _infer_category(FailureReason.SCRIPT_FAILURE, "a.ts:1 error TS2345: bad\nnpm ERR! build failed") == "build"
+    assert _infer_category(FailureReason.SCRIPT_FAILURE, "ERROR: Job failed: execution took longer than 1h") == "timeout"
+    assert _infer_category(FailureReason.SCRIPT_FAILURE, "exit code 137\nKilled") == "infrastructure"
+    assert _infer_category(FailureReason.SCRIPT_FAILURE, "nothing recognizable here") == "unknown"
+
+
+@pytest.mark.parametrize("fixture,expected", [
+    ("npm_build_failure", "build"),
+    ("pytest_failure_verbose", "test"),
+    ("go_test_failure", "test"),
+])
+def test_deterministic_category_from_fixture(fixture, expected):
+    # Simulate --from-file: no provider metadata, no LLM -> category inferred from evidence.
+    from pathlib import Path
+
+    log = (Path(__file__).parent / "fixtures" / "logs" / f"{fixture}.log").read_text()
+    job, attr, bundle, cfg = _pipeline(log, reason=FailureReason.UNKNOWN)
+    report = produce_report(job, attr, bundle, cfg)  # deterministic
+    assert report.category == expected
 
 
 def test_anthropic_backend_needs_no_api_base():

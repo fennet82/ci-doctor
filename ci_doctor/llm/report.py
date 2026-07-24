@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from importlib import resources
 from string import Template
 
@@ -39,6 +40,29 @@ _CATEGORY = {
     FailureReason.TIMEOUT: "timeout",
     FailureReason.MISSING_DEPENDENCY: "dependency",
 }
+
+# Deterministic category guess from the blamed evidence, used only when the reason
+# alone can't classify it (i.e. script_failure). First match wins.
+# ponytail: signature heuristic, known ceiling — the LLM is more accurate; upgrade
+# path is to let the model set category (enable an llm.backend).
+_CATEGORY_SIGNATURES: list[tuple[str, str]] = [
+    ("infrastructure", r"exit code 137|\bKilled\b|Out of memory|no space left on device|cannot allocate memory"),
+    ("timeout", r"(?i)execution took longer than|timed out|timeout exceeded|deadline exceeded"),
+    ("permissions", r"(?i)permission denied|403 forbidden|unauthorized|access denied|denied: requested access"),
+    ("test", r"=+ FAILURES =+|--- FAIL\b|^FAIL\b|Tests run:.*Failures: [1-9]|●\s|AssertionError|\bFAILED\b|\bassert(ion)?\b.*(error|failed|==)|pytest"),
+    ("dependency", r"(?i)ModuleNotFoundError|cannot find module|could not resolve|no matching distribution|unresolved (import|dependency)|could not find a version"),
+    ("build", r"error TS\d+|BUILD FAILURE|make(\[\d+\])?: \*\*\*|\bcmake\b|compilation (terminated|failed)|cannot find symbol|undefined reference|npm ERR!|failed to solve|\blinker\b|\btsc\b"),
+]
+
+
+def _infer_category(reason: FailureReason, text: str) -> str:
+    mapped = _CATEGORY.get(reason)
+    if mapped:
+        return mapped
+    for category, pattern in _CATEGORY_SIGNATURES:
+        if re.search(pattern, text, re.MULTILINE):
+            return category
+    return "unknown"
 
 
 def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None) -> Report:
@@ -93,10 +117,11 @@ def deterministic_report(job: Job, attr: Attribution, bundle: EvidenceBundle, *,
     if degraded:
         factors.append("ci-doctor could not reach the LLM; this is the deterministic fallback report.")
 
+    category = _infer_category(attr.reason, "\n".join(bundle.blamed_lines) + "\n" + (attr.terminal_evidence or ""))
     return Report(
         summary=f"{job.name} failed in the {attr.phase} phase ({attr.reason})."[:140],
         failure_phase=attr.phase,
-        category=_CATEGORY.get(attr.reason, "unknown"),
+        category=category,
         confidence=attr.confidence,
         is_infra_not_code=is_infra,
         likely_flaky=False,
