@@ -123,7 +123,7 @@ llm:
   enabled: true                       # false => deterministic-only report
   backend: openai                     # openai | litellm | anthropic | claude_code
   model: qwen2.5-coder:32b
-  api_base: http://vllm.internal:8000/v1
+  api_base: http://openai-compatible-endpoint.internal:8000/v1
 ```
 
 Nested env vars use `__`: `CI_DOCTOR_LLM__MODEL=…`. See the full reference in
@@ -186,7 +186,7 @@ The original design spec is [docs/PLAN.md](docs/PLAN.md).
 
 ```sh
 uv sync
-uv run pytest        # 77 tests, no network, no LLM
+uv run pytest        # 88 tests, no network, no LLM
 ```
 
 ```
