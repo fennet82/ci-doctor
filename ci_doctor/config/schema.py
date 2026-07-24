@@ -24,6 +24,17 @@ class GitLabConfig(_Strict):
     timeout_seconds: int = 30
 
 
+class GitHubConfig(_Strict):
+    # No default host (GitHub.com api.github.com OR a GHE base like
+    # https://ghe.internal/api/v3). Same air-gap rule as GitLab.
+    base_url: str | None = None
+    token_env: str = "CI_DOCTOR_GITHUB_TOKEN"
+    token_file: str | None = None
+    ca_bundle: str | None = None
+    verify_ssl: bool = True
+    timeout_seconds: int = 30
+
+
 class LLMConfig(_Strict):
     enabled: bool = True                     # false => deterministic-only report
     model: str | None = None                 # any litellm model string
@@ -80,6 +91,7 @@ class RedactionConfig(_Strict):
 class Config(_Strict):
     provider: str = "gitlab"
     gitlab: GitLabConfig = Field(default_factory=GitLabConfig)
+    github: GitHubConfig = Field(default_factory=GitHubConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     phases: dict[str, str] = Field(default_factory=dict)  # section name -> phase

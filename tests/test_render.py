@@ -30,3 +30,20 @@ def test_json_roundtrips():
     data = json.loads(JsonRenderer().render(_report()))
     assert data["failure_phase"] == "script"
     assert data["remediation"][0]["where"] == "tests/test_x.py"
+
+
+def test_terminal_preserves_bracketed_log_content():
+    # Log content full of [...] must not be eaten as rich markup.
+    import io
+
+    from ci_doctor.render.terminal import render_terminal
+
+    r = _report().model_copy(update={
+        "root_cause": "##[error]Process completed with exit code 1",
+        "evidence": [Evidence(section="script", excerpt="[gw0] [ 50%] FAILED test", why_it_matters="w")],
+    })
+    buf = io.StringIO()
+    render_terminal(r, no_color=True, file=buf)
+    out = buf.getvalue()
+    assert "[error]" in out
+    assert "[gw0]" in out

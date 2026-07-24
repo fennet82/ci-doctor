@@ -22,6 +22,13 @@ phases:
   upload_artifacts_on_success: post
   upload_artifacts_on_failure: post
   cleanup_file_variables: post
+  # GitHub Actions canonical section names (emitted by the GitHub segmenter).
+  setup_job: prepare
+  setup: prepare
+  checkout: fetch
+  run: script
+  post: post
+  complete_job: post
 
 extraction:
   # Anchored matchers, highest priority survives budget pressure. `start`/`end`

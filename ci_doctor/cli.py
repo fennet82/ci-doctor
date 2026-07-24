@@ -63,15 +63,33 @@ def analyze(
     _maybe_post_mr(provider, run, results, cfg)
 
 
+def _make_provider(cfg):
+    # Import adapters lazily so `core` and the offline path never pull a provider in.
+    if cfg.provider == "gitlab":
+        from ci_doctor.providers.gitlab.provider import GitLabProvider
+
+        return GitLabProvider(cfg)
+    if cfg.provider == "github":
+        from ci_doctor.providers.github.provider import GitHubProvider
+
+        return GitHubProvider(cfg)
+    raise ValueError(f"unsupported provider: {cfg.provider}")
+
+
+def _make_segmenter(cfg):
+    if cfg.provider == "github":
+        from ci_doctor.providers.github.segmenter import GitHubSegmenter
+
+        return GitHubSegmenter()
+    from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
+
+    return GitLabSegmenter()
+
+
 def _analyze_live(run_id: str, cfg, job_id: str | None):
-    # Import the adapter lazily so `core` and the offline path never pull a provider in.
     from ci_doctor.core.select import select_failed_jobs
-    from ci_doctor.providers.gitlab.provider import GitLabProvider
 
-    if cfg.provider != "gitlab":
-        raise ValueError(f"unsupported provider: {cfg.provider}")
-
-    provider = GitLabProvider(cfg)
+    provider = _make_provider(cfg)
     run = provider.fetch_run(run_id)
     jobs = select_failed_jobs(run.jobs, cfg.analysis.include_allowed_failures)
     if job_id is not None:
@@ -103,9 +121,8 @@ def _process(job: Job, cfg):
     from ci_doctor.core.attribution import attribute
     from ci_doctor.core.phases import assign_phases
     from ci_doctor.llm.report import produce_report
-    from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
 
-    job.sections = GitLabSegmenter().segment(job.log or "")
+    job.sections = _make_segmenter(cfg).segment(job.log or "")
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
     bundle = build_bundle(job, attr, job.sections, cfg)
