@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.11.0 (a1b2c3d4)
+  on green-2.saas-linux-small-amd64 Bn5Jx2Qe, system ID: s_66aa77bb88cc
+Preparing the "docker" executor
+  Using Docker executor with image oven/bun:1.1 ...
+section_start:1736530000:prepare_executor
+Using Docker executor with image oven/bun:1.1 ...
+Using docker image sha256:9e8d7c6b5a49 for oven/bun:1.1 with digest bun@sha256:4b3c...
+section_end:1736530013:prepare_executor
+section_start:1736530013:prepare_script
+Preparing environment
+Running on runner-bn5jx2qe-project-94-concurrent-0...
+section_end:1736530014:prepare_script
+section_start:1736530014:get_sources
+Fetching changes...
+Checking out 7ce20b93 as detached HEAD...
+section_end:1736530020:get_sources
+section_start:1736530020:restore_cache
+Checking cache for bun-install-cache...
+Successfully extracted cache
+section_end:1736530029:restore_cache
+section_start:1736530029:step_script
+$ bun --version
+1.1.18
+$ bun install --frozen-lockfile
+bun install v1.1.18 (aad3abea)
+ + zod@3.23.8
+ 142 packages installed [1.42s]
+$ bun test
+bun test v1.1.18 (aad3abea)
+
+src/cart.test.ts:
+✓ Cart > adds an item to the cart [0.42ms]
+✓ Cart > removes an item from the cart [0.11ms]
+✗ Cart > applies the loyalty discount before tax
+  error: expect(received).toBe(expected)
+
+    Expected: 2700
+    Received: 3000
+
+      at /builds/team/shop/src/cart.test.ts:18:23
+
+ 2 pass
+ 1 fail
+ 4 expect() calls
+Ran 3 tests across 1 files. [24.00ms]
+section_end:1736530061:step_script
+section_start:1736530061:after_script
+Running after_script
+$ echo "bun tests failed"
+bun tests failed
+section_end:1736530062:after_script
+section_start:1736530062:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736530065:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

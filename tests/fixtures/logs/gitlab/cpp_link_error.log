@@ -1,0 +1,48 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on build-farm-02 Bz2Kj6Qd, system ID: s_778899aabbcc
+Preparing the "docker" executor
+  Using Docker executor with image gcc:13 ...
+section_start:1736470000:prepare_executor
+Using Docker executor with image gcc:13 ...
+Using docker image sha256:8c7b6a5d4e3f for gcc:13 with digest gcc@sha256:2a3b...
+section_end:1736470020:prepare_executor
+section_start:1736470020:prepare_script
+Preparing environment
+Running on runner-bz2kj6qd-project-88-concurrent-1...
+section_end:1736470021:prepare_script
+section_start:1736470021:get_sources
+Fetching changes with git depth set to 50...
+Checking out 0ac91d77 as detached HEAD...
+section_end:1736470029:get_sources
+section_start:1736470029:restore_cache
+Checking cache for ccache-gcc13...
+Successfully extracted cache
+section_end:1736470041:restore_cache
+section_start:1736470041:step_script
+$ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+-- The CXX compiler identification is GNU 13.2.0
+-- Configuring done (1.8s)
+-- Generating done (0.2s)
+$ cmake --build build -j 4
+[ 14%] Building CXX object CMakeFiles/engine.dir/src/core.cpp.o
+[ 28%] Building CXX object CMakeFiles/engine.dir/src/audio.cpp.o
+[ 42%] Building CXX object CMakeFiles/engine.dir/src/render.cpp.o
+[ 57%] Building CXX object CMakeFiles/engine.dir/src/scene.cpp.o
+[ 71%] Linking CXX executable engine
+/usr/bin/ld: CMakeFiles/engine.dir/src/render.cpp.o: in function `Renderer::submit(Frame const&)':
+render.cpp:(.text+0x2f1): undefined reference to `Pipeline::flush()'
+collect2: error: ld returned 1 exit status
+make[2]: *** [CMakeFiles/engine.dir/build.make:142: engine] Error 1
+make[1]: *** [CMakeFiles/Makefile2:95: CMakeFiles/engine.dir/all] Error 2
+make: *** [Makefile:136: all] Error 2
+section_end:1736470094:step_script
+section_start:1736470094:after_script
+Running after_script
+$ echo "link failed"
+link failed
+section_end:1736470095:after_script
+section_start:1736470095:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: build/engine: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736470097:upload_artifacts_on_failure
+ERROR: Job failed: exit code 2

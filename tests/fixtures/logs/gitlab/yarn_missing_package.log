@@ -1,0 +1,39 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on green-4.saas-linux-medium-amd64 Kd8f2Lp1, system ID: s_9f8e7d6c5b4a
+Preparing the "docker+machine" executor
+  Using Docker executor with image node:20-alpine ...
+section_start:1736520000:prepare_executor
+Using Docker executor with image node:20-alpine ...
+Using docker image sha256:1122334455aa for node:20-alpine with digest node@sha256:ffee...
+section_end:1736520015:prepare_executor
+section_start:1736520015:prepare_script
+Preparing environment
+Running on runner-kd8f2lp1-project-88-concurrent-3...
+section_end:1736520016:prepare_script
+section_start:1736520016:get_sources
+Fetching changes...
+Checking out b1904ff7 as detached HEAD...
+section_end:1736520022:get_sources
+section_start:1736520022:restore_cache
+Checking cache for yarn-cache-20-default...
+Successfully extracted cache
+section_end:1736520034:restore_cache
+section_start:1736520034:step_script
+$ yarn --version
+1.22.22
+$ yarn install --frozen-lockfile --non-interactive
+yarn install v1.22.22
+[1/4] Resolving packages...
+error Couldn't find package "@acme/design-tokens@^3.1.0" required by "web@1.0.0" on the "npm" registry.
+info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.
+section_end:1736520049:step_script
+section_start:1736520049:after_script
+Running after_script
+$ echo "yarn install failed"
+yarn install failed
+section_end:1736520050:after_script
+section_start:1736520050:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: node_modules/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736520052:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

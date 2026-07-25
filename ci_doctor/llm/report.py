@@ -47,11 +47,31 @@ _CATEGORY = {
 # path is to let the model set category (enable an llm.backend).
 _CATEGORY_SIGNATURES: list[tuple[str, str]] = [
     ("infrastructure", r"exit code 137|\bKilled\b|Out of memory|no space left on device|cannot allocate memory"),
-    ("timeout", r"(?i)execution took longer than|timed out|timeout exceeded|deadline exceeded"),
+    # "timed out retrying" is Cypress's assertion-retry wording — a test failure,
+    # not a job timeout, so it must not be claimed here.
+    ("timeout", r"(?i)execution took longer than|timed out(?! retrying)|timeout exceeded|deadline exceeded"),
     ("permissions", r"(?i)permission denied|403 forbidden|unauthorized|access denied|denied: requested access"),
-    ("test", r"=+ FAILURES =+|--- FAIL\b|^FAIL\b|Tests run:.*Failures: [1-9]|●\s|AssertionError|\bFAILED\b|\bassert(ion)?\b.*(error|failed|==)|pytest"),
-    ("dependency", r"(?i)ModuleNotFoundError|cannot find module|could not resolve|no matching distribution|unresolved (import|dependency)|could not find a version"),
-    ("build", r"error TS\d+|BUILD FAILURE|make(\[\d+\])?: \*\*\*|\bcmake\b|compilation (terminated|failed)|cannot find symbol|undefined reference|npm ERR!|failed to solve|\blinker\b|\btsc\b"),
+    ("config", r"on .+\.tf line \d+"),
+    # Unambiguous build/compile markers, checked before the broad `test` signature
+    # below — its \bFAILED\b would otherwise claim "Build FAILED." (dotnet),
+    # "Task :app:compileJava FAILED" (gradle) and "FAILED: Build did NOT complete" (bazel).
+    ("build", r"Build did NOT complete|Build FAILED|error (CS|MSB|AD)\d+|error\[E\d+\]|could not compile|\* What went wrong:"),
+    ("test", r"=+ FAILURES =+|--- FAIL\b|^FAIL\b|Tests run:.*Failures: [1-9]|●\s|AssertionError|\bFAILED\b|\bassert(ion)?\b.*(error|failed|==)|pytest"
+             r"|test result: FAILED|^\d+ examples?, [1-9]\d* failures?|There (was|were) \d+ (failure|error)|^FAILURES!"
+             r"|\[FAIL\]|Failed!\s+-\s+Failed:|^\s*\d+\) (Failure|Error):|CypressError|^\s*\d+\) .+ › "
+             r"|expect\(received\)|^\s*\d+ fail\b"),
+    ("dependency", r"(?i)ModuleNotFoundError|cannot find module|could not resolve|no matching distribution|unresolved (import|dependency)|could not find a version"
+                   r"|your requirements could not be resolved|could not find gem|Bundler::(GemNotFound|VersionConflict)"
+                   r"|no matching package named|error NU\d+"
+                   r"|ERR_PNPM_\w+|couldn't find package|YN0082|no candidates found|no version matching|ERR_MODULE_NOT_FOUND"),
+    ("build", r"error TS\d+|BUILD FAILURE|make(\[\d+\])?: \*\*\*|\bcmake\b|compilation (terminated|failed)|cannot find symbol|undefined reference|npm ERR!|failed to solve|\blinker\b|\btsc\b"
+              r"|PHP Parse error|collect2: error|✖ \d+ problems?|Found \d+ errors? in \d+ files?"),
+    # The app itself crashed. Deliberately LAST: a traceback also shows up in a
+    # pytest failure (test) and in a ModuleNotFoundError crash (dependency), and
+    # both of those are the more actionable answer.
+    ("runtime", r"Traceback \(most recent call last\):|^panic: |^fatal error: |rake aborted!|PHP Fatal error"
+                r"|Exception in thread |Uncaught \w*(Error|Exception)|Segmentation fault|core dumped"
+                r"|node:internal/|^Node\.js v\d+"),
 ]
 
 
@@ -81,7 +101,8 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
 
     schema = Report.model_json_schema()
     prompt = redact_text(_render_prompt(job, attr, bundle, schema), cfg.redaction, environ)
-    log.debug("calling LLM backend=%s model=%s prompt=%d chars", cfg.llm.backend, cfg.llm.model, len(prompt))
+    log.info("job %s: calling LLM backend=%s model=%s (may take a while)", job.name, cfg.llm.backend, cfg.llm.model)
+    log.debug("prompt=%d chars", len(prompt))
     report = _call_and_validate(client, prompt, schema)
     if report is None:
         log.info("no valid LLM report; using deterministic fallback")

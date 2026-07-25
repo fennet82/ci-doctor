@@ -65,6 +65,9 @@ acquire → segment → attribute → denoise → extract → budget → (LLM) �
    ladder with a `WARNING:`-is-never-fatal rule.
 4. **Denoise / extract / budget** the blamed section into a small, high-signal evidence slice
    (ANSI/CR/dedup denoising, anchored windows, token budgeting — every truncation is visible).
+   Shipped matcher packs cover pytest/jest/go/maven/gradle/bazel, Rust, .NET, Ruby, PHP,
+   node + npm/pnpm/yarn/bun, Playwright/Cypress, tsc/eslint/mypy, Docker and Terraform;
+   add your own under `extraction.matchers`.
 5. **LLM (optional)** explains the cause *within* the already-decided phase, returning a
    validated JSON report. Disabled or unreachable → deterministic report instead.
 6. **Render / deliver** to the terminal, `report.md`/`report.json`, and an idempotent MR/PR note.
@@ -182,13 +185,15 @@ lives in [`docs/site/`](docs/site) — built with Astro:
 cd docs/site && npm install && npm run dev    # or: npm run build -> dist/
 ```
 
-The original design spec is [docs/PLAN.md](docs/PLAN.md).
+The original design spec is [docs/PLAN.md](docs/PLAN.md). How to work in this repo —
+where code goes, how to write tests, commit conventions — is
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 
 ```sh
 uv sync
-uv run pytest        # 88 tests, no network, no LLM
+uv run pytest        # 172 tests, no network, no LLM
 ```
 
 ```

@@ -107,7 +107,7 @@ ci_doctor/
   render/{terminal.py, markdown.py, json_out.py}
   providers/gitlab/{provider.py, segmenter.py, reasons.py}
   providers/github/   # M6
-  tests/fixtures/{logs/, expected/}
+  tests/fixtures/{logs/<provider>/, expected/}
 ```
 
 ---
@@ -186,8 +186,9 @@ conclusions + annotations + `startup_failure`/cancellation. **If it needs editin
 anything in `core/`, the design failed.**
 
 ## 11. Testing (non-negotiable)
-`tests/fixtures/logs/*.log` paired with `expected/*.json` of `{phase, reason,
-rule_id}`. Must include: noisy cache-miss block above a script `exit 1` ->
+`tests/fixtures/logs/<provider>/*.log` paired with a provider-neutral
+`expected/*.json` of `{phase, reason, rule_id}` (see CONTRIBUTING.md §4.1).
+Must include: noisy cache-miss block above a script `exit 1` ->
 `SCRIPT` (the regression test); empty log + `stuck_or_timeout_failure` ->
 `PROVISION`; runner system failure in `prepare_executor`; job timeout with unclosed
 `step_script`; `missing_dependency_failure` cascade; OOM `137`; 50k lines of docker

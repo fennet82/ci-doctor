@@ -1,0 +1,48 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on ruby-runner-04 Rb3Mn8Kw, system ID: s_44dd55ee66ff
+Preparing the "docker" executor
+  Using Docker executor with image ruby:3.3 ...
+section_start:1736350000:prepare_executor
+Using Docker executor with image ruby:3.3 ...
+Using docker image sha256:9a8b7c6d5e4f for ruby:3.3 with digest ruby@sha256:2b1c...
+section_end:1736350015:prepare_executor
+section_start:1736350015:prepare_script
+Preparing environment
+Running on runner-rb3mn8kw-project-29-concurrent-1...
+section_end:1736350016:prepare_script
+section_start:1736350016:get_sources
+Fetching changes with git depth set to 50...
+Checking out b70e2c94 as detached HEAD...
+section_end:1736350023:get_sources
+section_start:1736350023:restore_cache
+Checking cache for bundler-3.3-default...
+Successfully extracted cache
+section_end:1736350034:restore_cache
+section_start:1736350034:step_script
+$ bundle exec rake test
+Run options: --seed 46213
+
+# Running:
+
+.......F...
+
+  1) Failure:
+CartTest#test_discount_is_applied_before_tax [test/cart_test.rb:52]:
+Expected: 2700
+  Actual: 3000
+
+rails test test/cart_test.rb:49
+
+Finished in 0.482913s, 22.7787 runs/s, 45.5575 assertions/s.
+11 runs, 22 assertions, 1 failures, 0 errors, 0 skips
+section_end:1736350071:step_script
+section_start:1736350071:after_script
+Running after_script
+$ echo "tests failed"
+tests failed
+section_end:1736350072:after_script
+section_start:1736350072:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736350075:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

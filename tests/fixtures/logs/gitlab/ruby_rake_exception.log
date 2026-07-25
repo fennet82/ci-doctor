@@ -1,0 +1,46 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on ruby-runner-04 Rb3Mn8Kw, system ID: s_44dd55ee66ff
+Preparing the "docker" executor
+  Using Docker executor with image ruby:3.3 ...
+section_start:1736360000:prepare_executor
+Using Docker executor with image ruby:3.3 ...
+Using docker image sha256:9a8b7c6d5e4f for ruby:3.3 with digest ruby@sha256:2b1c...
+section_end:1736360017:prepare_executor
+section_start:1736360017:prepare_script
+Preparing environment
+Running on runner-rb3mn8kw-project-29-concurrent-2...
+section_end:1736360018:prepare_script
+section_start:1736360018:get_sources
+Fetching changes with git depth set to 50...
+Checking out ae44d013 as detached HEAD...
+section_end:1736360025:get_sources
+section_start:1736360025:restore_cache
+Checking cache for bundler-3.3-default...
+Successfully extracted cache
+section_end:1736360036:restore_cache
+section_start:1736360036:step_script
+$ bundle exec rake db:migrate
+== 20240612093000 AddLoyaltyTierToCustomers: migrating ========================
+-- add_column(:customers, :loyalty_tier, :string)
+   -> 0.0182s
+-- backfill_existing_customers()
+rake aborted!
+StandardError: An error has occurred, all later migrations canceled:
+
+undefined method `default_tier' for nil (NoMethodError)
+/builds/team/shop/db/migrate/20240612093000_add_loyalty_tier_to_customers.rb:8:in `up': undefined method `default_tier' for nil (NoMethodError)
+/builds/team/shop/lib/tasks/migrate.rake:12:in `block (2 levels) in <top (required)>'
+/builds/team/shop/vendor/bundle/ruby/3.3.0/gems/rake-13.2.1/lib/rake/task.rb:281:in `block in execute'
+Tasks: TOP => db:migrate
+(See full trace by running task with --trace)
+section_end:1736360068:step_script
+section_start:1736360068:after_script
+Running after_script
+$ echo "migration failed, rolling back deploy"
+migration failed, rolling back deploy
+section_end:1736360070:after_script
+section_start:1736360070:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: log/migrate.log: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736360072:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

@@ -1,0 +1,48 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on build-farm-02 Bz2Kj6Qd, system ID: s_778899aabbcc
+Preparing the "docker" executor
+  Using Docker executor with image gcr.io/bazel-public/bazel:7.2.0 ...
+section_start:1736420000:prepare_executor
+Using Docker executor with image gcr.io/bazel-public/bazel:7.2.0 ...
+Using docker image sha256:0f9e8d7c6b5a for gcr.io/bazel-public/bazel:7.2.0 with digest bazel@sha256:6e5f...
+section_end:1736420024:prepare_executor
+section_start:1736420024:prepare_script
+Preparing environment
+Running on runner-bz2kj6qd-project-88-concurrent-0...
+section_end:1736420025:prepare_script
+section_start:1736420025:get_sources
+Fetching changes with git depth set to 50...
+Checking out 91ab77de as detached HEAD...
+section_end:1736420034:get_sources
+section_start:1736420034:restore_cache
+Checking cache for bazel-disk-cache...
+Successfully extracted cache
+section_end:1736420061:restore_cache
+section_start:1736420061:step_script
+$ bazel --version
+bazel 7.2.0
+$ bazel build //src/... --noshow_progress
+Starting local Bazel server and connecting to it...
+INFO: Analyzed 42 targets (128 packages loaded, 4213 targets configured).
+INFO: Found 42 targets...
+ERROR: /builds/team/svc/src/render/BUILD.bazel:12:11: Compiling src/render/shader.cc failed: (Exit 1): gcc failed: error executing command
+src/render/shader.cc:57:19: error: 'GL_TEXTURE_2D_ARRAY' was not declared in this scope
+   57 |   glBindTexture(GL_TEXTURE_2D_ARRAY, handle_);
+      |                 ^~~~~~~~~~~~~~~~~~~
+src/render/shader.cc:58:3: note: suggested alternative: 'GL_TEXTURE_2D'
+Target //src/render:render failed to build
+Use --verbose_failures to see the command lines of failed build steps.
+INFO: Elapsed time: 41.882s, Critical Path: 12.44s
+INFO: 217 processes: 96 internal, 121 linux-sandbox.
+FAILED: Build did NOT complete successfully
+section_end:1736420118:step_script
+section_start:1736420118:after_script
+Running after_script
+$ echo "bazel build failed"
+bazel build failed
+section_end:1736420119:after_script
+section_start:1736420119:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: bazel-bin/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736420121:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

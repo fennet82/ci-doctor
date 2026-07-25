@@ -1,9 +1,9 @@
 import sys
-from pathlib import Path
 
 import pytest
 
 from ci_doctor import cli
+from tests import support
 
 
 def test_main_always_exits_zero_on_error(monkeypatch):
@@ -23,9 +23,10 @@ def test_verbose_enables_debug_logging():
     assert logging.getLogger("ci_doctor").level == logging.INFO
 
 
-def test_from_file_replay_smoke(monkeypatch, capsys, tmp_path):
+@pytest.mark.parametrize("provider", support.providers_with("sample"))
+def test_from_file_replay_smoke(provider, monkeypatch, capsys, tmp_path):
     monkeypatch.chdir(tmp_path)  # report.md/report.json land here, not in the repo
-    log = str((Path(__file__).parent / "fixtures" / "sample.log").resolve())
+    log = str(support.log_path(provider, "sample").resolve())
     monkeypatch.setattr(sys, "argv", ["ci-doctor", "analyze", "--no-color", "--from-file", log])
     with pytest.raises(SystemExit) as exc:
         cli.main()

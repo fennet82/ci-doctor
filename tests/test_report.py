@@ -10,7 +10,7 @@ from ci_doctor.core.attribution import attribute
 from ci_doctor.core.models import FailureReason, Job
 from ci_doctor.core.phases import assign_phases
 from ci_doctor.llm.report import produce_report
-from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
+from tests import support
 
 _GOOD = {
     "summary": "unit tests failed on assert",
@@ -41,10 +41,12 @@ class FakeClient:
         return r
 
 
-def _pipeline(log, reason=FailureReason.SCRIPT_FAILURE, overrides=None):
+def _pipeline(log, reason=FailureReason.SCRIPT_FAILURE, overrides=None, provider="gitlab"):
+    # `provider` defaults to gitlab only because _SIMPLE_LOG below is a GitLab-syntax
+    # literal; fixture-driven tests pass the provider the log actually came from.
     job = Job(id="1", name="build", status="failed", failure_reason=reason, log=log)
     cfg = load_config(environ={}, overrides=overrides)
-    job.sections = GitLabSegmenter().segment(log)
+    job.sections = support.segment(provider, log)
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
     bundle = build_bundle(job, attr, job.sections, cfg)
@@ -93,17 +95,20 @@ def test_infer_category_from_evidence():
     assert _infer_category(FailureReason.SCRIPT_FAILURE, "nothing recognizable here") == "unknown"
 
 
-@pytest.mark.parametrize("fixture,expected", [
-    ("npm_build_failure", "build"),
-    ("pytest_failure_verbose", "test"),
-    ("go_test_failure", "test"),
-])
-def test_deterministic_category_from_fixture(fixture, expected):
-    # Simulate --from-file: no provider metadata, no LLM -> category inferred from evidence.
-    from pathlib import Path
+_CATEGORY_FIXTURES = {
+    "npm_build_failure": "build",
+    "pytest_failure_verbose": "test",
+    "go_test_failure": "test",
+}
+_CATEGORY_PARAMS = [(p, c, _CATEGORY_FIXTURES[c]) for p, c in support.pairs_for(_CATEGORY_FIXTURES)]
 
-    log = (Path(__file__).parent / "fixtures" / "logs" / f"{fixture}.log").read_text()
-    job, attr, bundle, cfg = _pipeline(log, reason=FailureReason.UNKNOWN)
+
+@pytest.mark.parametrize("provider,fixture,expected", _CATEGORY_PARAMS,
+                         ids=[f"{p}-{c}" for p, c, _ in _CATEGORY_PARAMS])
+def test_deterministic_category_from_fixture(provider, fixture, expected):
+    # Simulate --from-file: no provider metadata, no LLM -> category inferred from evidence.
+    log = support.read_log(provider, fixture)
+    job, attr, bundle, cfg = _pipeline(log, reason=FailureReason.UNKNOWN, provider=provider)
     report = produce_report(job, attr, bundle, cfg)  # deterministic
     assert report.category == expected
 

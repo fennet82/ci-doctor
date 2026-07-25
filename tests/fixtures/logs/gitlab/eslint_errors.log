@@ -1,0 +1,46 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on green-4.saas-linux-medium-amd64 Kd8f2Lp1, system ID: s_9f8e7d6c5b4a
+Preparing the "docker+machine" executor
+  Using Docker executor with image node:20-alpine ...
+section_start:1736480000:prepare_executor
+Using Docker executor with image node:20-alpine ...
+Using docker image sha256:1122334455aa for node:20-alpine with digest node@sha256:ffee...
+section_end:1736480015:prepare_executor
+section_start:1736480015:prepare_script
+Preparing environment
+Running on runner-kd8f2lp1-project-88-concurrent-1...
+section_end:1736480016:prepare_script
+section_start:1736480016:get_sources
+Fetching changes...
+Checking out 1ce4407b as detached HEAD...
+section_end:1736480022:get_sources
+section_start:1736480022:restore_cache
+Checking cache for node-modules-20-default...
+Successfully extracted cache
+section_end:1736480035:restore_cache
+section_start:1736480035:step_script
+$ npm ci --no-audit --no-fund
+added 1284 packages in 19s
+$ npx eslint src --max-warnings=0
+
+/builds/team/web/src/checkout/total.js
+   14:9   error    'discount' is assigned a value but never used  no-unused-vars
+   22:5   error    Unexpected console statement                   no-console
+
+/builds/team/web/src/cart/index.js
+    8:1   error    'lodash' should be listed in the dependencies  import/no-extraneous-dependencies
+   31:18  warning  Missing return type on function                @typescript-eslint/explicit-module-boundary-types
+
+✖ 4 problems (3 errors, 1 warning)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+section_end:1736480061:step_script
+section_start:1736480061:after_script
+Running after_script
+$ echo "lint failed"
+lint failed
+section_end:1736480062:after_script
+section_start:1736480062:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: eslint-report.json: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736480064:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

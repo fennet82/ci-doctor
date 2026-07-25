@@ -1,0 +1,49 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on private-runner-07 Zx4Qw8Er, system ID: s_aabbccddeeff
+Preparing the "docker" executor
+  Using Docker executor with image golang:1.22 ...
+section_start:1736460000:prepare_executor
+Using Docker executor with image golang:1.22 ...
+Using docker image sha256:77aa88bb99cc for golang:1.22 with digest golang@sha256:1234...
+section_end:1736460012:prepare_executor
+section_start:1736460012:prepare_script
+Preparing environment
+Running on runner-zx4qw8er-project-15-concurrent-2...
+section_end:1736460013:prepare_script
+section_start:1736460013:get_sources
+Fetching changes with git depth set to 50...
+Checking out 58ab3f21 as detached HEAD...
+section_end:1736460020:get_sources
+section_start:1736460020:restore_cache
+Checking cache for go-mod-1.22...
+Successfully extracted cache
+section_end:1736460027:restore_cache
+section_start:1736460027:step_script
+$ go version
+go version go1.22.3 linux/amd64
+$ go build ./...
+$ go run ./cmd/indexer
+2026/01/05 09:20:11 indexer starting, shard=3
+2026/01/05 09:20:11 loaded 512 documents
+2026/01/05 09:20:11 rebuilding shard index
+panic: runtime error: index out of range [512] with length 512
+
+goroutine 1 [running]:
+example.com/svc/internal/index.(*Shard).Get(...)
+	/builds/team/svc/internal/index/shard.go:74
+example.com/svc/internal/index.(*Shard).Rebuild(0xc0000b4000)
+	/builds/team/svc/internal/index/shard.go:112 +0x1e5
+main.main()
+	/builds/team/svc/cmd/indexer/main.go:38 +0x94
+exit status 2
+section_end:1736460058:step_script
+section_start:1736460058:after_script
+Running after_script
+$ echo "indexer crashed"
+indexer crashed
+section_end:1736460059:after_script
+section_start:1736460059:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: index/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736460061:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

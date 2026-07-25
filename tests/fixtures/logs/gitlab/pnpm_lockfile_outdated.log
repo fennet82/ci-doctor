@@ -1,0 +1,44 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on green-4.saas-linux-medium-amd64 Kd8f2Lp1, system ID: s_9f8e7d6c5b4a
+Preparing the "docker+machine" executor
+  Using Docker executor with image node:20-alpine ...
+section_start:1736510000:prepare_executor
+Using Docker executor with image node:20-alpine ...
+Using docker image sha256:1122334455aa for node:20-alpine with digest node@sha256:ffee...
+section_end:1736510014:prepare_executor
+section_start:1736510014:prepare_script
+Preparing environment
+Running on runner-kd8f2lp1-project-88-concurrent-2...
+section_end:1736510015:prepare_script
+section_start:1736510015:get_sources
+Fetching changes...
+Checking out 3fa71c08 as detached HEAD...
+section_end:1736510021:get_sources
+section_start:1736510021:restore_cache
+Checking cache for pnpm-store-20-default...
+Successfully extracted cache
+section_end:1736510033:restore_cache
+section_start:1736510033:step_script
+$ corepack enable
+$ pnpm --version
+9.4.0
+$ pnpm install --frozen-lockfile
+Scope: all 4 workspace projects
+Lockfile is up to date, resolution step is skipped
+ ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile" because pnpm-lock.yaml is not up to date with packages/web/package.json
+
+Note that in CI environments this setting is true by default. If you still need to run install in such cases, use "pnpm install --no-frozen-lockfile"
+
+    Failure reason:
+    specifiers in the lockfile ({"react":"^18.2.0","zod":"^3.22.4"}) don't match specs in package.json ({"react":"^18.3.1","zod":"^3.23.8"})
+section_end:1736510052:step_script
+section_start:1736510052:after_script
+Running after_script
+$ echo "install failed, skipping build"
+install failed, skipping build
+section_end:1736510053:after_script
+section_start:1736510053:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: dist/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736510055:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

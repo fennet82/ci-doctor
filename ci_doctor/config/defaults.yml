@@ -62,6 +62,31 @@ extraction:
       before: 2
       after: 10
       priority: 75
+    # --- Other JS package managers + the node runtime itself ---------------
+    - id: pnpm
+      pattern: 'ERR_PNPM_\w+|^\s*ELIFECYCLE\b'
+      before: 1
+      after: 10
+      priority: 82
+    - id: yarn
+      # Classic prints `error <Capital>`; Berry prints `➤ YN####:`.
+      pattern: '^error [A-Z]|➤ YN\d{4}'
+      before: 1
+      after: 8
+      priority: 82
+    - id: bun
+      # Anchor on the ✗ marker too: the ` N fail` summary trails the assertion
+      # detail, so a summary-only match would window past the actual cause.
+      pattern: 'error: script ".+" exited with code|error: No version matching|^\s*✗ |^\s*\d+ fail\b'
+      before: 2
+      after: 12
+      priority: 84
+    - id: node_runtime
+      # The error message sits *above* the stack, hence the large `before`.
+      pattern: '^\s*at .+\(node:internal|^Node\.js v\d+\.|ERR_MODULE_NOT_FOUND|ERR_REQUIRE_ESM|UnhandledPromiseRejection'
+      before: 12
+      after: 6
+      priority: 84
     - id: docker_build
       pattern: 'failed to solve|executor failed running'
       before: 3
@@ -72,6 +97,126 @@ extraction:
       before: 5
       after: 2
       priority: 95
+    # --- Rust (cargo) -----------------------------------------------------
+    - id: rust_test
+      start: '^failures:$'
+      end: '^test result:'
+      priority: 90
+    - id: rust_panic
+      pattern: '^thread ''.*'' panicked at'
+      before: 2
+      after: 8
+      priority: 88
+    - id: rust_compile
+      pattern: '^error(\[E\d+\])?: |^error: could not compile'
+      after: 8
+      priority: 82
+
+    # --- .NET (dotnet build / dotnet test) --------------------------------
+    - id: dotnet_test
+      pattern: '\[FAIL\]|^\s*Failed\s+\S+\s+\[\d|^Failed!\s+-\s+Failed:'
+      before: 1
+      after: 12
+      priority: 88
+    - id: dotnet_build
+      pattern: 'error (CS|MSB|NU|AD)\d+'
+      before: 1
+      after: 3
+      priority: 82
+
+    # --- Ruby (rspec / minitest / bundler) --------------------------------
+    - id: rspec
+      start: '^Failures:$'
+      end: '^\d+ examples?, \d+ failures?'
+      priority: 90
+    - id: minitest
+      pattern: '^\s*\d+\) (Failure|Error):'
+      after: 10
+      priority: 88
+    - id: ruby_exception
+      pattern: '\.rb:\d+:in .+\(\w*(Error|Exception)\)'
+      before: 2
+      after: 10
+      priority: 80
+    - id: bundler
+      pattern: 'Could not find gem|Bundler::(GemNotFound|VersionConflict)'
+      before: 1
+      after: 6
+      priority: 80
+
+    # --- PHP (phpunit / composer) -----------------------------------------
+    - id: phpunit
+      start: '^There (was|were) \d+ (failure|error)'
+      end: '^(FAILURES|ERRORS|OK)'
+      priority: 90
+    - id: php_fatal
+      pattern: 'PHP (Fatal|Parse) error|^Fatal error:'
+      before: 1
+      after: 8
+      priority: 85
+    - id: composer
+      pattern: 'Your requirements could not be resolved'
+      before: 1
+      after: 12
+      priority: 80
+
+    # --- Gradle (its own block; maven_gradle catches the [ERROR] style) ----
+    - id: gradle
+      start: '^\* What went wrong:'
+      end: '^\* (Try|Get more help)'
+      priority: 88
+
+    # --- Bazel ------------------------------------------------------------
+    - id: bazel
+      pattern: '^ERROR: .*(failed|FAILED)|^FAILED: Build did NOT complete|FAILED in \d'
+      before: 2
+      after: 10
+      priority: 85
+
+    # --- Browser e2e (Playwright / Cypress) -------------------------------
+    - id: playwright
+      pattern: '^\s*\d+\) .+ › '
+      after: 20
+      priority: 88
+    - id: cypress
+      pattern: 'CypressError|Timed out retrying after \d+ms'
+      before: 3
+      after: 12
+      priority: 88
+
+    # --- Language runtimes not covered by a framework matcher -------------
+    - id: python_traceback
+      pattern: '^\s*Traceback \(most recent call last\):'
+      before: 1
+      after: 25
+      priority: 85
+    - id: go_panic
+      pattern: '^panic: |^fatal error: '
+      before: 2
+      after: 20
+      priority: 88
+    - id: cc_cpp
+      pattern: 'CMake Error|make(\[\d+\])?: \*\*\* |undefined reference to|collect2: error'
+      before: 3
+      after: 8
+      priority: 80
+
+    # --- Linters / type checkers / IaC ------------------------------------
+    - id: eslint
+      pattern: '^\s*\d+:\d+\s+error\s+|✖ \d+ problems?'
+      before: 2
+      after: 6
+      priority: 78
+    - id: python_lint
+      pattern: '^\S+\.py:\d+:(\d+:)? (error|[EFWCN]\d+)'
+      after: 3
+      priority: 78
+    - id: terraform
+      pattern: '^\s*│\s*Error: |on .+\.tf line \d+'
+      before: 1
+      after: 12
+      priority: 80
+
     - id: generic_error
       pattern: '^(ERROR|FATAL)\b'
       before: 5

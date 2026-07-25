@@ -16,7 +16,7 @@ from ci_doctor.core.models import Phase
 
 Category = Literal[
     "build", "test", "dependency", "config", "infrastructure",
-    "timeout", "permissions", "flaky", "unknown",
+    "timeout", "permissions", "flaky", "runtime", "unknown",
 ]
 
 

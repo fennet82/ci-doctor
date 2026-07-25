@@ -1,0 +1,43 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on php-runner-01 Ph7Yu2Nb, system ID: s_bb88cc77dd66
+Preparing the "docker" executor
+  Using Docker executor with image php:8.3-cli ...
+section_start:1736390000:prepare_executor
+Using Docker executor with image php:8.3-cli ...
+Using docker image sha256:3e2d1c0b9a87 for php:8.3-cli with digest php@sha256:5a4b...
+section_end:1736390017:prepare_executor
+section_start:1736390017:prepare_script
+Preparing environment
+Running on runner-ph7yu2nb-project-53-concurrent-1...
+section_end:1736390018:prepare_script
+section_start:1736390018:get_sources
+Fetching changes...
+Checking out c40ba992 as detached HEAD...
+section_end:1736390025:get_sources
+section_start:1736390025:restore_cache
+Checking cache for composer-8.3-default...
+Successfully extracted cache
+section_end:1736390037:restore_cache
+section_start:1736390037:step_script
+$ composer install --no-interaction --no-progress
+Installing dependencies from lock file (including require-dev)
+Generating optimized autoload files
+$ php bin/console cache:warmup --env=prod
+PHP Fatal error:  Uncaught TypeError: App\Pricing\VatCalculator::__construct(): Argument #1 ($rate) must be of type float, string given, called in /builds/team/shop/src/Kernel.php on line 88 and defined in /builds/team/shop/src/Pricing/VatCalculator.php:19
+Stack trace:
+#0 /builds/team/shop/src/Kernel.php(88): App\Pricing\VatCalculator->__construct('0.19')
+#1 /builds/team/shop/src/Kernel.php(41): App\Kernel->registerServices()
+#2 /builds/team/shop/bin/console(31): App\Kernel->boot()
+#3 {main}
+  thrown in /builds/team/shop/src/Pricing/VatCalculator.php on line 19
+section_end:1736390062:step_script
+section_start:1736390062:after_script
+Running after_script
+$ echo "cache warmup failed"
+cache warmup failed
+section_end:1736390063:after_script
+section_start:1736390063:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: var/cache/prod/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736390065:upload_artifacts_on_failure
+ERROR: Job failed: exit code 255

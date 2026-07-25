@@ -1,0 +1,47 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on infra-runner-01 Tf9Bg5Mz, system ID: s_dd11ee22ff33
+Preparing the "docker" executor
+  Using Docker executor with image hashicorp/terraform:1.9 ...
+section_start:1736500000:prepare_executor
+Using Docker executor with image hashicorp/terraform:1.9 ...
+Using docker image sha256:5e4d3c2b1a09 for hashicorp/terraform:1.9 with digest terraform@sha256:7f6e...
+section_end:1736500017:prepare_executor
+section_start:1736500017:prepare_script
+Preparing environment
+Running on runner-tf9bg5mz-project-12-concurrent-0...
+section_end:1736500018:prepare_script
+section_start:1736500018:get_sources
+Fetching changes...
+Checking out a51c8f60 as detached HEAD...
+section_end:1736500025:get_sources
+section_start:1736500025:restore_cache
+Checking cache for terraform-plugins-1.9...
+Successfully extracted cache
+section_end:1736500038:restore_cache
+section_start:1736500038:step_script
+$ terraform init -input=false
+Initializing the backend...
+Terraform has been successfully initialized!
+$ terraform apply -auto-approve -input=false
+data.aws_caller_identity.current: Reading...
+data.aws_caller_identity.current: Read complete after 1s [id=123456789012]
+aws_s3_bucket.artifacts: Creating...
+╷
+│ Error: creating S3 Bucket (team-artifacts-prod): BucketAlreadyOwnedByYou: Your previous request to create the named bucket succeeded and you already own it
+│
+│   with aws_s3_bucket.artifacts,
+│   on s3.tf line 12, in resource "aws_s3_bucket" "artifacts":
+│   12: resource "aws_s3_bucket" "artifacts" {
+│
+╵
+section_end:1736500079:step_script
+section_start:1736500079:after_script
+Running after_script
+$ echo "apply failed, state unchanged"
+apply failed, state unchanged
+section_end:1736500081:after_script
+section_start:1736500081:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736500084:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1
