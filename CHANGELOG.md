@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-07-25)
+
+### Features
+
+- Rework the config/analyze CLI surface and document every symbol
+  ([`98bc4c5`](https://github.com/fennet82/ci-doctor/commit/98bc4c5762ac13a2ef3a5e10dfefc4a4f4778cd7))
+
+`analyze` now takes one positional target: an existing path replays that log offline, anything else
+  is fetched as a pipeline id. A missing target that looks like a path reports "no such log file"
+  rather than being fetched as an id.
+
+`--config` gains a `-f` alias and is repeatable on both subcommands, applied left to right so the
+  rightmost file wins. `config --validate` merges every layer and names what failed instead of
+  raising.
+
+`config` output pages through $PAGER on a terminal (`--less` forces it, `--plain` and piping skip
+  it) and is syntax-highlighted for all three modes, including `--schema` and the `--diff` view.
+
+Matcher packs sharing a shipped id now override field by field, so retuning `priority` on the
+  `pytest` pack keeps its `start`/`end` instead of blanking them into a matcher that can never fire.
+
+Also carries the in-flight docstring pass across the package and tests.
+
+BREAKING CHANGE: `analyze --from-file <log>` is now `analyze <log>`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+### Breaking Changes
+
+- `analyze --from-file <log>` is now `analyze <log>`.
+
+
 ## v0.2.0 (2026-07-25)
 
 ### Documentation
