@@ -1,0 +1,64 @@
+Running with gitlab-runner 16.11.0 (a1b2c3d4)
+  on rust-runner-02 Rs9Tk3Lm, system ID: s_ff11223344aa
+Preparing the "docker" executor
+  Using Docker executor with image rust:1.79-slim ...
+section_start:1736300000:prepare_executor
+Using Docker executor with image rust:1.79-slim ...
+Using docker image sha256:aa11bb22cc33 for rust:1.79-slim with digest rust@sha256:9f8e...
+section_end:1736300014:prepare_executor
+section_start:1736300014:prepare_script
+Preparing environment
+Running on runner-rs9tk3lm-project-42-concurrent-0...
+section_end:1736300015:prepare_script
+section_start:1736300015:get_sources
+Fetching changes with git depth set to 20...
+Checking out 8ad41f02 as detached HEAD...
+section_end:1736300021:get_sources
+section_start:1736300021:restore_cache
+Checking cache for cargo-registry-1.79...
+Successfully extracted cache
+section_end:1736300038:restore_cache
+section_start:1736300038:step_script
+$ cargo --version
+cargo 1.79.0 (ffa9cf99a 2024-06-03)
+$ cargo build --locked
+   Compiling ledger v0.4.1 (/builds/team/ledger)
+    Finished dev [unoptimized + debuginfo] target(s) in 21.44s
+$ cargo test --locked
+   Compiling ledger v0.4.1 (/builds/team/ledger)
+    Finished test [unoptimized + debuginfo] target(s) in 18.02s
+     Running unittests src/lib.rs (target/debug/deps/ledger-3c7b1a9d)
+
+running 24 tests
+test balance::tests::zero_balance ... ok
+test balance::tests::credit_then_debit ... ok
+test posting::tests::rejects_future_date ... ok
+test posting::tests::rounds_half_even ... ok
+test posting::tests::applies_fx_rate ... FAILED
+
+failures:
+
+---- posting::tests::applies_fx_rate stdout ----
+thread 'posting::tests::applies_fx_rate' panicked at src/posting.rs:212:9:
+assertion `left == right` failed: fx conversion lost precision
+  left: 10499
+ right: 10500
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    posting::tests::applies_fx_rate
+
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+error: test failed, to rerun pass `--lib`
+section_end:1736300102:step_script
+section_start:1736300102:after_script
+Running after_script
+$ echo "tests failed, skipping publish"
+tests failed, skipping publish
+section_end:1736300103:after_script
+section_start:1736300103:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: target/nextest/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736300105:upload_artifacts_on_failure
+ERROR: Job failed: exit code 101

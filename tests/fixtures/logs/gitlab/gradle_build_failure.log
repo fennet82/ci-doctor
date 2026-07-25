@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on jvm-runner-03 Gr5Wz1Xc, system ID: s_11ee22ff3344
+Preparing the "docker" executor
+  Using Docker executor with image gradle:8.8-jdk21 ...
+section_start:1736410000:prepare_executor
+Using Docker executor with image gradle:8.8-jdk21 ...
+Using docker image sha256:6b5a4c3d2e1f for gradle:8.8-jdk21 with digest gradle@sha256:4d3e...
+section_end:1736410021:prepare_executor
+section_start:1736410021:prepare_script
+Preparing environment
+Running on runner-gr5wz1xc-project-64-concurrent-0...
+section_end:1736410022:prepare_script
+section_start:1736410022:get_sources
+Fetching changes with git depth set to 50...
+Checking out 2f8cc410 as detached HEAD...
+section_end:1736410030:get_sources
+section_start:1736410030:restore_cache
+Checking cache for gradle-jdk21-default...
+Successfully extracted cache
+section_end:1736410048:restore_cache
+section_start:1736410048:step_script
+$ ./gradlew --version
+Gradle 8.8
+$ ./gradlew build --no-daemon --console=plain
+> Task :app:compileJava FAILED
+/builds/team/svc/app/src/main/java/com/acme/OrderService.java:64: error: cannot find symbol
+        return repository.findByStatus(OrderStatus.PENDING);
+                                                  ^
+  symbol:   variable PENDING
+  location: class OrderStatus
+1 error
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+
+BUILD FAILED in 34s
+2 actionable tasks: 1 executed, 1 up-to-date
+section_end:1736410102:step_script
+section_start:1736410102:after_script
+Running after_script
+$ echo "gradle build failed"
+gradle build failed
+section_end:1736410103:after_script
+section_start:1736410103:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: app/build/libs/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736410105:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

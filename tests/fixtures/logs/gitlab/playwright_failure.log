@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on e2e-runner-01 Pw6Vn3Hs, system ID: s_ab12cd34ef56
+Preparing the "docker" executor
+  Using Docker executor with image mcr.microsoft.com/playwright:v1.45.0-jammy ...
+section_start:1736430000:prepare_executor
+Using Docker executor with image mcr.microsoft.com/playwright:v1.45.0-jammy ...
+Using docker image sha256:4c3b2a1908f7 for mcr.microsoft.com/playwright:v1.45.0-jammy with digest playwright@sha256:8e7d...
+section_end:1736430032:prepare_executor
+section_start:1736430032:prepare_script
+Preparing environment
+Running on runner-pw6vn3hs-project-90-concurrent-0...
+section_end:1736430033:prepare_script
+section_start:1736430033:get_sources
+Fetching changes...
+Checking out d3f1ba08 as detached HEAD...
+section_end:1736430040:get_sources
+section_start:1736430040:restore_cache
+Checking cache for npm-e2e-default...
+Successfully extracted cache
+section_end:1736430055:restore_cache
+section_start:1736430055:step_script
+$ npm ci --no-audit --no-fund
+added 412 packages in 9s
+$ npx playwright test --reporter=list
+
+Running 18 tests using 4 workers
+
+  ✓  1 [chromium] › tests/auth.spec.ts:8:1 › signs in with valid credentials (1.2s)
+  ✓  2 [chromium] › tests/cart.spec.ts:11:1 › adds an item to the cart (0.9s)
+  ✘  3 [chromium] › tests/checkout.spec.ts:24:1 › applies a promo code (5.4s)
+
+  1) [chromium] › tests/checkout.spec.ts:24:1 › applies a promo code ═══════════
+
+    Error: expect(locator).toHaveText(expected)
+
+    Locator: locator('[data-test=order-total]')
+    Expected string: "$27.00"
+    Received string: "$30.00"
+    Timeout: 5000ms
+
+      at tests/checkout.spec.ts:31:42
+
+  1 failed
+    [chromium] › tests/checkout.spec.ts:24:1 › applies a promo code
+  17 passed (23.1s)
+section_end:1736430121:step_script
+section_start:1736430121:after_script
+Running after_script
+$ echo "e2e failed, keeping traces"
+e2e failed, keeping traces
+section_end:1736430123:after_script
+section_start:1736430123:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736430128:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

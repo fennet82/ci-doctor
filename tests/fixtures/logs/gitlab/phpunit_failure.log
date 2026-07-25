@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on php-runner-01 Ph7Yu2Nb, system ID: s_bb88cc77dd66
+Preparing the "docker" executor
+  Using Docker executor with image php:8.3-cli ...
+section_start:1736380000:prepare_executor
+Using Docker executor with image php:8.3-cli ...
+Using docker image sha256:3e2d1c0b9a87 for php:8.3-cli with digest php@sha256:5a4b...
+section_end:1736380018:prepare_executor
+section_start:1736380018:prepare_script
+Preparing environment
+Running on runner-ph7yu2nb-project-53-concurrent-0...
+section_end:1736380019:prepare_script
+section_start:1736380019:get_sources
+Fetching changes...
+Checking out 7be3f1a0 as detached HEAD...
+section_end:1736380026:get_sources
+section_start:1736380026:restore_cache
+Checking cache for composer-8.3-default...
+Successfully extracted cache
+section_end:1736380038:restore_cache
+section_start:1736380038:step_script
+$ php --version
+PHP 8.3.7 (cli) (built: May 15 2024 10:22:11) (NTS)
+$ composer install --no-interaction --no-progress
+Installing dependencies from lock file (including require-dev)
+Generating optimized autoload files
+$ vendor/bin/phpunit --colors=never
+PHPUnit 10.5.20 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.7
+Configuration: /builds/team/shop/phpunit.xml
+
+...............F.........                                         25 / 25 (100%)
+
+Time: 00:01.284, Memory: 24.00 MB
+
+There was 1 failure:
+
+1) App\Tests\Pricing\VatCalculatorTest::testAppliesReducedRate
+Failed asserting that 2000 matches expected 1900.
+
+/builds/team/shop/tests/Pricing/VatCalculatorTest.php:41
+
+FAILURES!
+Tests: 25, Assertions: 63, Failures: 1.
+section_end:1736380089:step_script
+section_start:1736380089:after_script
+Running after_script
+$ echo "phpunit failed, skipping deploy"
+phpunit failed, skipping deploy
+section_end:1736380090:after_script
+section_start:1736380090:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736380093:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

@@ -1,0 +1,48 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on windows-docker-01 Dn4Pq7Vt, system ID: s_cc99aa11bb22
+Preparing the "docker" executor
+  Using Docker executor with image mcr.microsoft.com/dotnet/sdk:8.0 ...
+section_start:1736330000:prepare_executor
+Using Docker executor with image mcr.microsoft.com/dotnet/sdk:8.0 ...
+Using docker image sha256:5f4e3d2c1b0a for mcr.microsoft.com/dotnet/sdk:8.0 with digest sdk@sha256:77ab...
+section_end:1736330018:prepare_executor
+section_start:1736330018:prepare_script
+Preparing environment
+Running on runner-dn4pq7vt-project-71-concurrent-2...
+section_end:1736330019:prepare_script
+section_start:1736330019:get_sources
+Fetching changes...
+Checking out 33be80fa as detached HEAD...
+section_end:1736330026:get_sources
+section_start:1736330026:restore_cache
+Checking cache for nuget-packages-8.0...
+Successfully extracted cache
+section_end:1736330039:restore_cache
+section_start:1736330039:step_script
+$ dotnet --version
+8.0.303
+$ dotnet build --configuration Release
+  Determining projects to restore...
+  Restored /builds/team/billing/src/Billing/Billing.csproj (in 3.2 sec).
+  Billing -> Compiling...
+/builds/team/billing/src/Billing/InvoiceService.cs(112,31): error CS1061: 'Invoice' does not contain a definition for 'NetTotal' and no accessible extension method 'NetTotal' accepting a first argument of type 'Invoice' could be found (are you missing a using directive or an assembly reference?) [/builds/team/billing/src/Billing/Billing.csproj]
+/builds/team/billing/src/Billing/InvoiceService.cs(118,13): error CS0165: Use of unassigned local variable 'vat' [/builds/team/billing/src/Billing/Billing.csproj]
+
+Build FAILED.
+
+/builds/team/billing/src/Billing/InvoiceService.cs(112,31): error CS1061: 'Invoice' does not contain a definition for 'NetTotal' [/builds/team/billing/src/Billing/Billing.csproj]
+    0 Warning(s)
+    2 Error(s)
+
+Time Elapsed 00:00:11.63
+section_end:1736330063:step_script
+section_start:1736330063:after_script
+Running after_script
+$ echo "build failed, skipping pack"
+build failed, skipping pack
+section_end:1736330064:after_script
+section_start:1736330064:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: src/Billing/bin/Release/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736330066:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

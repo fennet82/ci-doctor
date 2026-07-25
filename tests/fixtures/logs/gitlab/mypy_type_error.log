@@ -1,0 +1,42 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on py-runner-05 Py8Lc4Rd, system ID: s_33aa44bb55cc
+Preparing the "docker" executor
+  Using Docker executor with image python:3.12-slim ...
+section_start:1736490000:prepare_executor
+Using Docker executor with image python:3.12-slim ...
+Using docker image sha256:2b1a0f9e8d7c for python:3.12-slim with digest python@sha256:3c4d...
+section_end:1736490014:prepare_executor
+section_start:1736490014:prepare_script
+Preparing environment
+Running on runner-py8lc4rd-project-37-concurrent-1...
+section_end:1736490015:prepare_script
+section_start:1736490015:get_sources
+Fetching changes with git depth set to 50...
+Checking out 7bb0e219 as detached HEAD...
+section_end:1736490022:get_sources
+section_start:1736490022:restore_cache
+Checking cache for pip-3.12-default...
+Successfully extracted cache
+section_end:1736490033:restore_cache
+section_start:1736490033:step_script
+$ pip install -e ".[dev]" --quiet
+Successfully installed etl-2.1.0 mypy-1.10.0
+$ ruff check etl
+All checks passed!
+$ mypy --strict etl
+etl/transform.py:88: error: Unsupported operand types for / ("Decimal" and "None")  [operator]
+etl/transform.py:88: note: Right operand is of type "float | None"
+etl/load.py:23: error: Function is missing a return type annotation  [no-untyped-def]
+etl/load.py:23: note: Use "-> None" if function does not return a value
+Found 2 errors in 2 files (checked 14 source files)
+section_end:1736490058:step_script
+section_start:1736490058:after_script
+Running after_script
+$ echo "type check failed"
+type check failed
+section_end:1736490059:after_script
+section_start:1736490059:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: .mypy_cache/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736490061:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

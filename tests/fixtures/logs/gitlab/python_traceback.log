@@ -1,0 +1,52 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on py-runner-05 Py8Lc4Rd, system ID: s_33aa44bb55cc
+Preparing the "docker" executor
+  Using Docker executor with image python:3.12-slim ...
+section_start:1736450000:prepare_executor
+Using Docker executor with image python:3.12-slim ...
+Using docker image sha256:2b1a0f9e8d7c for python:3.12-slim with digest python@sha256:3c4d...
+section_end:1736450015:prepare_executor
+section_start:1736450015:prepare_script
+Preparing environment
+Running on runner-py8lc4rd-project-37-concurrent-0...
+section_end:1736450016:prepare_script
+section_start:1736450016:get_sources
+Fetching changes with git depth set to 50...
+Checking out fe20c7a3 as detached HEAD...
+section_end:1736450023:get_sources
+section_start:1736450023:restore_cache
+Checking cache for pip-3.12-default...
+Successfully extracted cache
+section_end:1736450034:restore_cache
+section_start:1736450034:step_script
+$ pip install -e . --quiet
+Successfully installed etl-2.1.0
+$ python -m etl.run --config config/prod.yml
+2026-01-05 09:14:02 INFO  etl.run: loading config from config/prod.yml
+2026-01-05 09:14:02 INFO  etl.run: connecting to warehouse
+2026-01-05 09:14:03 INFO  etl.extract: pulled 12,481 rows from orders
+2026-01-05 09:14:04 INFO  etl.transform: applying fx conversion
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/runpy.py", line 198, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/builds/team/etl/etl/run.py", line 61, in <module>
+    main()
+  File "/builds/team/etl/etl/run.py", line 44, in main
+    totals = transform(rows, rate=cfg["fx"]["rate"])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/builds/team/etl/etl/transform.py", line 88, in transform
+    return [r.amount / rate for r in rows]
+            ~~~~~~~~~^~~~~~
+ZeroDivisionError: float division by zero
+section_end:1736450078:step_script
+section_start:1736450078:after_script
+Running after_script
+$ echo "etl run failed"
+etl run failed
+section_end:1736450079:after_script
+section_start:1736450079:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: out/totals.parquet: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736450081:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

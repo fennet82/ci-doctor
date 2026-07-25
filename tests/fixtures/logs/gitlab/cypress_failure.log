@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on e2e-runner-01 Pw6Vn3Hs, system ID: s_ab12cd34ef56
+Preparing the "docker" executor
+  Using Docker executor with image cypress/included:13.13.0 ...
+section_start:1736440000:prepare_executor
+Using Docker executor with image cypress/included:13.13.0 ...
+Using docker image sha256:7d6c5b4a3928 for cypress/included:13.13.0 with digest cypress@sha256:1f2e...
+section_end:1736440030:prepare_executor
+section_start:1736440030:prepare_script
+Preparing environment
+Running on runner-pw6vn3hs-project-90-concurrent-1...
+section_end:1736440031:prepare_script
+section_start:1736440031:get_sources
+Fetching changes...
+Checking out 66ee1a4b as detached HEAD...
+section_end:1736440038:get_sources
+section_start:1736440038:restore_cache
+Checking cache for npm-e2e-default...
+Successfully extracted cache
+section_end:1736440052:restore_cache
+section_start:1736440052:step_script
+$ npm ci --no-audit --no-fund
+added 388 packages in 8s
+$ npx cypress run --browser chrome
+
+  Running:  checkout.cy.js                                                (3 of 5)
+
+  Checkout
+    ✓ shows the cart summary (812ms)
+    1) applies a promo code
+
+  1 passing (6s)
+  1 failing
+
+  1) Checkout
+       applies a promo code:
+     AssertionError: Timed out retrying after 4000ms: expected '<span[data-test=order-total]>' to have text '$27.00', but the text was '$30.00'
+      at Context.eval (webpack:///./cypress/e2e/checkout.cy.js:22:38)
+
+  (Results)
+  ┌────────────────────────────────────────────────┐
+  │ Tests:        2                                │
+  │ Passing:      1                                │
+  │ Failing:      1                                │
+  └────────────────────────────────────────────────┘
+section_end:1736440118:step_script
+section_start:1736440118:after_script
+Running after_script
+$ echo "cypress failed, keeping videos"
+cypress failed, keeping videos
+section_end:1736440120:after_script
+section_start:1736440120:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736440126:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

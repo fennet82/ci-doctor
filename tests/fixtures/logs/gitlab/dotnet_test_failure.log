@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on windows-docker-01 Dn4Pq7Vt, system ID: s_cc99aa11bb22
+Preparing the "docker" executor
+  Using Docker executor with image mcr.microsoft.com/dotnet/sdk:8.0 ...
+section_start:1736320000:prepare_executor
+Using Docker executor with image mcr.microsoft.com/dotnet/sdk:8.0 ...
+Using docker image sha256:5f4e3d2c1b0a for mcr.microsoft.com/dotnet/sdk:8.0 with digest sdk@sha256:77ab...
+section_end:1736320019:prepare_executor
+section_start:1736320019:prepare_script
+Preparing environment
+Running on runner-dn4pq7vt-project-71-concurrent-0...
+section_end:1736320020:prepare_script
+section_start:1736320020:get_sources
+Fetching changes...
+Checking out 9c2e5a17 as detached HEAD...
+section_end:1736320027:get_sources
+section_start:1736320027:restore_cache
+Checking cache for nuget-packages-8.0...
+Successfully extracted cache
+section_end:1736320041:restore_cache
+section_start:1736320041:step_script
+$ dotnet --version
+8.0.303
+$ dotnet restore
+  Determining projects to restore...
+  Restored /builds/team/billing/src/Billing/Billing.csproj (in 4.1 sec).
+  Restored /builds/team/billing/tests/Billing.Tests/Billing.Tests.csproj (in 4.3 sec).
+$ dotnet test --no-restore --logger "console;verbosity=normal"
+  Billing -> /builds/team/billing/src/Billing/bin/Debug/net8.0/Billing.dll
+  Billing.Tests -> /builds/team/billing/tests/Billing.Tests/bin/Debug/net8.0/Billing.Tests.dll
+Test run for /builds/team/billing/tests/Billing.Tests/bin/Debug/net8.0/Billing.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.10.0 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:01.42]     Billing.Tests.InvoiceTests.AppliesVatToNetTotal [FAIL]
+  Failed Billing.Tests.InvoiceTests.AppliesVatToNetTotal [12 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 12000
+Actual:   11999
+  Stack Trace:
+     at Billing.Tests.InvoiceTests.AppliesVatToNetTotal() in /builds/team/billing/tests/Billing.Tests/InvoiceTests.cs:line 64
+
+Failed!  - Failed:     1, Passed:    87, Skipped:     0, Total:    88, Duration: 940 ms
+section_end:1736320098:step_script
+section_start:1736320098:after_script
+Running after_script
+$ echo "tests failed, skipping publish"
+tests failed, skipping publish
+section_end:1736320099:after_script
+section_start:1736320099:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736320102:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

@@ -1,0 +1,61 @@
+Running with gitlab-runner 16.11.0 (a1b2c3d4)
+  on rust-runner-02 Rs9Tk3Lm, system ID: s_ff11223344aa
+Preparing the "docker" executor
+  Using Docker executor with image rust:1.79-slim ...
+section_start:1736310000:prepare_executor
+Using Docker executor with image rust:1.79-slim ...
+Using docker image sha256:aa11bb22cc33 for rust:1.79-slim with digest rust@sha256:9f8e...
+section_end:1736310013:prepare_executor
+section_start:1736310013:prepare_script
+Preparing environment
+Running on runner-rs9tk3lm-project-42-concurrent-1...
+section_end:1736310014:prepare_script
+section_start:1736310014:get_sources
+Fetching changes with git depth set to 20...
+Checking out 4f90c1bb as detached HEAD...
+section_end:1736310020:get_sources
+section_start:1736310020:restore_cache
+Checking cache for cargo-registry-1.79...
+Successfully extracted cache
+section_end:1736310035:restore_cache
+section_start:1736310035:step_script
+$ cargo --version
+cargo 1.79.0 (ffa9cf99a 2024-06-03)
+$ cargo build --release --locked
+    Updating crates.io index
+   Compiling ledger v0.4.1 (/builds/team/ledger)
+error[E0308]: mismatched types
+   --> src/posting.rs:88:31
+    |
+88  |     let rate: Decimal = fx_rate(&currency);
+    |               -------   ^^^^^^^^^^^^^^^^^^ expected `Decimal`, found `Option<Decimal>`
+    |               |
+    |               expected due to this
+    |
+    = note: expected struct `Decimal`
+                 found enum `Option<Decimal>`
+help: consider using `Option::expect` to unwrap the `Option<Decimal>` value
+    |
+88  |     let rate: Decimal = fx_rate(&currency).expect("REASON");
+    |                                           +++++++++++++++++
+
+error[E0599]: no method named `to_minor_units` found for struct `Money` in the current scope
+   --> src/posting.rs:141:24
+    |
+141 |     let cents = amount.to_minor_units();
+    |                        ^^^^^^^^^^^^^^ method not found in `Money`
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `ledger` (lib) due to 2 previous errors
+section_end:1736310071:step_script
+section_start:1736310071:after_script
+Running after_script
+$ echo "build failed, skipping package"
+build failed, skipping package
+section_end:1736310072:after_script
+section_start:1736310072:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: target/release/ledger: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736310074:upload_artifacts_on_failure
+ERROR: Job failed: exit code 101

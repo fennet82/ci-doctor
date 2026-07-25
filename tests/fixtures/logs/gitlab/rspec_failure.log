@@ -1,0 +1,56 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on ruby-runner-04 Rb3Mn8Kw, system ID: s_44dd55ee66ff
+Preparing the "docker" executor
+  Using Docker executor with image ruby:3.3-slim ...
+section_start:1736340000:prepare_executor
+Using Docker executor with image ruby:3.3-slim ...
+Using docker image sha256:9a8b7c6d5e4f for ruby:3.3-slim with digest ruby@sha256:2b1c...
+section_end:1736340016:prepare_executor
+section_start:1736340016:prepare_script
+Preparing environment
+Running on runner-rb3mn8kw-project-29-concurrent-0...
+section_end:1736340017:prepare_script
+section_start:1736340017:get_sources
+Fetching changes with git depth set to 50...
+Checking out 6d1fa47c as detached HEAD...
+section_end:1736340024:get_sources
+section_start:1736340024:restore_cache
+Checking cache for bundler-3.3-default...
+Successfully extracted cache
+section_end:1736340036:restore_cache
+section_start:1736340036:step_script
+$ ruby --version
+ruby 3.3.4 (2024-07-09 revision be1089c8ec) [x86_64-linux]
+$ bundle install --jobs 4 --retry 3
+Bundle complete! 42 Gemfile dependencies, 118 gems now installed.
+$ bundle exec rspec --format progress
+.........................F.....
+
+Failures:
+
+  1) Checkout::Total applies the loyalty discount before tax
+     Failure/Error: expect(checkout.total_cents).to eq 2_700
+
+       expected: 2700
+            got: 3000
+
+       (compared using ==)
+     # ./spec/checkout/total_spec.rb:48:in `block (3 levels) in <top (required)>'
+
+Finished in 1.84 seconds (files took 2.31 seconds to load)
+31 examples, 1 failure
+
+Failed examples:
+
+rspec ./spec/checkout/total_spec.rb:44 # Checkout::Total applies the loyalty discount before tax
+section_end:1736340092:step_script
+section_start:1736340092:after_script
+Running after_script
+$ echo "specs failed, skipping deploy"
+specs failed, skipping deploy
+section_end:1736340093:after_script
+section_start:1736340093:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736340096:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

@@ -1,0 +1,45 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on php-runner-01 Ph7Yu2Nb, system ID: s_bb88cc77dd66
+Preparing the "docker" executor
+  Using Docker executor with image php:8.1-cli ...
+section_start:1736400000:prepare_executor
+Using Docker executor with image php:8.1-cli ...
+Using docker image sha256:1a2b3c4d5e6f for php:8.1-cli with digest php@sha256:9c8d...
+section_end:1736400016:prepare_executor
+section_start:1736400016:prepare_script
+Preparing environment
+Running on runner-ph7yu2nb-project-53-concurrent-2...
+section_end:1736400017:prepare_script
+section_start:1736400017:get_sources
+Fetching changes...
+Checking out 5da77e31 as detached HEAD...
+section_end:1736400024:get_sources
+section_start:1736400024:restore_cache
+Checking cache for composer-8.1-default...
+WARNING: file does not exist
+Failed to extract cache
+section_end:1736400028:restore_cache
+section_start:1736400028:step_script
+$ php --version
+PHP 8.1.27 (cli) (built: Dec 20 2023 14:02:04) (NTS)
+$ composer install --no-interaction --no-progress
+Loading composer repositories with package information
+Updating dependencies
+Your requirements could not be resolved to an installable set of packages.
+
+  Problem 1
+    - Root composer.json requires symfony/http-kernel ^7.1 -> satisfiable by symfony/http-kernel[v7.1.0].
+    - symfony/http-kernel v7.1.0 requires php >=8.2 -> your php version (8.1.27) does not satisfy that requirement.
+
+To enable extensions, verify that they are enabled in your .ini files.
+section_end:1736400049:step_script
+section_start:1736400049:after_script
+Running after_script
+$ echo "composer install failed"
+composer install failed
+section_end:1736400050:after_script
+section_start:1736400050:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: vendor/: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736400052:upload_artifacts_on_failure
+ERROR: Job failed: exit code 2
