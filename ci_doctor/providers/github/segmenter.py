@@ -20,6 +20,19 @@ _ENDGROUP = re.compile(r"^##\[endgroup\]\s*$")
 
 
 def _canonical(name: str) -> str:
+    """Reduce a dynamic GitHub group name to a stable token.
+
+    Group names embed action versions and step titles ("Run actions/checkout@v4"),
+    so they cannot be phase-map keys directly. Canonicalising here is what lets
+    phase assignment in `core` stay provider-free.
+
+    Args:
+        name: The raw group name.
+
+    Returns:
+        A stable token the config phase map keys on, or the trimmed original when
+        nothing matches.
+    """
     n = name.strip().lower()
     if "checkout" in n:
         return "checkout"
@@ -39,7 +52,19 @@ def _canonical(name: str) -> str:
 
 
 class GitHubSegmenter(LogSegmenter):
+    """Segments GitHub Actions logs on `##[group]` / `##[endgroup]` markers."""
+
     def segment(self, raw_log: str) -> list[Section]:
+        """Parse a GitHub Actions log into sections.
+
+        Args:
+            raw_log: The raw log. Every line carries an ISO timestamp prefix,
+                stripped here.
+
+        Returns:
+            Top-level sections, names canonicalised and the original kept as the
+            section header, plus synthetic `__preamble__`/`__trailer__`.
+        """
         top: list[Section] = []
         stack: list[Section] = []
         counter = 0

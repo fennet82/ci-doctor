@@ -22,6 +22,7 @@ CASES = support.pairs_for(SPECS)
 
 @pytest.mark.parametrize("provider,case", CASES, ids=[f"{p}-{c}" for p, c in CASES])
 def test_attribution(provider, case):
+    """A fixture log classifies to its expected phase, reason and rule."""
     spec = json.loads((support.EXPECTED / f"{case}.json").read_text())
     log = support.read_log(provider, case)
     meta = spec.get("job", {})
@@ -44,18 +45,21 @@ def test_attribution(provider, case):
 
 
 def test_every_provider_dir_has_a_segmenter():
-    # Guards the "drop a directory" workflow: a logs/<provider>/ with no
-    # segmenter registered would silently contribute zero tests.
+    """Guards the "drop a directory" workflow.
+
+    A `logs/<provider>/` with no registered segmenter would silently contribute
+    zero tests instead of failing.
+    """
     missing = set(support.providers()) - set(support.SEGMENTERS)
     assert not missing, f"logs/ dirs with no segmenter in support.SEGMENTERS: {sorted(missing)}"
 
 
 def test_every_expected_verdict_has_at_least_one_log():
-    # An orphaned expected/*.json would otherwise silently assert nothing.
+    """An orphaned `expected/*.json` would otherwise silently assert nothing."""
     covered = {case for _, case in CASES}
     assert set(SPECS) == covered, f"no log for: {sorted(set(SPECS) - covered)}"
 
 
 def test_regression_case_is_present():
-    # Guard the guard: the noisy-log regression fixture must exist and target SCRIPT.
+    """Guard the guard: the noisy-log regression fixture must not go missing."""
     assert "script_failure_noisy" in SPECS

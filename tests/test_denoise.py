@@ -1,28 +1,35 @@
+"""Denoising: cuts volume hard while the causal line always survives."""
+
 from ci_doctor.config.schema import DenoiseConfig
 from ci_doctor.core.denoise import denoise, strip_ansi
 
 
 def _cfg(**kw):
+    """Build a DenoiseConfig with test defaults, overridden by kwargs."""
     base = dict(collapse_carriage_returns=True, dedupe_repeats=True, noise_patterns=[r"^\s*$", r"^Progress:"])
     base.update(kw)
     return DenoiseConfig(**base)
 
 
 def test_strip_ansi():
+    """ANSI colour codes are removed, the text between them is not."""
     assert strip_ansi("\x1b[31mred\x1b[0m text") == "red text"
 
 
 def test_collapse_carriage_returns():
+    """A progress bar collapses to its final rendered state."""
     out = denoise(["downloading 1%\rdownloading 50%\rdownloading done"], _cfg())
     assert out == ["downloading done"]
 
 
 def test_dedupe_consecutive_with_count():
+    """Repeated adjacent lines fold into one, carrying the repeat count."""
     out = denoise(["same", "same", "same", "other"], _cfg())
     assert out == ["same  (×3)", "other"]
 
 
 def test_noise_dropped_but_anchor_kept():
+    """Noise patterns remove their lines and leave the error alone."""
     lines = ["Progress: 10%", "Progress: 20%", "ERROR: real boom", "Progress: 30%"]
     out = denoise(lines, _cfg())
     assert "ERROR: real boom" in out
@@ -30,12 +37,13 @@ def test_noise_dropped_but_anchor_kept():
 
 
 def test_anchor_matching_noise_pattern_is_not_dropped():
-    # A line matching a noise pattern but also looking like an error must survive.
+    """An over-broad noise pattern cannot delete the line that explains the failure."""
     out = denoise(["Progress: ERROR something failed"], _cfg(noise_patterns=[r"^Progress:"]))
     assert out == ["Progress: ERROR something failed"]
 
 
 def test_cuts_noisy_log_over_70pct_and_retains_anchor():
+    """On a ~50k-line log, denoising cuts >70% and still keeps the cause."""
     # Synthesize a ~50k-line noisy log: repeated waiting spam + \r progress + a real error.
     lines = ["Waiting for pod to be scheduled..."] * 40000
     lines += [f"pulling layer deadbeef {p}%\rpulling layer deadbeef done" for p in range(9000)]

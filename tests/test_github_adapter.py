@@ -14,6 +14,7 @@ from ci_doctor.providers.github.segmenter import GitHubSegmenter
 
 
 def test_reason_mapping():
+    """Conclusions map to reasons, and startup_failure wins over the conclusion."""
     assert to_failure_reason("failure") == FailureReason.SCRIPT_FAILURE
     assert to_failure_reason("timed_out") == FailureReason.TIMEOUT
     assert to_failure_reason("cancelled") == FailureReason.CANCELLED
@@ -22,6 +23,7 @@ def test_reason_mapping():
 
 
 def test_segmenter_groups_and_canonical_names():
+    """Groups become sections with canonical names, originals kept as headers."""
     log = (
         "2024-01-01T00:00:00.0Z ##[group]Run actions/checkout@v4\n"
         "2024-01-01T00:00:01.0Z Syncing repository\n"
@@ -40,8 +42,11 @@ def test_segmenter_groups_and_canonical_names():
 
 
 def test_full_attribution_through_github_path():
-    # The GitHub segmenter + shared phase-map + shared classifier => correct verdict,
-    # with zero GitHub-specific code in core.
+    """End to end on a GitHub log, with zero GitHub-specific code in core.
+
+    The provider segmenter plus the shared phase map and classifier reach the
+    right verdict — which is the whole point of the ports/adapters split.
+    """
     log = (
         "##[group]Run actions/checkout@v4\n"
         "Syncing repository\n"
@@ -64,6 +69,7 @@ def test_full_attribution_through_github_path():
 
 
 def _fake_client(jobs, logs):
+    """Build an in-memory stand-in for the GitHub REST client."""
     return SimpleNamespace(
         run_jobs=lambda repo, run_id: jobs,
         job_log=lambda repo, job_id: logs.get(job_id, ""),
@@ -71,6 +77,7 @@ def _fake_client(jobs, logs):
 
 
 def test_provider_maps_jobs_and_normalizes_status():
+    """Job dicts map to the domain model and failing conclusions become "failed"."""
     jobs = [
         {"id": 11, "name": "build", "status": "completed", "conclusion": "failure",
          "runner_name": "gh-runner-1", "html_url": "http://gh/11"},

@@ -67,7 +67,7 @@ acquire → segment → attribute → denoise → extract → budget → (LLM) �
    (ANSI/CR/dedup denoising, anchored windows, token budgeting — every truncation is visible).
    Shipped matcher packs cover pytest/jest/go/maven/gradle/bazel, Rust, .NET, Ruby, PHP,
    node + npm/pnpm/yarn/bun, Playwright/Cypress, tsc/eslint/mypy, Docker and Terraform;
-   add your own under `extraction.matchers`.
+   add your own under `extraction.matchers` — they merge onto the shipped packs by id.
 5. **LLM (optional)** explains the cause *within* the already-decided phase, returning a
    validated JSON report. Disabled or unreachable → deterministic report instead.
 6. **Render / deliver** to the terminal, `report.md`/`report.json`, and an idempotent MR/PR note.
@@ -95,27 +95,38 @@ docker build -t ci-doctor .
 
 ```sh
 # Replay a captured log offline — no network, no LLM:
-uv run ci-doctor analyze --from-file failing-job.log
+uv run ci-doctor analyze failing-job.log
 
 # Against a live pipeline (reads $CI_PIPELINE_ID etc. inside CI):
 uv run ci-doctor analyze "$CI_PIPELINE_ID"
 ```
 
 ```
-ci-doctor analyze [RUN_ID] [OPTIONS]
+ci-doctor analyze [TARGET] [OPTIONS]
 
-  --from-file PATH   Replay a raw job log offline (no network, no LLM).
+  TARGET             A pipeline/run id, or a path to a raw job log to replay
+                     offline (no network fetch).
   --job-id TEXT      Analyze a single job id.
-  --config PATH      Path to .ci-doctor.yml.
+  -f, --config PATH  Path to .ci-doctor.yml. Repeatable; the last one wins.
   --no-color         Disable coloured output (also honours NO_COLOR).
   -v, --verbose      Enable debug logging.
   --version          Show version and exit.
+
+ci-doctor config [OPTIONS]
+
+  --diff             Show only what your config changes vs the shipped defaults,
+                     git-diff style: green added, red replaced.
+  --schema           Print the JSON Schema for .ci-doctor.yml.
+  --validate         Load every layer and report what fails validation.
+  -f, --config PATH  Path to .ci-doctor.yml. Repeatable; the last one wins.
+  --less / --plain   Force / skip the scrollable pager (paged on a terminal).
 ```
 
 ## Configuration
 
 Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_DOCTOR_*` env
-< CLI flags. Unknown keys are an error. Minimal config:
+< CLI flags. Unknown keys are an error. Run `ci-doctor config --diff` to see exactly what
+your layers changed. Minimal config:
 
 ```yaml
 provider: gitlab

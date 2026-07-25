@@ -6,7 +6,16 @@ from ci_doctor.core.models import Job
 
 
 def select_failed_jobs(jobs: list[Job], include_allowed_failures: bool = False) -> list[Job]:
-    """Failed jobs worth analyzing. `allow_failure` jobs are noise by default."""
+    """Pick the failed jobs worth analyzing.
+
+    Args:
+        jobs: Every job in the run, in pipeline order.
+        include_allowed_failures: Keep jobs marked `allow_failure`. They are
+            noise by default — the pipeline already decided it tolerates them.
+
+    Returns:
+        The selected jobs, order preserved.
+    """
     out = []
     for job in jobs:
         if job.status != "failed":

@@ -1,3 +1,5 @@
+"""Renderers: Markdown sections, JSON round-trip, and rich-markup safety."""
+
 import json
 
 from ci_doctor.llm.schema import Evidence, RemediationStep, Report
@@ -6,6 +8,7 @@ from ci_doctor.render.markdown import MarkdownRenderer
 
 
 def _report():
+    """Build a fully populated report so every renderer branch is exercised."""
     return Report(
         summary="unit tests failed", failure_phase="script", category="test",
         confidence="high", is_infra_not_code=False, likely_flaky=False,
@@ -18,6 +21,7 @@ def _report():
 
 
 def test_markdown_has_sections():
+    """Every populated section appears in the Markdown output."""
     md = MarkdownRenderer().render(_report())
     assert "## ci-doctor" in md
     assert "### Root cause" in md
@@ -27,13 +31,18 @@ def test_markdown_has_sections():
 
 
 def test_json_roundtrips():
+    """The JSON artifact parses and preserves nested fields."""
     data = json.loads(JsonRenderer().render(_report()))
     assert data["failure_phase"] == "script"
     assert data["remediation"][0]["where"] == "tests/test_x.py"
 
 
 def test_terminal_preserves_bracketed_log_content():
-    # Log content full of [...] must not be eaten as rich markup.
+    """Log text full of `[...]` must not be eaten as rich markup.
+
+    Real logs are full of `[error]`, `[gw0]` and ANSI remnants; rendering them as
+    markup would mangle the evidence or raise on a malformed tag.
+    """
     import io
 
     from ci_doctor.render.terminal import render_terminal

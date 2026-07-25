@@ -1,3 +1,5 @@
+"""Evidence bundling: the blamed phase supplies the lines, noise is flagged not blamed."""
+
 import pytest
 
 from ci_doctor.config.loader import load_config
@@ -12,6 +14,7 @@ CASE = "script_failure_noisy"
 
 @pytest.mark.parametrize("provider", support.providers_with(CASE))
 def test_build_bundle_excludes_fetch_noise_but_flags_it(provider):
+    """A loud cache failure in `fetch` must not displace the real script cause."""
     log = support.read_log(provider, CASE)
     job = Job(id="1", name="build", status="failed",
               failure_reason=FailureReason.SCRIPT_FAILURE, log=log)

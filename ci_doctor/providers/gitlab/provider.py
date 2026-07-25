@@ -23,7 +23,19 @@ log = logging.getLogger("ci_doctor.gitlab")
 
 
 class GitLabProvider(CIProvider):
+    """Read-only GitLab adapter over python-gitlab."""
+
     def __init__(self, config: Config, client=None, environ: dict[str, str] | None = None):
+        """Connect to GitLab, unless a client is injected.
+
+        Args:
+            config: The effective config; only `config.gitlab` is used.
+            client: Pre-built `gitlab.Gitlab`, used by tests to stay offline.
+            environ: Environment for the token and CI_* vars. Defaults to os.environ.
+
+        Raises:
+            ValueError: If `gitlab.base_url` is empty.
+        """
         import os
 
         self.cfg = config.gitlab
@@ -34,6 +46,12 @@ class GitLabProvider(CIProvider):
     # --- connection -------------------------------------------------------
 
     def _read_token(self) -> str | None:
+        """Resolve the API token.
+
+        Returns:
+            The token, or None when neither source has one — a public project
+            still works unauthenticated.
+        """
         # token_file (k8s/Vault secret mount) takes precedence over the env var.
         if self.cfg.token_file:
             path = Path(self.cfg.token_file)
@@ -43,6 +61,14 @@ class GitLabProvider(CIProvider):
         return self.environ.get(self.cfg.token_env)
 
     def _connect(self):
+        """Build the python-gitlab client and probe the instance version.
+
+        Returns:
+            A configured `gitlab.Gitlab`.
+
+        Raises:
+            ValueError: If `base_url` is empty.
+        """
         if not self.cfg.base_url:
             raise ValueError("gitlab.base_url must not be empty")
         ssl_verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
@@ -61,6 +87,14 @@ class GitLabProvider(CIProvider):
         return gl
 
     def _project(self):
+        """Resolve and cache the project from `CI_PROJECT_ID`.
+
+        Returns:
+            The python-gitlab project object.
+
+        Raises:
+            ValueError: If `CI_PROJECT_ID` is not set.
+        """
         if self._project_obj is None:
             pid = self.environ.get("CI_PROJECT_ID")
             if not pid:
@@ -71,6 +105,15 @@ class GitLabProvider(CIProvider):
     # --- CIProvider -------------------------------------------------------
 
     def fetch_run(self, run_ref: str) -> Run:
+        """Fetch a pipeline and map its jobs.
+
+        Args:
+            run_ref: The pipeline id.
+
+        Returns:
+            The run. Job logs are not fetched here — that happens lazily, per
+            selected job, so an unread job costs nothing.
+        """
         project = self._project()
         pipeline = project.pipelines.get(int(run_ref))
         jobs = [self._to_job(pj) for pj in pipeline.jobs.list(all=True)]
@@ -85,6 +128,12 @@ class GitLabProvider(CIProvider):
         )
 
     def _merge_request_ref(self) -> MergeRequestRef | None:
+        """Resolve the MR from the predefined CI variable.
+
+        Returns:
+            The MR reference, or None outside an MR pipeline. Read from
+            `CI_MERGE_REQUEST_IID` rather than guessed from branch or SHA.
+        """
         # Resolve from the predefined CI var — reliable, no guessing from branch/sha.
         iid = self.environ.get("CI_MERGE_REQUEST_IID")
         if not iid:
@@ -92,6 +141,16 @@ class GitLabProvider(CIProvider):
         return MergeRequestRef(iid=iid, project_id=self.environ.get("CI_PROJECT_ID"))
 
     def fetch_job_log(self, job: Job) -> str | None:
+        """Fetch one job's trace.
+
+        Args:
+            job: The job, carrying its GitLab id.
+
+        Returns:
+            The decoded trace, or None when it is missing or empty. None is valid
+            data — it identifies the "never got a runner" case — so a fetch
+            failure is logged and swallowed rather than raised.
+        """
         # A missing/empty trace is valid data (the "never got a runner" case), not an error.
         try:
             raw = self._project().jobs.get(int(job.id)).trace()
@@ -105,9 +164,15 @@ class GitLabProvider(CIProvider):
         return text or None
 
     def post_note(self, mr: MergeRequestRef, body: str, marker: str) -> None:
-        """Idempotent: update our own previous note (found by marker) or create one.
+        """Post or update the report on an MR.
 
-        Nothing spams an MR faster than a bot that can't find its last comment.
+        Idempotent: nothing spams an MR faster than a bot that cannot find its
+        own last comment.
+
+        Args:
+            mr: The merge request.
+            body: The rendered Markdown report.
+            marker: Hidden comment identifying our note, appended to the body.
         """
         mr_obj = self._project().mergerequests.get(int(mr.iid))
         full = f"{body}\n\n{marker}"
@@ -121,6 +186,15 @@ class GitLabProvider(CIProvider):
     # --- mapping ----------------------------------------------------------
 
     def _to_job(self, pj) -> Job:
+        """Map a python-gitlab job onto the domain model.
+
+        Args:
+            pj: A python-gitlab job object.
+
+        Returns:
+            The neutral job. Every field is read defensively — older instances
+            omit attributes, and a missing one must degrade, not crash.
+        """
         status = getattr(pj, "status", "") or ""
         raw_reason = getattr(pj, "failure_reason", "") or ""
         reason = FailureReason.CANCELLED if status == "canceled" else to_failure_reason(raw_reason)
@@ -144,6 +218,14 @@ class GitLabProvider(CIProvider):
 
     @staticmethod
     def _to_runner(runner) -> RunnerInfo | None:
+        """Map GitLab's runner dict onto the domain model.
+
+        Args:
+            runner: The raw dict, or None when no runner was assigned.
+
+        Returns:
+            The runner info, or None.
+        """
         if not runner:
             return None
         rid = runner.get("id")
@@ -155,6 +237,14 @@ class GitLabProvider(CIProvider):
 
     @staticmethod
     def _to_needs(needs) -> list[str]:
+        """Extract upstream job names from GitLab's `needs`.
+
+        Args:
+            needs: A list of dicts or plain strings, or None.
+
+        Returns:
+            Upstream job names, used to spot cascade failures.
+        """
         out = []
         for n in needs or []:
             name = n.get("name") if isinstance(n, dict) else n

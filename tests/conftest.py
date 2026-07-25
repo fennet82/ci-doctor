@@ -12,7 +12,20 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
+    """Block every real socket connection for the duration of a test.
+
+    Autouse, so no test can opt out by forgetting to request it.
+
+    Args:
+        monkeypatch: pytest fixture used to patch the socket module.
+    """
+
     def guard(*args, **kwargs):
+        """Stand in for socket connect/create_connection.
+
+        Raises:
+            RuntimeError: Always.
+        """
         raise RuntimeError("network access is not allowed in tests (air-gap guarantee)")
 
     monkeypatch.setattr(socket.socket, "connect", guard)

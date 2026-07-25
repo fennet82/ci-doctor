@@ -29,11 +29,15 @@ _GOOD = {
 
 
 class FakeClient:
+    """Scripted LLM client: replays queued responses, raising any that are exceptions."""
+
     def __init__(self, responses):
+        """Queue the responses to replay, last one repeating once exhausted."""
         self.responses = list(responses)
         self.calls = 0
 
     def complete_structured(self, prompt, schema):
+        """Return the next queued response, or raise it if it is an exception."""
         r = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
         if isinstance(r, Exception):
@@ -42,8 +46,14 @@ class FakeClient:
 
 
 def _pipeline(log, reason=FailureReason.SCRIPT_FAILURE, overrides=None, provider="gitlab"):
-    # `provider` defaults to gitlab only because _SIMPLE_LOG below is a GitLab-syntax
-    # literal; fixture-driven tests pass the provider the log actually came from.
+    """Run a log through the deterministic stages up to (not including) the report.
+
+    `provider` defaults to gitlab only because `_SIMPLE_LOG` is a GitLab-syntax
+    literal; fixture-driven tests pass the provider the log actually came from.
+
+    Returns:
+        A ``(job, attribution, bundle, config)`` tuple.
+    """
     job = Job(id="1", name="build", status="failed", failure_reason=reason, log=log)
     cfg = load_config(environ={}, overrides=overrides)
     job.sections = support.segment(provider, log)
@@ -58,6 +68,7 @@ _SIMPLE_LOG = "section_start:1:step_script\n$ pytest\nE assert 1 == 2\nsection_e
 
 
 def test_deterministic_when_llm_disabled():
+    """With the LLM off, the report is still complete and correctly phased."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides={"llm": {"enabled": False}})
     report = produce_report(job, attr, bundle, cfg)
     assert report.failure_phase == "script"
@@ -65,6 +76,7 @@ def test_deterministic_when_llm_disabled():
 
 
 def test_llm_path_returns_validated_report():
+    """A valid LLM reply is used directly, in a single call."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([_GOOD])
     report = produce_report(job, attr, bundle, cfg, client=client)
@@ -73,6 +85,7 @@ def test_llm_path_returns_validated_report():
 
 
 def test_repair_retry_on_invalid_then_valid():
+    """An invalid reply triggers exactly one repair retry, which then succeeds."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([{"not": "a valid report"}, _GOOD])
     report = produce_report(job, attr, bundle, cfg, client=client)
@@ -81,6 +94,7 @@ def test_repair_retry_on_invalid_then_valid():
 
 
 def test_infer_category_from_evidence():
+    """The reason decides when it can; otherwise the evidence signatures do."""
     from ci_doctor.llm.report import _infer_category
 
     # reason map wins when it can classify
@@ -106,7 +120,7 @@ _CATEGORY_PARAMS = [(p, c, _CATEGORY_FIXTURES[c]) for p, c in support.pairs_for(
 @pytest.mark.parametrize("provider,fixture,expected", _CATEGORY_PARAMS,
                          ids=[f"{p}-{c}" for p, c, _ in _CATEGORY_PARAMS])
 def test_deterministic_category_from_fixture(provider, fixture, expected):
-    # Simulate --from-file: no provider metadata, no LLM -> category inferred from evidence.
+    """Offline replay, with no metadata and no LLM, still classifies correctly."""
     log = support.read_log(provider, fixture)
     job, attr, bundle, cfg = _pipeline(log, reason=FailureReason.UNKNOWN, provider=provider)
     report = produce_report(job, attr, bundle, cfg)  # deterministic
@@ -114,13 +128,14 @@ def test_deterministic_category_from_fixture(provider, fixture, expected):
 
 
 def test_anthropic_backend_needs_no_api_base():
-    # backend=anthropic is "ready" without api_base (model defaults, auth from env).
+    """The anthropic backend is ready without api_base — model and auth default."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides={"llm": {"backend": "anthropic"}})
     report = produce_report(job, attr, bundle, cfg, client=FakeClient([_GOOD]))
     assert report.summary == "unit tests failed on assert"
 
 
 def test_degraded_fallback_on_llm_error():
+    """A failed LLM call still yields a correct report, and says it degraded."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([RuntimeError("endpoint down")])
     report = produce_report(job, attr, bundle, cfg, client=client)
@@ -129,6 +144,7 @@ def test_degraded_fallback_on_llm_error():
 
 
 def test_secrets_roundtrip_no_leak():
+    """No secret in the log reaches the report, the JSON dump or the handoff prompt."""
     log = (
         "section_start:1:step_script\n"
         "$ deploy\n"

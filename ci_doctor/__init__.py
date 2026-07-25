@@ -1,3 +1,5 @@
+"""ci-doctor: a read-only postmortem analyzer for failed CI runs."""
+
 from importlib.metadata import PackageNotFoundError, version
 
 try:

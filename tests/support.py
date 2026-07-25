@@ -34,32 +34,80 @@ SEGMENTERS: dict[str, type[LogSegmenter]] = {
 
 
 def providers() -> list[str]:
-    """Providers that actually ship log fixtures."""
+    """List the providers that actually ship log fixtures.
+
+    Returns:
+        Provider names, sorted, taken from the `logs/` subdirectories.
+    """
     return sorted(d.name for d in LOGS.iterdir() if d.is_dir())
 
 
 def log_path(provider: str, case: str) -> Path:
+    """Path to one provider's log for a case.
+
+    Args:
+        provider: Provider name, matching a `logs/` subdirectory.
+        case: Fixture stem, e.g. "npm_build_failure".
+
+    Returns:
+        The path. Not checked for existence — use :func:`providers_with` for that.
+    """
     return LOGS / provider / f"{case}.log"
 
 
 def read_log(provider: str, case: str) -> str:
+    """Read one provider's log for a case.
+
+    Args:
+        provider: Provider name.
+        case: Fixture stem.
+
+    Returns:
+        The raw log text.
+
+    Raises:
+        FileNotFoundError: If that provider ships no log for the case.
+    """
     return log_path(provider, case).read_text()
 
 
 def providers_with(case: str) -> list[str]:
-    """Every provider shipping a log for `case` — feed straight to parametrize.
+    """Find every provider shipping a log for a case. Feed straight to parametrize.
 
-    Returns a list so a case with no log anywhere yields no tests rather than
-    silently passing.
+    Args:
+        case: Fixture stem.
+
+    Returns:
+        Provider names. A list, not a generator, so a case with no log anywhere
+        yields *no tests* rather than one that silently passes.
     """
     return [p for p in providers() if log_path(p, case).is_file()]
 
 
 def pairs_for(cases) -> list[tuple[str, str]]:
-    """(provider, case) for each case, across every provider that has it."""
+    """Cross a set of cases with the providers that ship each one.
+
+    Args:
+        cases: Any iterable of fixture stems, including a dict keyed by them.
+
+    Returns:
+        ``(provider, case)`` pairs, ready for `pytest.mark.parametrize`.
+    """
     return [(p, case) for case in cases for p in providers_with(case)]
 
 
 def segment(provider: str, raw_log: str):
-    """Parse a raw log with the segmenter for that provider's format."""
+    """Parse a raw log with the segmenter for that provider's format.
+
+    Args:
+        provider: Provider name.
+        raw_log: The raw log text.
+
+    Returns:
+        The section tree.
+
+    Raises:
+        KeyError: If the provider has no registered segmenter — which is the
+            point: a new `logs/` directory must register one.
+    """
     return SEGMENTERS[provider]().segment(raw_log)

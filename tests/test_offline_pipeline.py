@@ -20,6 +20,7 @@ CASE = "script_failure_noisy"
 
 @pytest.mark.parametrize("provider", support.providers_with(CASE))
 def test_full_offline_pipeline_no_network(provider):
+    """Every deterministic stage runs end to end without touching the network."""
     log = support.read_log(provider, CASE)
     job = Job(id="1", name="build", status="failed", failure_reason=FailureReason.SCRIPT_FAILURE, log=log)
     cfg = load_config(environ={})

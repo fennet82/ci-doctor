@@ -7,13 +7,26 @@ from ci_doctor.llm.schema import Report
 
 
 class MarkdownRenderer(Renderer):
+    """Emits the report as Markdown — the `report.md` artifact and MR-note body."""
+
     def render(self, report: Report) -> str:
+        """Render a report.
+
+        Args:
+            report: The validated, already-redacted report.
+
+        Returns:
+            Markdown: a summary table, then root cause, contributing factors,
+            evidence, remediation, related paths and the handoff prompt. Empty
+            sections are omitted rather than rendered as headings with nothing
+            under them.
+        """
         yn = lambda b: "yes" if b else "no"  # noqa: E731
         out = [
             f"## ci-doctor — {report.summary}",
             "",
-            f"| Phase | Category | Confidence | Infra not code | Likely flaky |",
-            f"|---|---|---|---|---|",
+            "| Phase | Category | Confidence | Infra not code | Likely flaky |",
+            "|---|---|---|---|---|",
             f"| {report.failure_phase} | {report.category} | {report.confidence} | "
             f"{yn(report.is_infra_not_code)} | {yn(report.likely_flaky)} |",
             "",

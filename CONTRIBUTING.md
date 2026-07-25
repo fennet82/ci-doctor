@@ -131,8 +131,17 @@ matches fails silently, because the tail window still returns something.
 Windows are `before`/`after` lines around the anchor. Anchor on the **cause**, not on a
 trailing summary line: a summary-only anchor windows *past* the detail above it.
 
-Config **lists replace, mappings deep-merge**. A repo defining `extraction.matchers`
-drops every shipped pack — so packs belong in `defaults.yml`, and user docs must say so.
+Config **lists replace, mappings deep-merge** — except lists whose entries all carry an
+`id`, which merge per id (`_merge_by_id` in `config/loader.py`). So a user pack with a new
+id is *added* to the shipped ones, and one reusing a shipped id *overrides* that pack and
+logs a warning naming it. The override is field by field: `priority: 95` on the shipped
+`pytest` pack keeps its `start`/`end`, because blanking them would leave a matcher that
+can never fire. A user `pattern` still wins over an inherited `start`/`end` — `extract.py`
+checks `pattern` first.
+
+Every field you add to `config/schema.py` needs a `description=` — it becomes the text in
+the published `ci-doctor.schema.json`, and `test_json_schema_documents_every_field` fails
+without it.
 
 ### 5.2 Add a deterministic category signature
 

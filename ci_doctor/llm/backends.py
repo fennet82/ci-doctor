@@ -19,10 +19,24 @@ from ci_doctor.config.schema import LLMConfig
 from ci_doctor.core.ports import LLMClient
 from ci_doctor.llm.client import _strip_fences
 
+#: System message shared by every backend. The reply schema lives in the user
+#: prompt; this only pins the *shape* of the response.
 _SYSTEM = "Respond with a single JSON object and nothing else. No markdown, no code fences, no prose."
 
 
 def make_client(cfg: LLMConfig, environ: dict[str, str] | None = None) -> LLMClient:
+    """Build the client for the configured backend.
+
+    Args:
+        cfg: LLM settings; `cfg.backend` selects the implementation.
+        environ: Environment for API keys. Defaults to os.environ.
+
+    Returns:
+        A client implementing :class:`~ci_doctor.core.ports.LLMClient`.
+
+    Raises:
+        ValueError: On an unknown backend name.
+    """
     if cfg.backend == "openai":
         from ci_doctor.llm.client import OpenAILLMClient
 
@@ -37,8 +51,17 @@ def make_client(cfg: LLMConfig, environ: dict[str, str] | None = None) -> LLMCli
 
 
 def backend_ready(cfg: LLMConfig) -> bool:
-    """Can this backend run as configured? If not, the caller emits the clean
-    deterministic report instead of attempting (and failing) a call."""
+    """Check whether a backend can run as configured.
+
+    Checked *before* attempting a call so an unconfigured backend produces the
+    clean deterministic report rather than a failed call and a degraded one.
+
+    Args:
+        cfg: LLM settings.
+
+    Returns:
+        True if the backend has everything it needs. Unknown backends are False.
+    """
     if cfg.backend == "openai":
         return bool(cfg.model and cfg.api_base)
     if cfg.backend == "litellm":
@@ -51,11 +74,32 @@ def backend_ready(cfg: LLMConfig) -> bool:
 
 
 class LiteLLMClient(LLMClient):
+    """Any litellm-supported provider (OpenAI, Gemini, Bedrock, Vertex, Ollama, …)."""
+
     def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+        """Store config; litellm is imported only when a call is made.
+
+        Args:
+            cfg: LLM settings.
+            environ: Environment for the API key. Defaults to os.environ.
+        """
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
     def complete_structured(self, prompt: str, schema: dict) -> dict:
+        """Run one completion through litellm.
+
+        Args:
+            prompt: The rendered, already-redacted prompt.
+            schema: JSON Schema of the expected reply, already embedded in the prompt.
+
+        Returns:
+            The parsed reply.
+
+        Raises:
+            json.JSONDecodeError: If the reply is not JSON.
+            Exception: Any provider error.
+        """
         import litellm
 
         litellm.telemetry = False  # no phone-home
@@ -79,10 +123,22 @@ class AnthropicLLMClient(LLMClient):
     """Official Anthropic SDK. No `temperature` (rejected on claude-opus-4-8)."""
 
     def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+        """Store config; the SDK is imported only when a call is made.
+
+        Args:
+            cfg: LLM settings.
+            environ: Environment for the API key. Defaults to os.environ.
+        """
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
     def _client(self):
+        """Build the SDK client.
+
+        Returns:
+            A configured `anthropic.Anthropic`. Every argument is optional — with
+            none set the SDK falls back to its own env/profile auth.
+        """
         import anthropic
 
         kwargs: dict = {"timeout": self.cfg.timeout_seconds}
@@ -97,6 +153,19 @@ class AnthropicLLMClient(LLMClient):
         return anthropic.Anthropic(**kwargs)
 
     def complete_structured(self, prompt: str, schema: dict) -> dict:
+        """Run one Messages API call.
+
+        Args:
+            prompt: The rendered, already-redacted prompt.
+            schema: JSON Schema of the expected reply, already embedded in the prompt.
+
+        Returns:
+            The parsed reply, concatenated from every text block.
+
+        Raises:
+            json.JSONDecodeError: If the reply is not JSON.
+            Exception: Any API error.
+        """
         resp = self._client().messages.create(
             model=self.cfg.model or "claude-opus-4-8",
             max_tokens=8192,
@@ -112,10 +181,31 @@ class ClaudeCodeClient(LLMClient):
     auth Claude Code is configured with; no API key/endpoint needed here."""
 
     def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+        """Store config; the CLI is located at call time, not here.
+
+        Args:
+            cfg: LLM settings; only `model` and `timeout_seconds` are used.
+            environ: Environment passed through to the subprocess.
+        """
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
     def complete_structured(self, prompt: str, schema: dict) -> dict:
+        """Run one headless `claude -p` and unwrap its JSON envelope.
+
+        Args:
+            prompt: The rendered, already-redacted prompt. Passed on stdin, which
+                avoids ARG_MAX on large evidence bundles.
+            schema: JSON Schema of the expected reply, already embedded in the prompt.
+
+        Returns:
+            The parsed reply, taken from the envelope's `result` field.
+
+        Raises:
+            RuntimeError: If the CLI is missing from PATH or exits non-zero.
+            json.JSONDecodeError: If the envelope or the reply is not JSON.
+            subprocess.TimeoutExpired: If the CLI outruns `timeout_seconds`.
+        """
         import subprocess
 
         binary = shutil.which("claude")

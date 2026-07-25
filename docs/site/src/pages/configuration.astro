@@ -12,6 +12,17 @@ export CI_DOCTOR_PROVIDER="github"
 # Secret-looking single-underscore vars (e.g. CI_DOCTOR_GITLAB_TOKEN) are
 # referenced by NAME (token_env) and ignored by the config loader.`;
 
+const inspect = `ci-doctor config           # the effective config, every layer merged
+ci-doctor config --diff    # only what your file/env/flags change vs the defaults
+ci-doctor config --schema  # the JSON Schema, for editors and CI validation
+ci-doctor config --validate            # merge every layer and report what fails
+ci-doctor config -f base.yml -f ci.yml # repeatable, the rightmost file wins
+# Output pages through $PAGER on a terminal; --plain prints raw (as does piping).`;
+
+const schemaComment = `# yaml-language-server: $schema=https://github.com/fennet82/ci-doctor/releases/latest/download/ci-doctor.schema.json
+llm:
+  model: qwen2.5-coder:32b`;
+
 const full = `# .ci-doctor.yml — every knob, with defaults shown.
 provider: gitlab                 # gitlab | github
 
@@ -55,17 +66,15 @@ phases:                          # section/step name -> phase (merged onto the s
 extraction:
   tail_lines: 120
   matchers:                      # anchored windows; higher priority survives budget pressure
-                                 # NOTE: lists REPLACE — defining this drops the ~35
-                                 # shipped language packs. Omit it to keep them.
-    - id: pytest
-      start: '^=+ FAILURES =+'
-      end: '^=+ short test summary'
-      priority: 90
-    - id: generic_error
+                                 # Merged by id onto the shipped language packs: a new
+                                 # id adds a pack, a shipped id retunes one (and warns).
+    - id: my_service_errors      # new id -> added alongside the shipped packs
       pattern: '^(ERROR|FATAL)\\b'
       before: 5
       after: 20
       priority: 50
+    - id: pytest                 # shipped id -> only these fields change, the rest is inherited
+      priority: 90
 
 denoise:
   collapse_carriage_returns: true   # collapse \\r progress bars to their final state
@@ -89,7 +98,28 @@ redaction:
 
   <h2>How layers combine</h2>
   <Code code={layering} lang="text" theme="github-dark" />
-  <p>Mappings deep-merge; lists and scalars replace. Point at a specific file with <code>--config path/to/.ci-doctor.yml</code>.</p>
+  <p>
+    Mappings deep-merge; lists and scalars replace. The one exception is a list whose
+    entries all carry an <code>id</code> — today only <code>extraction.matchers</code> —
+    which merges per id, so your packs add to the shipped ones instead of wiping them.
+    Point at specific files with <code>-f path/to/.ci-doctor.yml</code>, repeated as often
+    as you like — each one overrides the last.
+  </p>
+
+  <h2>Inspecting the result</h2>
+  <p>Config bugs are almost always a layer you forgot was applied. Ask:</p>
+  <Code code={inspect} lang="bash" theme="github-dark" />
+  <p>
+    <code>--diff</code> reads like <code>git diff</code>: green is what your config adds,
+    red is the default it replaced.
+  </p>
+
+  <h2>Editor completion</h2>
+  <p>
+    Every release ships <code>ci-doctor.schema.json</code>, generated from the same pydantic
+    model that validates your file, so it can never drift. Point your editor at it:
+  </p>
+  <Code code={schemaComment} lang="yaml" theme="github-dark" />
 
   <h2>Environment variables</h2>
   <Code code={envExample} lang="bash" theme="github-dark" />

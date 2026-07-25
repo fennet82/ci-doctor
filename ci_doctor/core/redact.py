@@ -18,6 +18,8 @@ from ci_doctor.config.schema import RedactionConfig
 _URL_CREDS = re.compile(r"([a-zA-Z][a-zA-Z0-9+.\-]*://)[^/\s:@]+:[^/\s@]+@")
 _SECRET_ENV_NAME = re.compile(r"TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY", re.IGNORECASE)
 
+#: Secret shapes scrubbed everywhere, keyed by the label that replaces them.
+#: Deliberately conservative and local — no entropy scanning, no network.
 _DEFAULT_PATTERNS = {
     "private_key": r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
     "glpat": r"glpat-[A-Za-z0-9_\-]{20,}",
@@ -30,6 +32,14 @@ _DEFAULT_PATTERNS = {
 
 
 def _compiled(cfg: RedactionConfig):
+    """Compile the built-in patterns plus the user's extras.
+
+    Args:
+        cfg: Redaction config supplying `extra_patterns`.
+
+    Returns:
+        ``(kind, compiled_regex)`` pairs; user extras are labelled `customN`.
+    """
     pats = [(k, re.compile(v)) for k, v in _DEFAULT_PATTERNS.items()]
     for i, extra in enumerate(cfg.extra_patterns):
         pats.append((f"custom{i}", re.compile(extra)))
@@ -37,11 +47,36 @@ def _compiled(cfg: RedactionConfig):
 
 
 def _env_secret_literals(environ: dict[str, str]) -> list[str]:
+    """Collect the *values* of secret-named environment variables.
+
+    A best-effort stand-in for the CI's masked-variable list: if the runner
+    exported it under a secret-ish name, its literal value must not appear in
+    output even when no regex would recognise its shape.
+
+    Args:
+        environ: The environment to scan.
+
+    Returns:
+        Distinct values of at least 6 characters, longest first so a short
+        secret that is a substring of a longer one cannot pre-empt it.
+    """
     vals = {v for name, v in environ.items() if v and len(v) >= 6 and _SECRET_ENV_NAME.search(name)}
     return sorted(vals, key=len, reverse=True)  # longest first, so substrings don't pre-empt
 
 
 def redact_text(text: str, cfg: RedactionConfig | None = None, environ: dict[str, str] | None = None) -> str:
+    """Scrub secrets from a string.
+
+    Args:
+        text: The text to scrub.
+        cfg: Redaction config. Defaults to the built-in set.
+        environ: Environment to harvest secret literals from. Defaults to
+            :data:`os.environ`; tests pass an explicit dict.
+
+    Returns:
+        The text with each secret replaced by ``[REDACTED:<kind>]``, or unchanged
+        when redaction is disabled.
+    """
     cfg = cfg or RedactionConfig()
     if not cfg.enabled:
         return text
@@ -55,7 +90,23 @@ def redact_text(text: str, cfg: RedactionConfig | None = None, environ: dict[str
 
 
 def redact_report(report, cfg: RedactionConfig | None = None, environ: dict[str, str] | None = None):
+    """Scrub every free-text field of a report.
+
+    Applied to the finished report, after the LLM has spoken — a model can quote
+    a secret straight out of the log it was shown, so scrubbing the prompt alone
+    is not enough.
+
+    Args:
+        report: The validated report.
+        cfg: Redaction config. Defaults to the built-in set.
+        environ: Environment to harvest secret literals from.
+
+    Returns:
+        A scrubbed copy. The original is not mutated.
+    """
+
     def r(s):
+        """Scrub a value if it is a string, else pass it through."""
         return redact_text(s, cfg, environ) if isinstance(s, str) else s
 
     return report.model_copy(update={

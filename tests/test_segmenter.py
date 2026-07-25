@@ -1,13 +1,17 @@
+"""GitLab segmentation: preamble/trailer, nesting, ANSI markers, phase inheritance."""
+
 from ci_doctor.core.models import Phase
 from ci_doctor.core.phases import assign_phases
 from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
 
 
 def _seg(text):
+    """Segment a GitLab log."""
     return GitLabSegmenter().segment(text)
 
 
 def test_preamble_sections_and_trailer():
+    """Content outside markers lands in the synthetic preamble and trailer."""
     log = (
         "Running with gitlab-runner\n"
         "section_start:100:step_script\n"
@@ -25,6 +29,7 @@ def test_preamble_sections_and_trailer():
 
 
 def test_unclosed_section_flagged():
+    """A section with no end marker stays open — the signal the job died inside."""
     log = "section_start:100:step_script\nworking...\nERROR: took too long\n"
     step = _seg(log)[0]
     assert step.name == "step_script"
@@ -32,6 +37,7 @@ def test_unclosed_section_flagged():
 
 
 def test_nesting():
+    """Nested sections become children, and both close correctly."""
     log = (
         "section_start:1:outer\n"
         "section_start:2:inner\n"
@@ -46,6 +52,7 @@ def test_nesting():
 
 
 def test_ansi_wrapped_markers_parse():
+    """Real ANSI-wrapped markers parse, and the header line is captured."""
     log = "\x1b[0Ksection_start:100:step_script\r\x1b[0KRunning script\n$ go test\n\x1b[0Ksection_end:160:step_script\r\x1b[0K\n"
     secs = _seg(log)
     assert [s.name for s in secs] == ["step_script"]
@@ -53,6 +60,7 @@ def test_ansi_wrapped_markers_parse():
 
 
 def test_phase_assignment_and_inheritance():
+    """An unknown nested section inherits its parent's phase."""
     log = (
         "section_start:1:step_script\n"
         "section_start:2:my_custom_step\n"     # unknown -> inherits enclosing SCRIPT

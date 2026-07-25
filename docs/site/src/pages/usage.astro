@@ -2,15 +2,15 @@
 import { Code } from 'astro:components';
 import Base from '../layouts/Base.astro';
 
-const cli = `ci-doctor analyze [RUN_ID] [OPTIONS]
+const cli = `ci-doctor analyze [TARGET] [OPTIONS]
 
 Arguments:
-  RUN_ID                 Pipeline/run id. Omit when using --from-file.
+  TARGET                 Pipeline/run id, or a path to a raw job log to replay
+                         offline (no network fetch).
 
 Options:
-  --from-file PATH       Replay a raw job log offline (no network, no LLM).
   --job-id TEXT          Analyze a single job id.
-  --config PATH          Path to .ci-doctor.yml.
+  -f, --config PATH      Path to .ci-doctor.yml. Repeatable; the last one wins.
   --no-color             Disable coloured terminal output (also honours NO_COLOR).
   -v, --verbose          Enable debug logging.
   --version              Show version and exit.`;
@@ -22,9 +22,9 @@ ci-doctor analyze --config .ci-doctor.yml "$CI_PIPELINE_ID"
 # It prints the verdict, writes report.md + report.json, and (if configured
 # and confidence >= medium) posts/updates one idempotent MR/PR note.`;
 
-const verbose = `ci-doctor analyze -v --from-file failing-job.log
+const verbose = `ci-doctor analyze -v failing-job.log
 
-ci-doctor [DEBUG] provider=gitlab from_file=failing-job.log ...
+ci-doctor [DEBUG] provider=gitlab target=failing-job.log ...
 ci-doctor [DEBUG] job failing-job: 6 top-level sections
 ci-doctor [DEBUG] job failing-job: attribution phase=script reason=script_failure rule=trailer_exit_code confidence=high
 ci-doctor [DEBUG] blamed phase script: denoise 812->190, extract ->140, fit ->140 lines (truncated=False)
@@ -66,7 +66,7 @@ Remediation
   <Code code={verbose} lang="text" theme="github-dark" />
 
   <div class="note">
-    <strong>Offline replay.</strong> <code>--from-file</code> runs the full pipeline against a captured
+    <strong>Offline replay.</strong> Passing a log path instead of a run id runs the full pipeline against a captured
     log with zero network and zero LLM — ideal for testing your config or reproducing an attribution.
   </div>
 </Base>

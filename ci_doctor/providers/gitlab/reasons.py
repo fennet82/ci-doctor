@@ -11,6 +11,9 @@ from __future__ import annotations
 
 from ci_doctor.core.models import FailureReason
 
+#: GitLab's `failure_reason` strings -> the neutral enum. Several GitLab reasons
+#: collapse onto one of ours; that is intended, the distinctions they draw are not
+#: ones a developer acts on differently.
 _MAP: dict[str, FailureReason] = {
     "script_failure": FailureReason.SCRIPT_FAILURE,
     "api_failure": FailureReason.API_FAILURE,
@@ -26,6 +29,16 @@ _MAP: dict[str, FailureReason] = {
 
 
 def to_failure_reason(raw: str | None) -> FailureReason:
+    """Normalise a GitLab failure reason.
+
+    Args:
+        raw: GitLab's string, or None when the API reported none.
+
+    Returns:
+        The mapped reason, or UNKNOWN. Unrecognised values degrade rather than
+        raise — self-managed instances drift both older and newer than us, and
+        the classifier does the real disambiguation from the log anyway.
+    """
     if not raw:
         return FailureReason.UNKNOWN
     return _MAP.get(raw, FailureReason.UNKNOWN)

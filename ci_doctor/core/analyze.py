@@ -23,6 +23,19 @@ log = logging.getLogger("ci_doctor.analyze")
 
 @dataclass
 class EvidenceBundle:
+    """Everything the report step gets to see — and all it gets to see.
+
+    Attributes:
+        blamed_phase: The phase attribution settled on.
+        blamed_lines: Denoised, windowed, budget-fitted lines from that phase.
+        secondary: One non-causal line per warning-only phase.
+        metadata: Job facts and the attribution's own reasoning.
+        token_estimate: Approximate prompt cost of the whole bundle.
+        truncated: Whether the budget dropped lines. Always surfaced in the
+            report — a silent truncation would be a lie about the evidence.
+        extra: Free-form slot for future stages.
+    """
+
     blamed_phase: Phase
     blamed_lines: list[str]
     secondary: list[str]          # one-liner context per secondary phase (non-causal)
@@ -33,12 +46,30 @@ class EvidenceBundle:
 
 
 def _walk(sections):
+    """Yield every section depth-first, parents before their children.
+
+    Args:
+        sections: Top-level sections.
+
+    Yields:
+        Each section in the tree, in log order.
+    """
     for sec in sections:
         yield sec
         yield from _walk(sec.children)
 
 
 def _blamed_section(sections: list[Section], phase: Phase) -> Section | None:
+    """Find the section to draw evidence from.
+
+    Args:
+        sections: Top-level sections.
+        phase: The phase attribution blamed.
+
+    Returns:
+        The *last* real section carrying that phase — later output is closer to
+        the failure — or None when no section matches.
+    """
     match = [s for s in _walk(sections) if s.name not in {"__preamble__", "__trailer__"} and s.phase == phase]
     return match[-1] if match else None
 
@@ -51,6 +82,22 @@ def build_bundle(
     *,
     strip_timestamps: bool = False,
 ) -> EvidenceBundle:
+    """Denoise, window and budget the blamed section into a bundle.
+
+    Deterministic and offline: no model is called here. Only the blamed phase's
+    lines are considered, which is what keeps fetch/prepare noise out of the
+    evidence for a plain script failure.
+
+    Args:
+        job: The failed job.
+        attr: The classifier's verdict.
+        sections: The job's sections, phases already assigned.
+        cfg: Config supplying the denoise, extraction and budget knobs.
+        strip_timestamps: Drop the runner's ISO timestamp prefix from each line.
+
+    Returns:
+        The bundle the report step consumes.
+    """
     blamed = _blamed_section(sections, attr.phase)
     if blamed is not None:
         raw = [line.text for line in blamed.lines]

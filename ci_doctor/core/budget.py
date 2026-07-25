@@ -9,12 +9,31 @@ from __future__ import annotations
 
 
 def estimate_tokens(text: str) -> int:
+    """Approximate a token count without loading a tokenizer.
+
+    Args:
+        text: Any text.
+
+    Returns:
+        Estimated tokens, at least 1.
+    """
     # ponytail: ~4 chars/token heuristic; swap for a local tokenizer if precision matters.
     return max(1, len(text) // 4)
 
 
 def fit(lines: list[str], max_tokens: int) -> tuple[list[str], bool]:
-    """Return (lines, truncated). Fits by keeping the tail; head elision is visible.
+    """Trim evidence to a token budget, keeping the tail.
+
+    The failure lives at the end of a log, so the head is what gets dropped — and
+    the drop is always announced in the returned lines, never silent.
+
+    Args:
+        lines: Evidence lines, in log order.
+        max_tokens: The budget from `llm.max_input_tokens`.
+
+    Returns:
+        A ``(lines, truncated)`` pair. When truncated, the first line is a visible
+        "… [N lines elided …] …" marker.
 
     ponytail: tail-keep. Upgrade to phase-aware 70/10/20 + drop-lowest-priority-
     windows-first (see extract._Window.priority) if the tail heuristic misses causes.

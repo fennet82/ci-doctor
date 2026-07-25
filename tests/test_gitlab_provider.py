@@ -8,6 +8,7 @@ from ci_doctor.providers.gitlab.provider import GitLabProvider
 
 
 def _pipeline_job(**kw):
+    """Build a python-gitlab-shaped job double, overridden by kwargs."""
     base = dict(
         id=0, name="", status="failed", stage=None, allow_failure=False,
         failure_reason="", started_at=None, finished_at=None, duration=None,
@@ -18,6 +19,7 @@ def _pipeline_job(**kw):
 
 
 def _fake_gl(pipeline_jobs, traces):
+    """Build an in-memory stand-in for the python-gitlab client."""
     project = SimpleNamespace(
         pipelines=SimpleNamespace(
             get=lambda pid: SimpleNamespace(
@@ -31,12 +33,14 @@ def _fake_gl(pipeline_jobs, traces):
 
 
 def _provider(pipeline_jobs, traces):
+    """Build a GitLabProvider over the fake client, so nothing connects."""
     cfg = load_config(environ={})  # base_url is None; injected client => no _connect()
     gl = _fake_gl(pipeline_jobs, traces)
     return GitLabProvider(cfg, client=gl, environ={"CI_PROJECT_ID": "42"})
 
 
 def test_fetch_run_maps_jobs():
+    """Pipeline jobs map onto the domain model, runner and tags included."""
     jobs = [
         _pipeline_job(
             id=101, name="build", stage="build", failure_reason="script_failure",
@@ -58,12 +62,14 @@ def test_fetch_run_maps_jobs():
 
 
 def test_canceled_status_maps_to_cancelled_reason():
+    """GitLab's "canceled" status becomes CANCELLED even with no failure_reason."""
     jobs = [_pipeline_job(id=1, name="x", status="canceled", failure_reason="")]
     run = _provider(jobs, {}).fetch_run("1")
     assert run.jobs[0].failure_reason == FailureReason.CANCELLED
 
 
 def test_fetch_job_log_and_empty_is_none():
+    """A trace decodes to text, and an empty one becomes None, not ""."""
     jobs = [_pipeline_job(id=101, name="build"), _pipeline_job(id=102, name="stuck")]
     prov = _provider(jobs, {101: b"boom\nERROR: Job failed: exit code 1\n", 102: b""})
     run = prov.fetch_run("1")
@@ -72,11 +78,13 @@ def test_fetch_job_log_and_empty_is_none():
 
 
 def test_default_base_url_is_public_host():
+    """base_url defaults to gitlab.com so the tool works with no config."""
     cfg = load_config(environ={})
     assert cfg.gitlab.base_url == "https://gitlab.com"
 
 
 def test_blank_base_url_raises_on_connect():
+    """An explicitly blank base_url fails loudly instead of silently guessing."""
     import pytest
 
     cfg = load_config(environ={}, overrides={"gitlab": {"base_url": ""}})

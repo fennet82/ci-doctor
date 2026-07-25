@@ -14,11 +14,26 @@ _SYNTHETIC = {"__preamble__", "__trailer__"}
 
 
 def assign_phases(sections: list[Section], phase_map: dict[str, str]) -> None:
+    """Set `.phase` on every section in the tree, in place.
+
+    Args:
+        sections: Top-level sections from a segmenter. Mutated.
+        phase_map: Section name -> phase name, from `config.phases`.
+    """
     for sec in sections:
         _assign(sec, phase_map, inherited=None)
 
 
 def _assign(sec: Section, phase_map: dict[str, str], inherited: Phase | None) -> None:
+    """Assign one section's phase and recurse into its children.
+
+    Args:
+        sec: The section to assign. Mutated.
+        phase_map: Section name -> phase name.
+        inherited: Nearest enclosing *mapped* phase, or None at the top level.
+            An unknown section name takes this, falling back to SCRIPT — an
+            unrecognised block is far more often the user's command than infra.
+    """
     mapped = phase_map.get(sec.name)
     if mapped is not None:
         sec.phase = Phase(mapped)

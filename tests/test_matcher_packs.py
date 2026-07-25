@@ -69,6 +69,7 @@ def _analyze(provider: str, stem: str):
 
 @pytest.mark.parametrize("provider,stem,matcher_ids,causal,_category", PARAMS, ids=IDS)
 def test_pack_matches_and_stays_targeted(provider, stem, matcher_ids, causal, _category):
+    """The pack fires, captures the causal line, and windows rather than swallows."""
     lines = support.read_log(provider, stem).splitlines()
     for mid in matcher_ids:
         assert _windows_for(lines, [MATCHERS[mid]]), f"{mid} matched nothing in {stem}.log"
@@ -82,6 +83,7 @@ def test_pack_matches_and_stays_targeted(provider, stem, matcher_ids, causal, _c
 
 @pytest.mark.parametrize("provider,stem,matcher_ids,causal,_category", PARAMS, ids=IDS)
 def test_causal_line_survives_into_the_bundle(provider, stem, matcher_ids, causal, _category):
+    """The causal line survives the full pipeline into the evidence bundle."""
     _job, _attr, bundle = _analyze(provider, stem)
     joined = "\n".join(bundle.blamed_lines)
     assert causal in joined, f"{stem}: {causal!r} missing from the evidence bundle"
@@ -91,6 +93,7 @@ def test_causal_line_survives_into_the_bundle(provider, stem, matcher_ids, causa
 
 @pytest.mark.parametrize("provider,stem,matcher_ids,causal,category", PARAMS, ids=IDS)
 def test_deterministic_category(provider, stem, matcher_ids, causal, category):
+    """Each fixture classifies to its expected category with no LLM involved."""
     job, attr, bundle = _analyze(provider, stem)
     report = deterministic_report(job, attr, bundle)
     assert report.category == category
@@ -109,4 +112,5 @@ def test_deterministic_category(provider, stem, matcher_ids, causal, category):
     ("runtime", "Error: missing DATABASE_URL\n    at node:internal/main/run_main_module:28:49\nNode.js v20.11.1"),
 ])
 def test_runtime_never_outranks_a_more_actionable_category(expected, text):
+    """Pins the signature ordering: a traceback alone never wins over test/dependency."""
     assert _infer_category(FailureReason.SCRIPT_FAILURE, text) == expected

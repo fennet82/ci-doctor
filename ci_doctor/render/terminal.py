@@ -21,13 +21,27 @@ from rich.text import Text
 
 from ci_doctor.llm.schema import Report
 
+#: Name of the collapsible section wrapping the report inside a GitLab job log.
 _SECTION = "ci_doctor_report"
+
+#: Traffic-light cue on the confidence field, so a low-confidence verdict looks
+#: like one at a glance.
 _CONFIDENCE_STYLE = {"high": "green", "medium": "yellow", "low": "red"}
+
 _LABEL = "bold cyan"
 _SUBLABEL = "bold"      # headers nested inside the evidence panel
 
 
 def render_terminal(report: Report, *, no_color: bool = False, wrap_section: bool = False, file=None) -> None:
+    """Print a report to the terminal.
+
+    Args:
+        report: The validated, already-redacted report.
+        no_color: Force plain text. Rich also auto-detects NO_COLOR and non-TTY.
+        wrap_section: Emit GitLab collapsible-section markers around the output,
+            so the report doesn't dominate the job log.
+        file: Output stream. Defaults to stdout.
+    """
     console = Console(no_color=no_color, file=file, highlight=False, soft_wrap=True)
     ts = int(time.time())
     if wrap_section:
@@ -81,13 +95,27 @@ def render_terminal(report: Report, *, no_color: bool = False, wrap_section: boo
 
 
 def _print_each(console: Console, items: list) -> None:
-    """Print each item, appending a blank line after the last one only."""
+    """Print a list, leaving one blank line after the last item only.
+
+    Args:
+        console: The output console.
+        items: Renderables. Must not be empty.
+    """
     for item in items[:-1]:
         console.print(item)
     console.print(items[-1], end="\n\n")
 
 
 def _step_text(step) -> Text:
+    """Format one remediation step.
+
+    Args:
+        step: A :class:`~ci_doctor.llm.schema.RemediationStep`.
+
+    Returns:
+        The action, with any `where` appended in colour — a file:line is the
+        actionable part, not chrome.
+    """
     text = Text(step.action)
     if step.where:
         text.append(f" ({step.where})", style="cyan")  # a file:line is actionable, not chrome

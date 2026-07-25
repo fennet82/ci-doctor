@@ -35,11 +35,31 @@ _MARKER = re.compile(
 
 
 class GitLabSegmenter(LogSegmenter):
+    """Segments GitLab job traces on `section_start`/`section_end` markers."""
+
     def segment(self, raw_log: str) -> list[Section]:
+        """Parse a GitLab trace into sections.
+
+        Args:
+            raw_log: The raw trace, ANSI wrappers optional.
+
+        Returns:
+            Top-level sections, plus synthetic `__preamble__`/`__trailer__` for
+            content outside any marker.
+        """
         return _assemble(_tokenize(raw_log))
 
 
 def _tokenize(raw: str):
+    """Split a trace into content runs and section markers.
+
+    Args:
+        raw: The raw trace.
+
+    Returns:
+        A list of ``("content", text)`` and ``(kind, name, ts)`` tuples in log
+        order, where `kind` is "start" or "end".
+    """
     tokens = []
     pos = 0
     for m in _MARKER.finditer(raw):
@@ -53,6 +73,17 @@ def _tokenize(raw: str):
 
 
 def _pop_matching(stack: list[Section], name: str) -> Section | None:
+    """Close the innermost open section with a given name.
+
+    Args:
+        stack: Currently open sections, outermost first. Mutated.
+        name: The name from the `section_end` marker.
+
+    Returns:
+        The matched section, or None when no open section has that name. Any
+        unclosed sections nested above it are dropped from the stack — a
+        malformed log should not leave phantom sections open forever.
+    """
     for i in range(len(stack) - 1, -1, -1):
         if stack[i].name == name:
             sec = stack[i]
@@ -62,6 +93,16 @@ def _pop_matching(stack: list[Section], name: str) -> Section | None:
 
 
 def _assemble(tokens) -> list[Section]:
+    """Build the section tree from a token stream.
+
+    Args:
+        tokens: Output of :func:`_tokenize`.
+
+    Returns:
+        Top-level sections. Line numbers run continuously across the whole log,
+        so evidence can always point back at the original trace. A section left
+        open at EOF keeps `closed=False` — that is the signal the job died inside it.
+    """
     top: list[Section] = []
     stack: list[Section] = []
     counter = [0]
@@ -70,6 +111,12 @@ def _assemble(tokens) -> list[Section]:
     trailer: Section | None = None
 
     def emit(target: Section, text: str) -> None:
+        """Append a content run's lines to a section, numbering them.
+
+        Args:
+            target: The section receiving the lines. Mutated.
+            text: A content run, possibly multi-line.
+        """
         parts = text.split("\n")
         if parts and parts[-1] == "":
             parts.pop()  # drop the empty tail after a trailing newline

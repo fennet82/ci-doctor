@@ -21,6 +21,7 @@ from ci_doctor.llm.client import OpenAILLMClient
 
 
 def _llm(**over):
+    """Build an LLMConfig from the shipped defaults, overridden by kwargs."""
     return load_config(environ={}, overrides={"llm": over}).llm
 
 
@@ -31,11 +32,16 @@ def _llm(**over):
     ("claude_code", ClaudeCodeClient),
 ])
 def test_make_client_selects_backend(backend, cls):
+    """Each backend name builds its own client class."""
     assert isinstance(make_client(_llm(backend=backend)), cls)
 
 
 def test_unknown_backend_raises():
-    # Literal validation blocks bad values at config load, so exercise the factory directly.
+    """The factory rejects an unknown backend.
+
+    Config-level Literal validation blocks bad values earlier, so the factory is
+    exercised directly here.
+    """
     from types import SimpleNamespace
 
     with pytest.raises(ValueError, match="unknown llm.backend"):
@@ -43,6 +49,7 @@ def test_unknown_backend_raises():
 
 
 def test_backend_ready_rules(monkeypatch):
+    """Each backend reports ready only when it has everything it needs."""
     assert backend_ready(_llm(backend="openai", model="m", api_base="http://x")) is True
     assert backend_ready(_llm(backend="openai", model="m")) is False          # needs api_base
     assert backend_ready(_llm(backend="litellm", model="m")) is True
@@ -56,10 +63,12 @@ def test_backend_ready_rules(monkeypatch):
 
 
 def test_claude_code_client_parses_cli_envelope(monkeypatch):
+    """The CLI's JSON envelope is unwrapped to the model's own JSON reply."""
     monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
     report = {"summary": "x", "failure_phase": "script"}  # inner JSON the model returned
 
     def fake_run(cmd, **kwargs):
+        """Stand in for subprocess.run, returning a successful CLI envelope."""
         assert kwargs["input"], "prompt must be piped on stdin"
         envelope = json.dumps({"result": json.dumps(report), "session_id": "abc"})
         return subprocess.CompletedProcess(cmd, 0, stdout=envelope, stderr="")
@@ -70,6 +79,7 @@ def test_claude_code_client_parses_cli_envelope(monkeypatch):
 
 
 def test_claude_code_client_raises_on_cli_failure(monkeypatch):
+    """A non-zero CLI exit raises, so the caller can fall back deterministically."""
     monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
     monkeypatch.setattr(
         subprocess, "run",
