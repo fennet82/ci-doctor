@@ -1,9 +1,12 @@
 """Golden-file attribution suite: segment + phase-map + classify each fixture log,
 compare {phase, reason, rule_id} to expected. No network, no LLM.
+
+One `expected/<case>.json` covers every provider that ships a log for that case —
+attribution is provider-neutral, so adding `logs/github/oom_137.log` asserts it
+against the same verdict with no change here. See `tests/support.py`.
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -11,16 +14,16 @@ from ci_doctor.config.loader import load_config
 from ci_doctor.core.attribution import attribute
 from ci_doctor.core.models import FailureReason, Job
 from ci_doctor.core.phases import assign_phases
-from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
+from tests import support
 
-FIX = Path(__file__).parent / "fixtures"
-CASES = sorted(p.stem for p in (FIX / "expected").glob("*.json"))
+SPECS = sorted(p.stem for p in support.EXPECTED.glob("*.json"))
+CASES = support.pairs_for(SPECS)
 
 
-@pytest.mark.parametrize("case", CASES)
-def test_attribution(case):
-    spec = json.loads((FIX / "expected" / f"{case}.json").read_text())
-    log = (FIX / "logs" / f"{case}.log").read_text()
+@pytest.mark.parametrize("provider,case", CASES, ids=[f"{p}-{c}" for p, c in CASES])
+def test_attribution(provider, case):
+    spec = json.loads((support.EXPECTED / f"{case}.json").read_text())
+    log = support.read_log(provider, case)
     meta = spec.get("job", {})
     job = Job(
         id=case, name=case, status=meta.get("status", "failed"),
@@ -29,16 +32,30 @@ def test_attribution(case):
         log=log or None,
     )
     cfg = load_config(environ={})
-    job.sections = GitLabSegmenter().segment(job.log or "")
+    job.sections = support.segment(provider, job.log or "")
     assign_phases(job.sections, cfg.phases)
 
     attr = attribute(job, job.sections)
     exp = spec["expect"]
-    assert attr.phase == exp["phase"], f"{case}: phase {attr.phase} != {exp['phase']}"
-    assert attr.reason == exp["reason"], f"{case}: reason {attr.reason} != {exp['reason']}"
-    assert attr.rule_id == exp["rule_id"], f"{case}: rule {attr.rule_id} != {exp['rule_id']}"
+    who = f"{provider}/{case}"
+    assert attr.phase == exp["phase"], f"{who}: phase {attr.phase} != {exp['phase']}"
+    assert attr.reason == exp["reason"], f"{who}: reason {attr.reason} != {exp['reason']}"
+    assert attr.rule_id == exp["rule_id"], f"{who}: rule {attr.rule_id} != {exp['rule_id']}"
+
+
+def test_every_provider_dir_has_a_segmenter():
+    # Guards the "drop a directory" workflow: a logs/<provider>/ with no
+    # segmenter registered would silently contribute zero tests.
+    missing = set(support.providers()) - set(support.SEGMENTERS)
+    assert not missing, f"logs/ dirs with no segmenter in support.SEGMENTERS: {sorted(missing)}"
+
+
+def test_every_expected_verdict_has_at_least_one_log():
+    # An orphaned expected/*.json would otherwise silently assert nothing.
+    covered = {case for _, case in CASES}
+    assert set(SPECS) == covered, f"no log for: {sorted(set(SPECS) - covered)}"
 
 
 def test_regression_case_is_present():
     # Guard the guard: the noisy-log regression fixture must exist and target SCRIPT.
-    assert "script_failure_noisy" in CASES
+    assert "script_failure_noisy" in SPECS

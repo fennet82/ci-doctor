@@ -1,19 +1,22 @@
-from pathlib import Path
+import pytest
 
 from ci_doctor.config.loader import load_config
 from ci_doctor.core.analyze import build_bundle
 from ci_doctor.core.attribution import attribute
 from ci_doctor.core.models import FailureReason, Job
 from ci_doctor.core.phases import assign_phases
-from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
+from tests import support
+
+CASE = "script_failure_noisy"
 
 
-def test_build_bundle_excludes_fetch_noise_but_flags_it():
-    log = Path("tests/fixtures/logs/script_failure_noisy.log").read_text()
+@pytest.mark.parametrize("provider", support.providers_with(CASE))
+def test_build_bundle_excludes_fetch_noise_but_flags_it(provider):
+    log = support.read_log(provider, CASE)
     job = Job(id="1", name="build", status="failed",
               failure_reason=FailureReason.SCRIPT_FAILURE, log=log)
     cfg = load_config(environ={})
-    job.sections = GitLabSegmenter().segment(log)
+    job.sections = support.segment(provider, log)
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
 
