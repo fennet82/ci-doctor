@@ -16,6 +16,11 @@ import sys
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.highlighter import NullHighlighter
+from rich.logging import RichHandler
+from rich.style import Style
+from rich.theme import Theme
 
 from ci_doctor import __version__
 from ci_doctor.config.loader import load_config
@@ -54,7 +59,7 @@ def _root(
 def analyze(
     run_id: str = typer.Argument(None, help="Pipeline/run id. Omit when using --from-file."),
     from_file: Path = typer.Option(
-        None, "--from-file", help="Replay a raw job log offline (no network, no LLM)."
+        None, "--from-file", help="Replay a raw job log offline (no network fetch; still calls the LLM if llm.enabled)."
     ),
     job_id: str = typer.Option(None, "--job-id", help="Analyze a single job id."),
     config_path: Path = typer.Option(None, "--config", help="Path to .ci-doctor.yml."),
@@ -67,7 +72,9 @@ def analyze(
 
     run = provider = None
     if from_file is not None:
-        results = [_process(job, cfg) for job in _run_from_file(from_file).jobs]
+        jobs = _run_from_file(from_file).jobs
+        log.info("analyzing %d job(s) from %s", len(jobs), from_file)
+        results = [_process(job, cfg) for job in jobs]
     elif run_id is not None:
         run, provider, results = _analyze_live(run_id, cfg, job_id)
     else:
@@ -195,8 +202,24 @@ def _maybe_post_mr(provider, run, results, cfg) -> None:
         typer.echo(f"MR note failed (ignored): {exc}", err=True)
 
 
+_LEVEL_COLORS = Theme({
+    "logging.level.debug": Style(color="blue"),
+    "logging.level.info": Style(color="green"),
+    "logging.level.warning": Style(color="yellow"),
+    "logging.level.error": Style(color="red"),
+    "logging.level.critical": Style(color="red", bold=True),
+})
+
+
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="ci-doctor [%(levelname)s] %(message)s")
+    # NullHighlighter: rich otherwise repr-highlights the message body (numbers
+    # cyan, words yellow/magenta), which drowns out the level colour. Passing
+    # highlighter=None does NOT disable it — rich falls back to ReprHighlighter.
+    logging.basicConfig(
+        level=logging.INFO, format="%(message)s",
+        handlers=[RichHandler(console=Console(theme=_LEVEL_COLORS), show_time=False,
+                              show_path=False, markup=False, highlighter=NullHighlighter())],
+    )
     try:
         app()
     except SystemExit:
