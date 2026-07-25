@@ -55,6 +55,8 @@ phases:                          # section/step name -> phase (merged onto the s
 extraction:
   tail_lines: 120
   matchers:                      # anchored windows; higher priority survives budget pressure
+                                 # NOTE: lists REPLACE — defining this drops the ~35
+                                 # shipped language packs. Omit it to keep them.
     - id: pytest
       start: '^=+ FAILURES =+'
       end: '^=+ short test summary'
