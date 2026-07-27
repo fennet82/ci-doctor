@@ -1,7 +1,111 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-07-27)
+
+### Chores
+
+- Merge master (1.0.0) into the branch
+  ([`cb291cb`](https://github.com/fennet82/ci-doctor/commit/cb291cb0d91c8fe261849298fd21d4cb944db445))
+
+Master released 1.0.0 and dropped .claude/skills/ while this branch was open. Clean merge; the
+  markdown and gitleaks path exclusions still name .claude/**, which now simply matches nothing
+  rather than being wrong.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- Sync uv.lock to the 1.0.0 version from master
+  ([`47b2b0f`](https://github.com/fennet82/ci-doctor/commit/47b2b0f8b3665dbf5f127590035375fa81898f10))
+
+
 ## v1.0.0 (2026-07-25)
+
+### Bug Fixes
+
+- **action**: Use a venv and never fail the caller's workflow
+  ([`d1c8dfe`](https://github.com/fennet82/ci-doctor/commit/d1c8dfefe3a682446bc469f7c7bec1b8e5a9a0aa))
+
+Three defects found reviewing the action, none reachable from the test suite:
+
+- `pip install` into the runner's system Python fails outright on Ubuntu 24.04, which is
+  externally-managed under PEP 668. Installs into a venv instead. - The step inherited -e from
+  GitHub's `shell: bash`, despite a comment claiming otherwise, so a non-zero analyze or a malformed
+  report.json would have failed the caller's workflow — breaking invariant #3 from the outside,
+  whatever the analyzer itself guarantees. Now explicitly `set +e`, guarded JSON read, `exit 0`. -
+  Docs told people to use @v1. No such tag exists and none will: semantic-release publishes exact
+  versions, so there is no floating major to resolve.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+### Chores
+
+- Added skills for claude
+  ([`6bb28f0`](https://github.com/fennet82/ci-doctor/commit/6bb28f0f18ac3d864ec76679a1b791683bfb47f5))
+
+### Code Style
+
+- Apply ruff format across the tree
+  ([`dd7390b`](https://github.com/fennet82/ci-doctor/commit/dd7390b4459a45f54b7bcab5949a5b3f693de830))
+
+The repo had never been formatted, so adding a formatter to the hooks and to CI meant either
+  restyling every file as it was next touched, or one commit that gets it over with. This is that
+  commit — no behaviour change, tests untouched at 347.
+
+line-length is 110 rather than ruff's default 88: the code was written to it (p99 line is 109
+  chars), and exploding the long single-line `return Attribution(...)` calls onto five lines each
+  costs more than it buys.
+
+Markdown is included but only reformats Python code blocks inside the docs, never prose or tables,
+  and skips .claude/ (vendored third-party skill docs).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+### Continuous Integration
+
+- Add a reusable action, PR checks, git hooks and a mise toolchain
+  ([`9cc829c`](https://github.com/fennet82/ci-doctor/commit/9cc829cf30dc4ee337b6b5988ce7c285e99aeda0))
+
+action.yml — a composite GitHub Action, so consumers get one step instead of a uv-install recipe.
+  Composite rather than Docker on purpose: it installs the source tree the caller pinned (`uses:
+  fennet82/ci-doctor@v1` -> that ref's code), so the action version and the analyzer version cannot
+  drift, with no registry or PyPI round-trip at release time. run-id defaults to the run that
+  triggered it, and the verdict (phase, category, confidence, is-infra-not-code) is exposed as
+  outputs so a workflow can branch on it — e.g. only retry when the failure was infrastructure.
+
+.github/workflows/ci.yml — on PRs to master and on master itself: tests, lint (ruff check + format,
+  Python and markdown), the core/ guardrail grep, and gitleaks. Separate jobs so a red check names
+  the kind of problem without reading the log.
+
+.githooks/ — plain shell, enabled by `mise run setup`, no framework to install. pre-commit fixes and
+  formats staged files then re-stages what it rewrote; commit-msg enforces Conventional Commits,
+  which semantic-release parses to pick the bump; pre-push runs the suite, the guardrail and
+  gitleaks.
+
+.mise.toml — uv, gitleaks, gh, glab, node, plus tasks wrapping every check. Python and ruff are
+  deliberately absent: uv installs Python from requires-python, and ruff is now a dev dependency, so
+  uv.lock pins both and `uv run ruff` is the same binary locally and in CI. Before this, `uv run
+  ruff` resolved to whatever ruff happened to be on PATH.
+
+.gitleaks.toml — the redaction suite plants fake tokens and asserts they are scrubbed, so the
+  scanner finds them every run. The exemption is scoped to those two files and that one rule; a real
+  token in application code still fails the build.
+
+ruff is pinned <0.16: 0.16 widened the default rule set (25 new findings across existing code),
+  which is its own change, not this one.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- **mise**: Install codegraph via the npm backend
+  ([`c85cf75`](https://github.com/fennet82/ci-doctor/commit/c85cf751749e808e0e0878e5a1e5530e152f2219))
+
+`node` was listed "for codegraph" without anything actually installing it. @colbymchenry/codegraph
+  is declared as a tool rather than shelled out in the setup task, so `mise install` pins its
+  version alongside everything else.
+
+Indexing is deliberately not part of `mise run setup`: building .codegraph/ is a per-developer
+  choice, and the directory ignores its own contents so the 21MB index never reaches a commit.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 
 ### Features
 
@@ -28,9 +132,42 @@ BREAKING CHANGE: `analyze --from-file <log>` is now `analyze <log>`.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 
-### Breaking Changes
+- **github**: Read GitHub through PyGithub, run locally, and fix the segmenter
+  ([`9b62eaf`](https://github.com/fennet82/ci-doctor/commit/9b62eaf67080d02abf67f7089bbedd020dee7aae))
 
-- `analyze --from-file <log>` is now `analyze <log>`.
+Replaces the hand-rolled REST client with PyGithub, makes a run analyzable from a laptop, and fixes
+  three bugs that writing realistic GitHub fixtures exposed.
+
+Adapter: - Delete GitHubApi (~130 lines) in favour of PyGithub. ref/sha/web_url now come off the
+  workflow run instead of GITHUB_* env vars, and run.pull_requests identifies the PR authoritatively
+  (GITHUB_REF stays the fork fallback). - Normalise PyGithub's datetime timestamps at the boundary:
+  the domain models are plain dataclasses, so one would sail through to a JSON-dump crash. - Check
+  the status of the log-blob fetch; an expired signed URL answers with an XML body that would
+  otherwise be analyzed as the log.
+
+Local runs: - providers/git_origin.py resolves the repository from `git remote origin` when
+  GITHUB_REPOSITORY / CI_PROJECT_ID is unset, warning once. Both adapters use it.
+
+Fixes, each verified against the pre-change code: - A `##[group]` wraps a step's *header*; its
+  output follows `##[endgroup]`. Reading the group as the step collected `with:`/`env:` and dropped
+  everything the command printed, so the evidence bundle held the step's inputs. A step now owns
+  output until the next step opens, and closes when the runner reports it — which is also what
+  leaves a section open for a cancelled or timed-out job. - `##[error]` was invisible to the
+  classifier (`\b(ERROR|FATAL)\b` is case-sensitive), and `##[warning]` was treated as fatal — the
+  "blamed the cache" bug on the GitHub path. Both annotations are now recognised, matched
+  case-sensitively so a tool's own "Warning:" is not excused. - Drop the vendor tokens (`npm ERR!`,
+  `Traceback`) from the classifier: they are a second, hardcoded copy of the matcher catalogue that
+  no config can tune, and both already ship in defaults.yml.
+
+Fixtures: every GitLab log now has a GitHub twin (41/41) and every log has a verdict (41). Tool
+  output is copied verbatim; runner framing is re-written, since a GitLab runner line in a GitHub
+  log asserts something that cannot happen. Three guards keep the grid square, and
+  test_matcher_packs now feeds matchers the lines the pipeline actually produces rather than the raw
+  file.
+
+Docs: split the engineering guidelines out of CONTRIBUTING.md into GUIDELINES.md.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 
 
 ## v0.2.0 (2026-07-25)
