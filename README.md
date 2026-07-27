@@ -105,32 +105,15 @@ uv run ci-doctor analyze "$CI_PIPELINE_ID"
 uv run ci-doctor analyze 18234567890
 ```
 
-```
-ci-doctor analyze [TARGET] [OPTIONS]
-
-  TARGET             A pipeline/run id, or a path to a raw job log to replay
-                     offline (no network fetch).
-  --job-id TEXT      Analyze a single job id.
-  -f, --config PATH  Path to .ci-doctor.yml. Repeatable; the last one wins.
-  --no-color         Disable coloured output (also honours NO_COLOR).
-  -v, --verbose      Enable debug logging.
-  --version          Show version and exit.
-
-ci-doctor config [OPTIONS]
-
-  --diff             Show only what your config changes vs the shipped defaults,
-                     git-diff style: green added, red replaced.
-  --schema           Print the JSON Schema for .ci-doctor.yml.
-  --validate         Load every layer and report what fails validation.
-  -f, --config PATH  Path to .ci-doctor.yml. Repeatable; the last one wins.
-  --less / --plain   Force / skip the scrollable pager (paged on a terminal).
-```
+`ci-doctor config` prints the effective config; `--diff` shows only what your layers
+changed, `--schema` emits the JSON Schema. Full CLI and config reference on the
+[documentation site](https://fennet82.github.io/ci-doctor).
 
 ## Configuration
 
 Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_DOCTOR_*` env
-< CLI flags. Unknown keys are an error. Run `ci-doctor config --diff` to see exactly what
-your layers changed. Minimal config:
+< CLI flags, with nested env vars using `__` (`CI_DOCTOR_LLM__MODEL=…`). Unknown keys are
+an error. Minimal config:
 
 ```yaml
 provider: gitlab
@@ -146,20 +129,10 @@ llm:
   api_base: http://openai-compatible-endpoint.internal:8000/v1
 ```
 
-Nested env vars use `__`: `CI_DOCTOR_LLM__MODEL=…`. See the full reference in
-[docs/site](docs/site) or [docs/PLAN.md §9](docs/PLAN.md).
-
-### LLM backends
-
-| `llm.backend` | Calls | Needs |
-|---|---|---|
-| `openai` *(default)* | any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, gateway) | `model` + `api_base` — base install |
-| `litellm` | any [litellm](https://docs.litellm.ai/) provider | `model`; `pip install '.[litellm]'` |
-| `anthropic` | Claude via the official SDK (defaults to `claude-opus-4-8`) | API key / `ant` profile; `'.[anthropic]'` |
-| `claude_code` | the local `claude` CLI, headless | `claude` on PATH |
-
-The LLM step is optional throughout — when it's disabled, unconfigured, or unreachable,
-ci-doctor emits the deterministic report instead of failing.
+Every knob, and the four LLM backends, are documented on the
+[configuration page](https://fennet82.github.io/ci-doctor/configuration/). The LLM step is
+optional throughout — disabled, unconfigured or unreachable, ci-doctor emits the
+deterministic report instead of failing.
 
 ## Use it in CI
 
@@ -177,8 +150,16 @@ steps:
 ```
 
 Outputs `phase`, `category`, `confidence`, `is-infra-not-code`, and the two report
-paths, so a workflow can branch on the verdict. Full example in
+paths, so a workflow can branch on the verdict. Inputs, PR comments and GitHub
+Enterprise are on the [action page](https://fennet82.github.io/ci-doctor/action/);
+the full workflow is in
 [examples/github-actions.example.yml](examples/github-actions.example.yml).
+
+> **Listing on GitHub Marketplace is a one-time manual step** and cannot be
+> scripted: draft or edit a release in the GitHub UI, tick *Publish this Action
+> to the GitHub Marketplace*, and accept the terms. `action.yml` already carries
+> the metadata that requires. None of this affects `uses:` — that resolves
+> straight from the repo either way.
 
 **GitLab** (`.gitlab-ci.yml`) — runs only on failure, always exits 0:
 
@@ -198,61 +179,42 @@ ci-doctor:
     paths: [report.md, report.json]
 ```
 
-**GitHub Actions** — triggered on a failed workflow run. Full examples in
-[`examples/`](examples/).
+Both providers have a complete, commented workflow in [`examples/`](examples/).
 
 ## Air-gapped / offline
 
 ci-doctor makes no network calls except to the GitLab/GitHub and LLM endpoints you
-configure. Build once where there is internet, then ship inside — a Docker image, or an
-offline wheel bundle (`pip install --no-index --find-links ./wheels ci-doctorr`). See
-[docs/OFFLINE.md](docs/OFFLINE.md).
+configure — no telemetry, no update checks, no runtime model/rule/schema downloads.
+Build once where there is internet, then ship inside:
+
+```sh
+docker build -t ci-doctor .                              # a self-contained image
+pip wheel . -w ./wheels                                  # ...or a wheel bundle
+pip install --no-index --find-links ./wheels ci-doctorr  # on the air-gapped host
+```
+
+Custom CA bundles (`gitlab.ca_bundle`, `github.ca_bundle`, `llm.ca_bundle`) and the
+standard `HTTPS_PROXY` / `NO_PROXY` / `REQUESTS_CA_BUNDLE` variables are honoured.
 
 ## Documentation
 
-A full documentation site (overview, requirements, configuration, usage, CI/CD examples)
-lives in [`docs/site/`](docs/site) — built with Astro:
+**[fennet82.github.io/ci-doctor](https://fennet82.github.io/ci-doctor)** — overview,
+requirements, configuration, usage, the GitHub Action, and CI/CD examples. Source in
+[`docs/site/`](docs/site) (Astro); `mise run docs` previews it locally.
 
-```sh
-cd docs/site && npm install && npm run dev    # or: npm run build -> dist/
-```
-
-The original design spec is [docs/PLAN.md](docs/PLAN.md). How the code is built —
-where things go, the invariants, how to write tests — is
-[GUIDELINES.md](GUIDELINES.md); how to get a change in — setup, commits, pre-push
-checks — is [CONTRIBUTING.md](CONTRIBUTING.md).
+For contributors: how the code is built — where things go, the invariants, how to write
+tests — is [GUIDELINES.md](GUIDELINES.md); how to get a change in — setup, commits,
+pre-push checks — is [CONTRIBUTING.md](CONTRIBUTING.md). The original design spec, kept
+for provenance, is [docs/PLAN.md](docs/PLAN.md).
 
 ## Development
 
 ```sh
-uv sync
-uv run pytest        # 347 tests, no network, no LLM
+mise run setup       # uv sync + the repo's git hooks  (or just: uv sync)
+mise run check       # everything CI runs: tests, lint, guardrails, secret scan
 ```
 
-```
-ci_doctor/
-  cli.py            typer entrypoint (always exits 0)
-  config/           pydantic schema + defaults.yml + layered loader
-  core/             provider-neutral: models, ports, attribution (pure), denoise,
-                    extract, budget, redact, analyze
-  llm/              Report schema, prompt templates, backends (openai/litellm/anthropic/claude_code)
-  render/           terminal (rich), markdown, json
-  providers/
-    gitlab/         python-gitlab adapter + segmenter + reasons
-    github/         GitHub Actions adapter + segmenter + reasons
-tests/              fixtures + golden-file attribution suite
-docs/site/          Astro documentation site
-examples/           .gitlab-ci.yml + GitHub Actions snippets
-Dockerfile
-```
-
-### Design guardrails
-
-- The LLM never selects the failure phase — that lives in `core/attribution.py`.
-- `core/` depends on no provider or vendor SDK — `grep -riE 'gitlab|github|openai' ci_doctor/core/`
-  is clean. Adding the GitHub adapter required no core changes.
-- `attribution.py` is a pure function — no I/O, network, or clock.
-- Always exits 0 · never emits unredacted log content · every truncation is visible.
+The suite blocks real sockets and never calls an LLM, so it runs in seconds.
 
 ## License
 

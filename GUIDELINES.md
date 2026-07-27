@@ -4,8 +4,8 @@ How the code is built: where things go, what must never break, and the conventio
 every change follows. **Read this before writing code** — for humans and for agents.
 
 For the contribution *process* (setup, running tests, commits, pushing) see
-[CONTRIBUTING.md](CONTRIBUTING.md). The design spec is [docs/PLAN.md](docs/PLAN.md);
-the user-facing overview is the [README](README.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). For *why* the architecture is shaped this way —
+the failure modes it defends against — see [docs/PLAN.md](docs/PLAN.md).
 
 ---
 
@@ -21,6 +21,22 @@ acquire → segment → attribute → denoise → extract → budget → (LLM) �
 ```
 
 ## 2. Where code goes
+
+```
+ci_doctor/
+  cli.py            typer entrypoint (always exits 0)
+  config/           pydantic schema + defaults.yml + layered loader
+  core/             provider-neutral: models, ports, attribution (pure), denoise,
+                    extract, budget, redact, analyze
+  llm/              Report schema, prompt templates, backends
+  render/           terminal (rich), markdown, json
+  providers/
+    gitlab/         python-gitlab adapter + segmenter + reasons
+    github/         PyGithub adapter + segmenter + reasons
+tests/              fixtures + golden-file attribution suite
+docs/site/          Astro documentation site
+examples/           .gitlab-ci.yml + GitHub Actions workflows
+```
 
 | You are adding | It belongs in | Rule |
 |---|---|---|
@@ -39,7 +55,7 @@ acquire → segment → attribute → denoise → extract → budget → (LLM) �
 
 ## 3. Invariants — do not break these
 
-These come from [docs/PLAN.md §13](docs/PLAN.md). The first three are load-bearing:
+This list is the single source of truth for them. The first three are load-bearing:
 
 1. **The LLM never selects the failure phase.** Attribution is deterministic and auditable.
 2. **No provider identifiers in `core/`.** Verify: `grep -ri gitlab ci_doctor/core/` must be empty.
@@ -145,6 +161,12 @@ matches fails silently, because the tail window still returns something.
 
 Windows are `before`/`after` lines around the anchor. Anchor on the **cause**, not on a
 trailing summary line: a summary-only anchor windows *past* the detail above it.
+
+`priority` decides who gets cut when the evidence exceeds the token budget: `extract.py`
+sheds whole low-priority windows before `budget.py` truncates what is left. Rank a pack
+by how *diagnostic* it is, not how loud — `npm ERR!` (75) trails the compiler errors that
+caused it, so it must lose to `tsc` (80). Only windows separated by unselected lines are
+rankable; adjacent ones merge and take the highest priority among them.
 
 Config **lists replace, mappings deep-merge** — except lists whose entries all carry an
 `id`, which merge per id (`_merge_by_id` in `config/loader.py`). So a user pack with a new
