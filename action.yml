@@ -73,11 +73,17 @@ outputs:
 runs:
   using: composite
   steps:
-    # Plain pip against the runner's preinstalled Python: one less marketplace
-    # action in the caller's supply chain than pulling in a Python/uv setup action.
+    # A venv, not the runner's system Python: since Ubuntu 24.04 the system
+    # interpreter is PEP 668 externally-managed and a plain `pip install` fails
+    # outright. This also keeps one less marketplace action in the caller's supply
+    # chain than pulling in a Python or uv setup action.
     - name: Install ci-doctor
       shell: bash
-      run: python3 -m pip install --quiet --disable-pip-version-check "$GITHUB_ACTION_PATH"
+      run: |
+        python3 -m venv "$RUNNER_TEMP/ci-doctor-venv"
+        "$RUNNER_TEMP/ci-doctor-venv/bin/pip" install --quiet --disable-pip-version-check \
+          "$GITHUB_ACTION_PATH"
+        echo "$RUNNER_TEMP/ci-doctor-venv/bin" >> "$GITHUB_PATH"
 
     - name: Analyze the failed run
       id: analyze
@@ -93,18 +99,29 @@ runs:
         JOB_ID: ${{ inputs.job-id }}
         CONFIG: ${{ inputs.config }}
       run: |
-        set -uo pipefail   # not -e: this step must never fail the caller's workflow
+        # GitHub runs `shell: bash` with -e already set. Turn it off deliberately:
+        # invariant #3 is that ci-doctor never changes a pipeline's outcome, and an
+        # action that can fail the caller's workflow would break that promise from
+        # the outside no matter what the analyzer does.
+        set +e
+        set -uo pipefail
+
         args=("$RUN_ID")
         [[ -n "$JOB_ID" ]] && args+=(--job-id "$JOB_ID")
         [[ -n "$CONFIG" ]] && args+=(--config "$CONFIG")
         ci-doctor analyze "${args[@]}"
 
-        # Surface the verdict so callers can branch on it (e.g. skip the retry when
-        # it is not infrastructure). Guarded: a missing report must not fail here.
+        # Surface the verdict so callers can branch on it (e.g. only retry when the
+        # failure was infrastructure). Every read is guarded: a missing or malformed
+        # report degrades to empty outputs rather than failing the step.
         python3 - <<'PY' >> "$GITHUB_OUTPUT"
         import json, pathlib
+
         report = pathlib.Path("report.json")
-        first = (json.loads(report.read_text()) or [{}])[0] if report.is_file() else {}
+        try:
+            first = (json.loads(report.read_text()) or [{}])[0]
+        except (OSError, ValueError, IndexError):
+            first = {}
         print(f"phase={first.get('failure_phase', '')}")
         print(f"category={first.get('category', '')}")
         print(f"confidence={first.get('confidence', '')}")
@@ -112,6 +129,7 @@ runs:
         print(f"markdown-path={pathlib.Path('report.md').resolve()}")
         print(f"json-path={report.resolve()}")
         PY
+        exit 0
 
     - name: Add the report to the job summary
       if: always()

@@ -169,7 +169,7 @@ ci-doctor emits the deterministic report instead of failing.
 permissions: { actions: read, contents: read, pull-requests: write }
 steps:
   - id: doctor
-    uses: fennet82/ci-doctor@v1
+    uses: fennet82/ci-doctor@master   # or pin a release tag
     with:
       post-pr-note: 'true'
   - if: steps.doctor.outputs.is-infra-not-code == 'true'
