@@ -1,0 +1,42 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z ##[group]Operating System
+2026-07-24T20:04:01.2300000Z Ubuntu
+2026-07-24T20:04:01.6399999Z 24.04.4
+2026-07-24T20:04:02.0499999Z LTS
+2026-07-24T20:04:02.4600000Z ##[endgroup]
+2026-07-24T20:04:02.8699999Z Secret source: Actions
+2026-07-24T20:04:03.2799999Z Prepare workflow directory
+2026-07-24T20:04:03.6899999Z Prepare all required actions
+2026-07-24T20:04:04.0999999Z Complete job name: script_failure_noisy
+2026-07-24T20:04:04.5099999Z ##[group]Run actions/cache@v4
+2026-07-24T20:04:04.9200000Z   with:
+2026-07-24T20:04:05.3300000Z     path: ~/.cache
+2026-07-24T20:04:05.7399999Z     key: Linux-deps-8ad41f02
+2026-07-24T20:04:06.1499999Z ##[endgroup]
+2026-07-24T20:04:06.5599999Z Cache not found for input keys: Linux-deps-8ad41f02
+2026-07-24T20:04:06.9699999Z ##[warning]file does not exist
+2026-07-24T20:04:07.3799999Z ##[warning]Failed to extract cache
+2026-07-24T20:04:07.7899999Z ##[group]Run actions/download-artifact@v4
+2026-07-24T20:04:08.1999999Z   with:
+2026-07-24T20:04:08.6099999Z     name: compile
+2026-07-24T20:04:09.0199999Z ##[endgroup]
+2026-07-24T20:04:09.4299999Z Downloading single artifact
+2026-07-24T20:04:09.8399999Z Artifact download completed successfully.
+2026-07-24T20:04:10.2500000Z ##[warning]Downloading artifacts from coordinator... not found  id=5123 responseStatus=404 Not Found
+2026-07-24T20:04:10.6600000Z ##[group]Run pip install -e .
+2026-07-24T20:04:11.0699999Z pip install -e .
+2026-07-24T20:04:11.4799999Z pytest -q
+2026-07-24T20:04:11.8899999Z shell: /usr/bin/bash -e {0}
+2026-07-24T20:04:12.2999999Z ##[endgroup]
+2026-07-24T20:04:12.7099999Z ============================= FAILURES =============================
+2026-07-24T20:04:13.1199999Z _________________________ test_add ________________________________
+2026-07-24T20:04:13.5299999Z E   assert 1 == 2
+2026-07-24T20:04:13.9399999Z ========================= short test summary info =================
+2026-07-24T20:04:14.3499999Z FAILED tests/test_math.py::test_add - assert 1 == 2
+2026-07-24T20:04:14.7599999Z ##[error]Process completed with exit code 1.
+2026-07-24T20:04:15.1699999Z ##[group]Post Run actions/checkout@v4
+2026-07-24T20:04:15.5799999Z ##[endgroup]
+2026-07-24T20:04:15.9899999Z /usr/bin/git version
+2026-07-24T20:04:16.3999999Z git version 2.54.0
+2026-07-24T20:04:16.8099999Z Post job cleanup.
+2026-07-24T20:04:17.2199999Z Cleaning up orphan processes

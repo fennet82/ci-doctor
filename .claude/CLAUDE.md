@@ -1,9 +1,12 @@
 ## Working in this repo
 
-Read [CONTRIBUTING.md](../CONTRIBUTING.md) before writing code. It covers where code
+Read [GUIDELINES.md](../GUIDELINES.md) before writing code. It covers where code
 goes, the invariants that must not break (read-only, always `exit 0`, no provider
 names in `core/`, no network in tests), how to add a matcher pack or a CI provider,
-the provider-generic fixture layout, conventional commits, and the pre-push checks.
+the provider-generic fixture layout, and the style rules.
+
+[CONTRIBUTING.md](../CONTRIBUTING.md) is the shorter process guide: setup, the test
+command, conventional commits, and the pre-push checks.
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

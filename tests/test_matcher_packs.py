@@ -70,7 +70,7 @@ def _analyze(provider: str, stem: str):
 @pytest.mark.parametrize("provider,stem,matcher_ids,causal,_category", PARAMS, ids=IDS)
 def test_pack_matches_and_stays_targeted(provider, stem, matcher_ids, causal, _category):
     """The pack fires, captures the causal line, and windows rather than swallows."""
-    lines = support.read_log(provider, stem).splitlines()
+    lines = support.log_lines(provider, stem)
     for mid in matcher_ids:
         assert _windows_for(lines, [MATCHERS[mid]]), f"{mid} matched nothing in {stem}.log"
 

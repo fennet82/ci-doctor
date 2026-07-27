@@ -2,6 +2,7 @@
 attribution through the GitHub path — proving core needed no changes.
 """
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from ci_doctor.config.loader import load_config
@@ -68,23 +69,29 @@ def test_full_attribution_through_github_path():
     assert attr.reason == FailureReason.SCRIPT_FAILURE
 
 
-def _fake_client(jobs, logs):
-    """Build an in-memory stand-in for the GitHub REST client."""
-    return SimpleNamespace(
-        run_jobs=lambda repo, run_id: jobs,
-        job_log=lambda repo, job_id: logs.get(job_id, ""),
-    )
+def _job(**kw):
+    """A stand-in for a PyGithub WorkflowJob, with every attribute we read."""
+    return SimpleNamespace(**{"runner_name": None, "runner_id": None, "started_at": None,
+                              "completed_at": None, "html_url": "", **kw})
+
+
+def _fake_client(jobs, *, pull_requests=()):
+    """An in-memory stand-in for `github.Github`, down to the workflow run."""
+    run = SimpleNamespace(id=999, head_branch="main", head_sha="deadbeef", html_url="http://gh/run/999",
+                          pull_requests=list(pull_requests), jobs=lambda: jobs)
+    return SimpleNamespace(get_repo=lambda name: SimpleNamespace(get_workflow_run=lambda rid: run))
 
 
 def test_provider_maps_jobs_and_normalizes_status():
-    """Job dicts map to the domain model and failing conclusions become "failed"."""
+    """PyGithub jobs map to the domain model and failing conclusions become "failed"."""
     jobs = [
-        {"id": 11, "name": "build", "status": "completed", "conclusion": "failure",
-         "runner_name": "gh-runner-1", "html_url": "http://gh/11"},
-        {"id": 12, "name": "flaky", "status": "completed", "conclusion": "timed_out"},
-        {"id": 13, "name": "ok", "status": "completed", "conclusion": "success"},
+        _job(id=11, name="build", status="completed", conclusion="failure",
+             runner_name="gh-runner-1", runner_id=7, html_url="http://gh/11",
+             started_at=datetime(2024, 1, 1, tzinfo=timezone.utc)),
+        _job(id=12, name="flaky", status="completed", conclusion="timed_out"),
+        _job(id=13, name="ok", status="completed", conclusion="success"),
     ]
-    provider = GitHubProvider(load_config(environ={}), client=_fake_client(jobs, {11: b"boom".decode()}),
+    provider = GitHubProvider(load_config(environ={}), client=_fake_client(jobs),
                               environ={"GITHUB_REPOSITORY": "acme/app", "GITHUB_REF": "refs/pull/42/merge"})
     run = provider.fetch_run("999")
 
@@ -92,6 +99,45 @@ def test_provider_maps_jobs_and_normalizes_status():
     assert build.status == "failed"  # normalized from conclusion
     assert build.failure_reason == FailureReason.SCRIPT_FAILURE
     assert build.runner.description == "gh-runner-1"
+    assert build.started_at == "2024-01-01T00:00:00+00:00"  # datetime -> ISO string
     assert run.jobs[1].failure_reason == FailureReason.TIMEOUT
     assert run.jobs[2].status == "completed"  # success conclusion stays non-failed
+    assert run.ref == "main" and run.sha == "deadbeef"  # straight off the run, no env vars
     assert run.mr is not None and run.mr.iid == "42"  # PR resolved from GITHUB_REF
+
+
+def test_pull_request_on_the_run_wins_over_the_ref():
+    """The run's own PR list is authoritative; GITHUB_REF is only the fork fallback."""
+    provider = GitHubProvider(
+        load_config(environ={}),
+        client=_fake_client([], pull_requests=[SimpleNamespace(number=7)]),
+        environ={"GITHUB_REPOSITORY": "acme/app", "GITHUB_REF": "refs/pull/42/merge"},
+    )
+    assert provider.fetch_run("999").mr.iid == "7"
+
+
+def test_repository_falls_back_to_git_origin(monkeypatch):
+    """With no GITHUB_REPOSITORY, the local origin names the repo (and warns)."""
+    from ci_doctor.providers import git_origin
+
+    git_origin.origin_repo.cache_clear()
+    monkeypatch.setattr(git_origin.subprocess, "run", lambda *a, **k: SimpleNamespace(
+        stdout="git@github.com:acme/app.git\n"))
+    seen = []
+    provider = GitHubProvider(load_config(environ={}),
+                              client=SimpleNamespace(get_repo=lambda name: seen.append(name)),
+                              environ={})
+    provider._repo()
+    assert seen == ["acme/app"]
+    git_origin.origin_repo.cache_clear()
+
+
+def test_origin_keeps_nested_gitlab_groups(monkeypatch):
+    """A GitLab subgroup path survives; a bare regex on the tail would lose it."""
+    from ci_doctor.providers import git_origin
+
+    git_origin.origin_repo.cache_clear()
+    monkeypatch.setattr(git_origin.subprocess, "run", lambda *a, **k: SimpleNamespace(
+        stdout="https://gitlab.example.com/group/sub/project.git\n"))
+    assert git_origin.origin_repo("CI_PROJECT_ID") == "group/sub/project"
+    git_origin.origin_repo.cache_clear()

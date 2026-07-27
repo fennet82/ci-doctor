@@ -1,0 +1,18 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z ##[group]Operating System
+2026-07-24T20:04:01.2300000Z Ubuntu
+2026-07-24T20:04:01.6399999Z 24.04.4
+2026-07-24T20:04:02.0499999Z LTS
+2026-07-24T20:04:02.4600000Z ##[endgroup]
+2026-07-24T20:04:02.8699999Z Secret source: Actions
+2026-07-24T20:04:03.2799999Z Prepare workflow directory
+2026-07-24T20:04:03.6899999Z Prepare all required actions
+2026-07-24T20:04:04.0999999Z Complete job name: oom_137
+2026-07-24T20:04:04.5099999Z ##[group]Run ./build_big.sh
+2026-07-24T20:04:04.9200000Z ./build_big.sh
+2026-07-24T20:04:05.3300000Z shell: /usr/bin/bash -e {0}
+2026-07-24T20:04:05.7399999Z ##[endgroup]
+2026-07-24T20:04:06.1499999Z Compiling everything at once...
+2026-07-24T20:04:06.5599999Z ##[error]Process completed with exit code 137.
+2026-07-24T20:04:06.9699999Z Post job cleanup.
+2026-07-24T20:04:07.3799999Z Cleaning up orphan processes

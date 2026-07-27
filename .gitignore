@@ -11,3 +11,5 @@ report.json
 # local Claude Code settings / temp
 .claude/settings.local.json
 .claude/*.tmp*
+# custom LLM config for ci-doctor
+llm.config.yml

@@ -1,0 +1,11 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z Secret source: Actions
+2026-07-24T20:04:01.2300000Z Prepare workflow directory
+2026-07-24T20:04:01.6399999Z ##[group]Set up job
+2026-07-24T20:04:02.0499999Z Image: ubuntu-24.04
+2026-07-24T20:04:02.4600000Z ##[endgroup]
+2026-07-24T20:04:02.8699999Z ##[group]Initialize containers
+2026-07-24T20:04:03.2799999Z ##[command]/usr/bin/docker pull internal.registry/build:latest
+2026-07-24T20:04:03.6899999Z Error response from daemon: Head "https://internal.registry/v2/build/manifests/latest": unauthorized
+2026-07-24T20:04:04.0999999Z ##[endgroup]
+2026-07-24T20:04:04.5099999Z ##[error]Failed to initialize container internal.registry/build:latest

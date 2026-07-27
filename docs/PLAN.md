@@ -187,7 +187,7 @@ anything in `core/`, the design failed.**
 
 ## 11. Testing (non-negotiable)
 `tests/fixtures/logs/<provider>/*.log` paired with a provider-neutral
-`expected/*.json` of `{phase, reason, rule_id}` (see CONTRIBUTING.md §4.1).
+`expected/*.json` of `{phase, reason, rule_id}` (see GUIDELINES.md §4.1).
 Must include: noisy cache-miss block above a script `exit 1` ->
 `SCRIPT` (the regression test); empty log + `stuck_or_timeout_failure` ->
 `PROVISION`; runner system failure in `prepare_executor`; job timeout with unclosed

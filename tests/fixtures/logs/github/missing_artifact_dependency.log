@@ -1,0 +1,18 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z Secret source: Actions
+2026-07-24T20:04:01.2300000Z Prepare workflow directory
+2026-07-24T20:04:01.6399999Z Complete job name: bundle:frontend
+2026-07-24T20:04:02.0499999Z ##[group]Run actions/checkout@v4
+2026-07-24T20:04:02.4600000Z   with:
+2026-07-24T20:04:02.8699999Z     fetch-depth: 20
+2026-07-24T20:04:03.2799999Z ##[endgroup]
+2026-07-24T20:04:03.6899999Z Syncing repository: acme/storefront
+2026-07-24T20:04:04.0999999Z /usr/bin/git checkout --progress --force 8ad41f02
+2026-07-24T20:04:04.5099999Z ##[group]Run actions/download-artifact@v4
+2026-07-24T20:04:04.9200000Z   with:
+2026-07-24T20:04:05.3300000Z     name: compile:assets
+2026-07-24T20:04:05.7399999Z     path: public/assets
+2026-07-24T20:04:06.1499999Z ##[endgroup]
+2026-07-24T20:04:06.5599999Z Downloading single artifact
+2026-07-24T20:04:07.3799999Z ##[error]Unable to download artifact(s): Artifact not found for name: compile:assets
+2026-07-24T20:04:07.7899999Z Ensure the artifact was uploaded by an earlier job in this workflow run.
