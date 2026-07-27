@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://github.com/fennet82/ci-doctor/releases/latest/download/ci-doctor.schema.json
+
 # Shipped baseline config.
 #
 # Scalar defaults live in schema.py; this file carries the data-heavy baseline
