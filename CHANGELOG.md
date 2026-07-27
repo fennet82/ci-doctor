@@ -1,6 +1,94 @@
 # CHANGELOG
 
 
+## v1.1.1 (2026-07-27)
+
+### Bug Fixes
+
+- **extract**: Let matcher priority survive budget pressure
+  ([`5ee2c79`](https://github.com/fennet82/ci-doctor/commit/5ee2c7914aca04aa6e089bfa1161040c9c28a013))
+
+extraction.matchers has carried a priority field documented as "higher priority survives budget
+  pressure", but nothing read it: extract() returned list[str], discarding the windows, and
+  budget.fit() then cut positionally from the head.
+
+That picks wrong whenever a tool reports the cause before its own epilogue. On a tsc-then-npm build
+  over budget, the old path discarded the compiler errors entirely and spent the whole budget on
+  npm's complaint:
+
+OLD: TS errors=False npm noise=True truncated=True
+
+NEW: TS errors=True npm noise=False truncated=False
+
+extract() now takes an optional max_tokens and sheds whole low-priority windows worst-first; fit()
+  stays the last resort that cuts inside what survived. It never drops the last window — a single
+  unbounded start/end block can exceed the budget alone.
+
+Note the limit: _merge fuses adjacent windows and takes the max priority, so only windows separated
+  by unselected lines are rankable.
+
+### Chores
+
+- Schema hint in defaults.yml, lockfile and plugin settings
+  ([`b8d38e7`](https://github.com/fennet82/ci-doctor/commit/b8d38e742332093e1375fa6be2694386fce30f98))
+
+Your changes, carried through: the yaml-language-server $schema comment moved to the top of
+  defaults.yml, and the frontend-design plugin enabled. uv.lock picks up the 1.1.0 version it had
+  lagged behind.
+
+### Documentation
+
+- Consolidate the markdown onto one home per topic
+  ([`b83d0ec`](https://github.com/fennet82/ci-doctor/commit/b83d0eccffa7f01bf7bedc62595e49a546117455))
+
+The four docs had grown to ~940 lines with the same content in three places: the invariants list in
+  README, GUIDELINES and PLAN; the pipeline diagram in all three; air-gap instructions across four
+  files.
+
+Each topic now has one owner. GUIDELINES owns the invariants and the package layout; the site owns
+  the CLI, config and backend references, so README links out instead of restating them. PLAN drops
+  the milestones, the "open questions" and the duplicated invariants, keeping the design rationale
+  that outlives the code. OFFLINE.md is deleted — README plus the site's air-gap sections already
+  covered all of it, and its one unique line pointed at a PLAN section that was a four-line stub.
+
+Also fixes: the stale 347-test count (now stated nowhere, so it cannot drift), a duplicate "GitHub
+  Actions" heading, and PLAN still marking the GitHub adapter as future work.
+
+941 -> 782 lines, with every relative link verified to resolve.
+
+- Rebuild the site and publish it to GitHub Pages
+  ([`42bf99e`](https://github.com/fennet82/ci-doctor/commit/42bf99eb69badc9974d2876c7c92b3d693b84123))
+
+Design: real token system with a dark palette, fluid type scale, theme toggle (with a pre-paint
+  script so dark-theme visitors get no white flash), collapsing mobile nav, skip link, focus rings,
+  reduced-motion, OG/canonical meta.
+
+Content: adds an /action/ page — the shipped GitHub Action was nowhere in the docs, and the Actions
+  example still hand-rolled uv sync. Also covers local runs via the git-origin fallback, the config
+  subcommand, and token scopes per provider.
+
+Publishing: docs.yml deploys from master only, path-filtered; ci.yml gains a docs job that builds on
+  PRs but cannot publish.
+
+The base gotcha: Pages serves from /ci-doctor and Astro does not rewrite plain href/src attributes,
+  so every existing link worked under astro dev and would have 404'd in production. All of them now
+  go through src/lib/url.ts, verified against the built HTML — 8/8 targets resolve.
+
+### Refactoring
+
+- Drop the redundant __future__ annotations import
+  ([`80c6e9f`](https://github.com/fennet82/ci-doctor/commit/80c6e9f06ff371d94c19b5cc7bf2a375a9c694d3))
+
+requires-python is >=3.11, where PEP 604 unions and builtin generics are native. The only genuine
+  need is a forward reference, and the two places that have one (core/ports.py under TYPE_CHECKING,
+  models.Section.children) already quote theirs — so the import was insuring against a risk the code
+  had already handled another way.
+
+Verified beyond the suite, since a broken forward ref fails at import time rather than test time:
+  every module imports, get_type_hints() resolves on every dataclass, and both pydantic schemas
+  build.
+
+
 ## v1.1.0 (2026-07-27)
 
 ### Chores
