@@ -6,8 +6,6 @@ wires the deterministic stages together; it does not call any model. Segmentatio
 the already-segmented job plus its Attribution.
 """
 
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass, field
 
@@ -107,8 +105,10 @@ def build_bundle(
         raw = [line.text for sec in _walk(sections) for line in sec.lines]
 
     clean = denoise(raw, cfg.denoise, strip_timestamps=strip_timestamps)
-    excerpt = extract(clean, cfg.extraction.matchers, cfg.extraction.tail_lines)
     blamed_budget = int(cfg.llm.max_input_tokens * 0.7)
+    # Budget the *selection* by matcher priority first; `fit` is the last resort
+    # that cuts inside whatever survives.
+    excerpt = extract(clean, cfg.extraction.matchers, cfg.extraction.tail_lines, blamed_budget)
     fitted, truncated = fit(excerpt, blamed_budget)
     log.debug(
         "blamed phase %s: denoise %d->%d, extract ->%d, fit ->%d lines (truncated=%s)",

@@ -5,12 +5,11 @@ tail-only view would miss them). Overlapping windows merge. Every gap between
 selected windows is marked with an explicit elision count — never a silent cut.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 
 from ci_doctor.config.schema import MatcherConfig
+from ci_doctor.core.budget import estimate_tokens
 
 
 @dataclass
@@ -89,7 +88,39 @@ def _merge(wins: list[_Window]) -> list[_Window]:
     return merged
 
 
-def extract(lines: list[str], matchers: list[MatcherConfig], tail_lines: int) -> list[str]:
+def _drop_to_fit(lines: list[str], windows: list[_Window], max_tokens: int) -> list[_Window]:
+    """Shed the least valuable windows until the selection fits the budget.
+
+    Without this the budget is enforced only by `budget.fit`, which keeps the
+    *tail*. That picks wrong whenever a tool reports the cause before its own
+    epilogue — `npm ERR!` always trails the compiler errors that caused it, so
+    tail-keep discards the diagnosis and keeps the complaint.
+
+    Args:
+        lines: The denoised log lines.
+        windows: Merged, non-overlapping windows.
+        max_tokens: Budget for the selected lines.
+
+    Returns:
+        The surviving windows, back in log order. Always at least one — a single
+        window can exceed the budget on its own (an unbounded `start`/`end` block
+        over a large suite), and truncating *inside* it is `budget.fit`'s job.
+    """
+    # Worst first: lowest priority, and among equals the earliest, since later
+    # output sits closer to the failure.
+    ranked = sorted(
+        ((estimate_tokens("\n".join(lines[w.start : w.end])), w) for w in windows),
+        key=lambda cw: (cw[1].priority, -cw[1].start),
+    )
+    total = sum(cost for cost, _ in ranked)
+    while len(ranked) > 1 and total > max_tokens:
+        total -= ranked.pop(0)[0]
+    return sorted((w for _, w in ranked), key=lambda w: w.start)
+
+
+def extract(
+    lines: list[str], matchers: list[MatcherConfig], tail_lines: int, max_tokens: int | None = None
+) -> list[str]:
     """Reduce a log to the lines worth showing.
 
     Args:
@@ -98,6 +129,9 @@ def extract(lines: list[str], matchers: list[MatcherConfig], tail_lines: int) ->
         tail_lines: How many trailing lines to always keep, at lowest priority.
             Pass 0 to test a pack in isolation — otherwise the tail masks a
             matcher that never fired.
+        max_tokens: Evidence budget. When given, low-priority windows are dropped
+            before rendering rather than left for `budget.fit` to cut blindly off
+            the head. None keeps every window, whatever it costs.
 
     Returns:
         The selected lines with "… [N lines elided] …" markers where content was
@@ -109,6 +143,8 @@ def extract(lines: list[str], matchers: list[MatcherConfig], tail_lines: int) ->
     merged = _merge(wins)
     if not merged:
         return list(lines)
+    if max_tokens is not None:
+        merged = _drop_to_fit(lines, merged, max_tokens)
     return _render(lines, merged)
 
 

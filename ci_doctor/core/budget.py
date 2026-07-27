@@ -5,8 +5,6 @@ cap. When it still overflows we keep the tail (the failure lives at the end) and
 elide the head with a visible marker — never a silent truncation.
 """
 
-from __future__ import annotations
-
 
 def estimate_tokens(text: str) -> int:
     """Approximate a token count without loading a tokenizer.
@@ -35,8 +33,11 @@ def fit(lines: list[str], max_tokens: int) -> tuple[list[str], bool]:
         A ``(lines, truncated)`` pair. When truncated, the first line is a visible
         "… [N lines elided …] …" marker.
 
-    ponytail: tail-keep. Upgrade to phase-aware 70/10/20 + drop-lowest-priority-
-    windows-first (see extract._Window.priority) if the tail heuristic misses causes.
+    Low-priority windows are already shed upstream by `extract._drop_to_fit`, so
+    this only ever cuts *inside* the evidence that survived that pass.
+
+    ponytail: tail-keep within the surviving window. Upgrade to phase-aware
+    70/10/20 if the tail heuristic still misses causes.
     """
     if estimate_tokens("\n".join(lines)) <= max_tokens:
         return lines, False
