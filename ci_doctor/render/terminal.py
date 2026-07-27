@@ -11,8 +11,6 @@ Colour is deliberately restrained: section headers, a status line, and severity
 cues only.
 """
 
-from __future__ import annotations
-
 import time
 
 from rich.console import Console

@@ -7,8 +7,6 @@ none). openai/httpx are imported lazily so nothing here is pulled in unless a re
 model is actually configured and called.
 """
 
-from __future__ import annotations
-
 import json
 import os
 

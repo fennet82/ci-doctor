@@ -7,8 +7,6 @@ REQUESTS_CA_BUNDLE). Feature-detection is defensive: missing attributes/endpoint
 on older instances degrade to sensible defaults instead of crashing.
 """
 
-from __future__ import annotations
-
 import logging
 from pathlib import Path
 

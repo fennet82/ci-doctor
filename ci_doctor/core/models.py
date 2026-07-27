@@ -5,8 +5,6 @@ leak past an adapter boundary. Purity guardrail: a case-insensitive grep for any
 provider name over core/ must return nothing (keep this file free of them too).
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import StrEnum
 

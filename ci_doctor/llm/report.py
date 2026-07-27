@@ -7,8 +7,6 @@ evidence, an excerpt, and templated remediation. Nothing here crashes; a broken
 analyzer must never change the pipeline outcome.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import re

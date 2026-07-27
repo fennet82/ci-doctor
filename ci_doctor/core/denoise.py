@@ -6,8 +6,6 @@ Then collapse runs of identical lines. A line that looks like an error is never
 dropped by a noise pattern — the escape hatch that keeps the cause visible.
 """
 
-from __future__ import annotations
-
 import re
 from collections.abc import Callable
 

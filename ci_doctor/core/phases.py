@@ -6,8 +6,6 @@ phase, else SCRIPT. Synthetic preamble/trailer stay UNKNOWN — the classifier
 handles them specially.
 """
 
-from __future__ import annotations
-
 from ci_doctor.core.models import Phase, Section
 
 _SYNTHETIC = {"__preamble__", "__trailer__"}

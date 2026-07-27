@@ -7,8 +7,6 @@ call PyGithub cannot finish for us is the job log: it hands back the redirect
 target for the log blob, and we fetch that ourselves.
 """
 
-from __future__ import annotations
-
 import logging
 import re
 from pathlib import Path

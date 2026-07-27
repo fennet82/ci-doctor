@@ -9,8 +9,6 @@ Every field carries a ``description``: it is the text editors show when completi
 field added without one ships an undocumented knob.
 """
 
-from __future__ import annotations
-
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field

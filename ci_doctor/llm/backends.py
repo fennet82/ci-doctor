@@ -9,8 +9,6 @@ the base install stays lean and air-gap-clean; install via `ci-doctor[litellm]` 
 subprocess, no dep, but the binary must be on PATH).
 """
 
-from __future__ import annotations
-
 import json
 import os
 import shutil

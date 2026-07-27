@@ -19,8 +19,6 @@ just stops mid-output. That distinction is what leaves a section *open* for the
 classifier to blame, and it is the direct analogue of GitLab's `section_end`.
 """
 
-from __future__ import annotations
-
 import re
 
 from ci_doctor.core.models import LogLine, Section

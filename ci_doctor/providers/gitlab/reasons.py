@@ -7,8 +7,6 @@ normalization. The provider's original string is always kept in
 `Job.raw_failure_reason`.
 """
 
-from __future__ import annotations
-
 from ci_doctor.core.models import FailureReason
 
 #: GitLab's `failure_reason` strings -> the neutral enum. Several GitLab reasons

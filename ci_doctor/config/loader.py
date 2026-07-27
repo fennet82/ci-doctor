@@ -8,8 +8,6 @@ keys in a config *file* are a hard error (schema uses ``extra="forbid"``). Env v
 are more permissive by necessity (see :func:`_env_overlay`).
 """
 
-from __future__ import annotations
-
 import logging
 import os
 from copy import deepcopy

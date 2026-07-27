@@ -1,7 +1,5 @@
 """Pure job-selection policy. Provider-neutral: operates on domain Jobs only."""
 
-from __future__ import annotations
-
 from ci_doctor.core.models import Job
 
 

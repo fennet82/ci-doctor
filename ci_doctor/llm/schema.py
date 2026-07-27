@@ -6,8 +6,6 @@ It is defined here in M0 because the ports reference it; the LLM code that fills
 it in lands in M4.
 """
 
-from __future__ import annotations
-
 from typing import Literal
 
 from pydantic import BaseModel, Field

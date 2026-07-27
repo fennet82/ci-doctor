@@ -1,7 +1,5 @@
 """Render a Report as Markdown (report.md artifact and MR-note body)."""
 
-from __future__ import annotations
-
 from ci_doctor.core.ports import Renderer
 from ci_doctor.llm.schema import Report
 

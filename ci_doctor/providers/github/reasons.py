@@ -5,8 +5,6 @@ the startup-failure signal. The classifier (shared, in core) still does the real
 disambiguation from the log structure.
 """
 
-from __future__ import annotations
-
 from ci_doctor.core.models import FailureReason
 
 #: GitHub job conclusions -> the neutral enum.

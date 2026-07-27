@@ -13,8 +13,6 @@ fixtures parse the same way. Content outside any section becomes the synthetic
 trailer carries the terminal ``ERROR: Job failed:`` line.
 """
 
-from __future__ import annotations
-
 import re
 
 from ci_doctor.core.models import LogLine, Section

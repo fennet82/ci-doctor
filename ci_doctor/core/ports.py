@@ -5,8 +5,6 @@ types are only pulled in under TYPE_CHECKING so importing a port never drags a
 provider or the LLM stack into core.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 

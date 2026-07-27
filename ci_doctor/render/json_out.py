@@ -1,7 +1,5 @@
 """Render a Report as JSON (report.json artifact)."""
 
-from __future__ import annotations
-
 from ci_doctor.core.ports import Renderer
 from ci_doctor.llm.schema import Report
 

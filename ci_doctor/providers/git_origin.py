@@ -9,8 +9,6 @@ Shared by every adapter, so the guess is parsed once and identically. Lives here
 rather than in `core/` only because it is I/O; it names no provider.
 """
 
-from __future__ import annotations
-
 import logging
 import subprocess
 from functools import lru_cache

@@ -8,8 +8,6 @@ is intentionally not a dependency — it stays a future opt-in flag, never a def
 and must not fetch anything.
 """
 
-from __future__ import annotations
-
 import os
 import re
 

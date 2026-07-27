@@ -11,8 +11,6 @@ cannot be selected as the blamed phase — see ``_is_warning_line`` for which pr
 count, and ``_last_error_section`` for where it bites.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass, field
 

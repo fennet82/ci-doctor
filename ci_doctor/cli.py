@@ -8,8 +8,6 @@ Guardrail #3: the analyzer must never change a pipeline's outcome, so `main()`
 catches everything and always exits 0.
 """
 
-from __future__ import annotations
-
 import logging
 import os
 import sys
