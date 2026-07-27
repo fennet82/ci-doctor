@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v2.0.0 (2026-07-27)
+
+### Features
+
+- **llm**: Drop the anthropic backend, litellm covers it
+  ([`57ffef0`](https://github.com/fennet82/ci-doctor/commit/57ffef080362d3bba6438520ab7585d9b8d6fa3b))
+
+BREAKING CHANGE: llm.backend no longer accepts "anthropic". Reach Claude through litellm (model:
+  anthropic/claude-...) or the claude_code backend. The ci-doctorr[anthropic] extra is gone; [all]
+  now means [litellm].
+
+The backend was duplicate coverage: litellm already routes to Claude, so this was ~55 lines and an
+  optional dependency for a provider that was already reachable two other ways.
+
+Also corrects how litellm is described. It was sold as "any litellm provider", which oversells it —
+  the OpenAI Chat Completions shape already covers Ollama, vLLM, llama.cpp, Together, Groq,
+  DeepSeek, Mistral and Gemini/Claude compat endpoints, with no extra dependency. litellm earns its
+  place only for the clouds the OpenAI shape cannot reach: Bedrock (SigV4), Vertex (GCP auth) and
+  Azure. Docs now say so, and point at openai first.
+
+Note the two audiences are disjoint: whoever needs Bedrock/Vertex is on a cloud, whoever is
+  air-gapped runs local vLLM/Ollama over the openai path — so litellm's tiktoken runtime download
+  never reaches the air-gapped user, as long as it stays an optional extra.
+
+### Breaking Changes
+
+- **llm**: Llm.backend no longer accepts "anthropic". Reach Claude through litellm (model:
+  anthropic/claude-...) or the claude_code backend. The ci-doctorr[anthropic] extra is gone; [all]
+  now means [litellm].
+
+
 ## v1.1.1 (2026-07-27)
 
 ### Bug Fixes
