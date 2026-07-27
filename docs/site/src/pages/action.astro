@@ -1,0 +1,149 @@
+---
+import { Code } from 'astro:components';
+import Base from '../layouts/Base.astro';
+import { url } from '../lib/url';
+
+const minimal = `name: ci-doctor
+on:
+  workflow_run:
+    workflows: ["CI"]        # the workflow whose failures you want explained
+    types: [completed]
+
+jobs:
+  explain:
+    if: \${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read          # read the failed run, its jobs and their logs
+      contents: read
+    steps:
+      - uses: fennet82/ci-doctor@master`;
+
+const withNote = `    permissions:
+      actions: read
+      contents: read
+      pull-requests: write   # only needed for the PR comment
+    steps:
+      - uses: fennet82/ci-doctor@master
+        with:
+          post-pr-note: true`;
+
+const withLlm = `      - uses: fennet82/ci-doctor@master
+        env:
+          CI_DOCTOR_LLM__MODEL: qwen2.5-coder:32b
+          CI_DOCTOR_LLM__API_BASE: http://vllm.internal:8000/v1`;
+
+const outputs = `      - uses: fennet82/ci-doctor@master
+        id: doctor
+
+      # Route infrastructure failures somewhere other than the author's inbox.
+      - if: \${{ steps.doctor.outputs.is-infra-not-code == 'true' }}
+        run: gh issue create --label infra --title "Runner trouble in \${{ github.workflow }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-doctor-report
+          path: \${{ steps.doctor.outputs.markdown-path }}`;
+
+const ghe = `      - uses: fennet82/ci-doctor@master
+        with:
+          api-url: https://ghe.internal/api/v3
+          token: \${{ secrets.GHE_TOKEN }}`;
+---
+
+<Base
+  title="GitHub Action"
+  description="Drop-in GitHub Action that explains why a workflow run failed. Read-only, always succeeds."
+>
+  <h1>GitHub Action</h1>
+  <p class="lead">
+    One step, no install. It reads the run that triggered it, works out what broke, and
+    writes a report — without ever failing your workflow.
+  </p>
+
+  <h2>Minimal setup</h2>
+  <p>
+    Wire it to <code>workflow_run</code> on the workflow you want explained. Every input has a
+    default that does the right thing on the triggering run:
+  </p>
+  <figure class="snippet">
+    <figcaption>.github/workflows/ci-doctor.yml</figcaption>
+    <Code code={minimal} lang="yaml" theme="github-dark" />
+  </figure>
+
+  <h3>Which ref to pin</h3>
+  <table>
+    <thead><tr><th>Pin</th><th>You get</th></tr></thead>
+    <tbody>
+      <tr><td><code>@master</code></td><td>The latest code. What the examples here use.</td></tr>
+      <tr><td><code>@v1.2.3</code></td><td>Exactly that release. Never moves.</td></tr>
+      <tr><td><code>@&lt;sha&gt;</code></td><td>Immutable, and what a strict supply-chain policy wants.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    There is no floating <code>@v1</code>: releases are cut by semantic-release, which
+    publishes the exact tag and nothing else. Pin a release tag or a SHA when you need
+    reproducibility.
+  </p>
+
+  <h2>Inputs</h2>
+  <table>
+    <thead><tr><th>Input</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>run-id</code></td><td>the triggering run</td><td>Workflow run to analyze.</td></tr>
+      <tr><td><code>token</code></td><td><code>github.token</code></td><td>Reads the run, its jobs and their logs.</td></tr>
+      <tr><td><code>repository</code></td><td>current repo</td><td>Repository to read, as <code>owner/name</code>.</td></tr>
+      <tr><td><code>job-id</code></td><td>—</td><td>Analyze one job instead of every failed job.</td></tr>
+      <tr><td><code>config</code></td><td>repo root</td><td>Path to a <code>.ci-doctor.yml</code>.</td></tr>
+      <tr><td><code>post-pr-note</code></td><td><code>false</code></td><td>Post/update one idempotent PR comment. Needs <code>pull-requests: write</code>.</td></tr>
+      <tr><td><code>api-url</code></td><td><code>github.api_url</code></td><td>Override for GitHub Enterprise.</td></tr>
+      <tr><td><code>working-directory</code></td><td><code>.</code></td><td>Where the reports are written.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Outputs</h2>
+  <table>
+    <thead><tr><th>Output</th><th>Values</th></tr></thead>
+    <tbody>
+      <tr><td><code>phase</code></td><td><code>provision</code>, <code>prepare</code>, <code>fetch</code>, <code>script</code>, <code>post</code></td></tr>
+      <tr><td><code>category</code></td><td><code>test</code>, <code>build</code>, <code>dependency</code>, <code>infrastructure</code>, <code>runtime</code>, <code>config</code>, …</td></tr>
+      <tr><td><code>confidence</code></td><td><code>high</code>, <code>medium</code>, <code>low</code></td></tr>
+      <tr><td><code>is-infra-not-code</code></td><td><code>"true"</code> when the failure looks like infrastructure rather than the change</td></tr>
+      <tr><td><code>markdown-path</code></td><td>path to the rendered Markdown report</td></tr>
+      <tr><td><code>json-path</code></td><td>path to the structured JSON report</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Comment on the pull request</h2>
+  <p>Idempotent — it updates its own previous comment instead of piling up. Skipped below medium confidence.</p>
+  <Code code={withNote} lang="yaml" theme="github-dark" />
+
+  <h2>Add an LLM explanation</h2>
+  <p>
+    Optional. Without it you still get the full deterministic report. Any OpenAI-compatible
+    endpoint works — see <a href={url('/configuration/')}>Configuration</a> for the other backends.
+  </p>
+  <Code code={withLlm} lang="yaml" theme="github-dark" />
+
+  <h2>Act on the verdict</h2>
+  <p>The outputs are the point: they let the <em>workflow</em> branch on what broke.</p>
+  <Code code={outputs} lang="yaml" theme="github-dark" />
+
+  <h2>GitHub Enterprise</h2>
+  <Code code={ghe} lang="yaml" theme="github-dark" />
+
+  <h2>How it installs</h2>
+  <p>
+    It is a <strong>composite</strong> action, not a Docker one: it installs the source tree at
+    the ref you pinned, so the action version and the analyzer version cannot drift. The install
+    goes into a virtualenv under <code>$RUNNER_TEMP</code> — since Ubuntu 24.04 the runner's
+    system Python is PEP 668 externally-managed and a plain <code>pip install</code> fails.
+  </p>
+
+  <div class="note">
+    <strong>It always exits 0.</strong> The analyze step runs with <code>set +e</code> and a
+    guarded read of the report, so a crash, a malformed report, or an unreachable LLM leaves the
+    outputs empty rather than failing your workflow. Adding this step cannot break your CI.
+  </div>
+</Base>

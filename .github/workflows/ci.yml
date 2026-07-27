@@ -45,6 +45,23 @@ jobs:
       - name: ruff format (markdown code blocks)
         run: uv run ruff format --preview --check $(git ls-files '*.md' ':!:.claude/**')
 
+  docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs/site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/site/package-lock.json
+      - run: npm ci
+      # Build only. Publishing is docs.yml, which runs on master alone — a PR
+      # proves the site compiles without being able to touch what is live.
+      - run: npm run build
+
   guardrails:
     runs-on: ubuntu-latest
     steps:

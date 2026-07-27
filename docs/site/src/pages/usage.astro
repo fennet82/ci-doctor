@@ -1,19 +1,25 @@
 ---
 import { Code } from 'astro:components';
 import Base from '../layouts/Base.astro';
+import { url } from '../lib/url';
 
-const cli = `ci-doctor analyze [TARGET] [OPTIONS]
+const cli = `ci-doctor analyze [OPTIONS] [TARGET]
 
 Arguments:
-  TARGET                 Pipeline/run id, or a path to a raw job log to replay
-                         offline (no network fetch).
+  TARGET                 Pipeline/run id, or the path to a raw job log to replay
+                         offline (an existing path means no network fetch).
 
 Options:
   --job-id TEXT          Analyze a single job id.
-  -f, --config PATH      Path to .ci-doctor.yml. Repeatable; the last one wins.
+  -f, --config PATH      Path to a .ci-doctor.yml. Repeatable — later files
+                         override earlier ones.
   --no-color             Disable coloured terminal output (also honours NO_COLOR).
   -v, --verbose          Enable debug logging.
-  --version              Show version and exit.`;
+  --help                 Show this message and exit.`;
+
+const configCmd = `ci-doctor config           # the effective config, every layer merged
+ci-doctor config --diff    # only what your file/env/flags change vs the defaults
+ci-doctor config --schema  # the JSON Schema, for editors and CI validation`;
 
 const deterministic = `# Deterministic report, no model required:
 ci-doctor analyze --config .ci-doctor.yml "$CI_PIPELINE_ID"
@@ -43,9 +49,10 @@ Evidence
 Remediation
   1. Inspect the failing assertion in tests/test_math.py`;
 ---
+
 <Base title="Usage">
   <h1>Usage</h1>
-  <p class="lead">One command, <code>analyze</code>. It always exits 0.</p>
+  <p class="lead">Two commands: <code>analyze</code> and <code>config</code>. Both always exit 0.</p>
 
   <h2>Command line</h2>
   <Code code={cli} lang="text" theme="github-dark" />
@@ -61,12 +68,24 @@ Remediation
   <h2>Deterministic mode (no LLM)</h2>
   <Code code={deterministic} lang="bash" theme="github-dark" />
 
+  <h2>Inspecting your config</h2>
+  <p>
+    Config surprises are almost always a layer you forgot was applied. Ask, rather than guess —
+    the full layering rules are on <a href={url('/configuration/')}>Configuration</a>:
+  </p>
+  <Code code={configCmd} lang="bash" theme="github-dark" />
+
   <h2>Debugging with <code>--verbose</code></h2>
   <p>Turn on debug logs across the whole pipeline (or set <code>CI_DOCTOR_LOG_LEVEL=DEBUG</code>):</p>
   <Code code={verbose} lang="text" theme="github-dark" />
+  <p>
+    The <code>denoise → extract → fit</code> line is the one to read when the evidence looks
+    wrong: it shows how many lines each stage kept, and whether the token budget had to truncate.
+  </p>
 
   <div class="note">
-    <strong>Offline replay.</strong> Passing a log path instead of a run id runs the full pipeline against a captured
-    log with zero network and zero LLM — ideal for testing your config or reproducing an attribution.
+    <strong>Offline replay.</strong> Passing a log path instead of a run id runs the full pipeline
+    against a captured log with zero network and zero LLM — ideal for testing your config or
+    reproducing an attribution.
   </div>
 </Base>

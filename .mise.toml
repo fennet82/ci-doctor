@@ -69,3 +69,14 @@ depends = ["test", "lint", "guardrails", "leaks"]
 [tasks.schema]
 description = "Emit the .ci-doctor.yml JSON Schema (what the release attaches)"
 run = "uv run ci-doctor config --schema"
+
+# The site is served from /ci-doctor, so the dev URL carries the base too.
+[tasks.docs]
+description = "Preview the docs site at http://localhost:4321/ci-doctor"
+dir = "docs/site"
+run = ["npm install", "npm run dev"]
+
+[tasks."docs:build"]
+description = "Build the docs site, same as the CI job"
+dir = "docs/site"
+run = ["npm ci", "npm run build"]

@@ -1,8 +1,9 @@
 ---
 import { Code } from 'astro:components';
 import Base from '../layouts/Base.astro';
+import { url } from '../lib/url';
 
-const gitlab = `# .gitlab-ci.yml — runs only on failure; always exits 0.
+const gitlab = `# runs only on failure; always exits 0.
 ci-doctor:
   stage: .post
   image: registry.internal.example.com/ci-doctor:latest
@@ -30,43 +31,24 @@ const gitlabMr = `  variables:
     CI_DOCTOR_GITLAB_TOKEN: "$CI_DOCTOR_TOKEN"
     CI_DOCTOR_OUTPUT__MR_NOTE: "true"   # post/update one note when confidence >= medium`;
 
-const github = `# .github/workflows/ci-doctor.yml
-name: ci-doctor
-on:
-  workflow_run:
-    workflows: ["CI"]          # the workflow whose failures you want explained
-    types: [completed]
+const gitlabSelfHosted = `  variables:
+    CI_DOCTOR_GITLAB_TOKEN: "$CI_DOCTOR_TOKEN"
+    CI_DOCTOR_GITLAB__BASE_URL: "https://gitlab.internal.example.com"
+    CI_DOCTOR_GITLAB__CA_BUNDLE: "/etc/ssl/certs/internal-ca.pem"`;
 
-jobs:
-  explain:
-    if: \${{ github.event.workflow_run.conclusion == 'failure' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write     # only needed for PR notes
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv sync
-      - name: Analyze the failed run
-        env:
-          CI_DOCTOR_PROVIDER: github
-          CI_DOCTOR_GITHUB__BASE_URL: https://api.github.com
-          CI_DOCTOR_GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: \${{ github.repository }}
-        run: uv run ci-doctor analyze "\${{ github.event.workflow_run.id }}"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ci-doctor-report
-          path: |
-            report.md
-            report.json`;
+const github = `- uses: fennet82/ci-doctor@master`;
+
+const local = `# Replay a log you saved from a failed job — no network, no token, no LLM:
+ci-doctor analyze ~/Downloads/failing-job.log
+
+# Or hit a live run from your checkout. With no CI_PROJECT_ID / GITHUB_REPOSITORY
+# set, the repo is read from your git origin (and it says so in a warning):
+ci-doctor analyze 123456`;
 
 const docker = `# Build once where there is internet, push to your internal registry:
-docker build -t ci-doctor:1.0.0 .
-docker tag  ci-doctor:1.0.0 registry.internal.example.com/ci-doctor:1.0.0
-docker push registry.internal.example.com/ci-doctor:1.0.0
+docker build -t ci-doctor:latest .
+docker tag  ci-doctor:latest registry.internal.example.com/ci-doctor:latest
+docker push registry.internal.example.com/ci-doctor:latest
 
 # The image needs no network at job runtime beyond your GitLab/LLM endpoints.`;
 
@@ -76,13 +58,27 @@ pip wheel . -w ./wheels
 # Copy ./wheels inside the air-gapped network, then:
 pip install --no-index --find-links ./wheels ci-doctorr`;
 ---
-<Base title="CI/CD Examples">
-  <h1>CI/CD Examples</h1>
-  <p class="lead">Wire it into the <em>post</em> stage so it explains failures without ever changing the outcome.</p>
+
+<Base title="Examples">
+  <h1>Examples</h1>
+  <p class="lead">
+    Wire it into the <em>post</em> stage so it explains failures without ever changing the outcome.
+  </p>
+
+  <h2>GitHub Actions</h2>
+  <p>One step. It defaults to the run that triggered it, so there is nothing else to pass:</p>
+  <Code code={github} lang="yaml" theme="github-dark" />
+  <p>
+    Inputs, outputs, PR comments and GitHub Enterprise are all on the
+    <a href={url('/action/')}>Action reference →</a>
+  </p>
 
   <h2>GitLab CI</h2>
   <p>The minimal drop-in — deterministic report, artifacts on every failure:</p>
-  <Code code={gitlab} lang="yaml" theme="github-dark" />
+  <figure class="snippet">
+    <figcaption>.gitlab-ci.yml</figcaption>
+    <Code code={gitlab} lang="yaml" theme="github-dark" />
+  </figure>
 
   <h3>Add an LLM explanation</h3>
   <p>Point at any OpenAI-compatible endpoint (swap in place of the deterministic-only variables):</p>
@@ -92,18 +88,25 @@ pip install --no-index --find-links ./wheels ci-doctorr`;
   <p>Idempotent — it updates its own previous comment instead of spamming. Gated on confidence ≥ medium.</p>
   <Code code={gitlabMr} lang="yaml" theme="github-dark" />
 
-  <h2>GitHub Actions</h2>
-  <p>Trigger on the completion of your CI workflow and analyze the failed run:</p>
-  <Code code={github} lang="yaml" theme="github-dark" />
+  <h3>Self-hosted GitLab</h3>
+  <p>Override the API host and hand it your internal CA. Proxy variables are honoured as-is:</p>
+  <Code code={gitlabSelfHosted} lang="yaml" theme="github-dark" />
+
+  <h2>On your laptop</h2>
+  <p>
+    Nothing about ci-doctor requires CI. This is the fastest way to test a
+    <code>.ci-doctor.yml</code> or reproduce an attribution you disagree with:
+  </p>
+  <Code code={local} lang="bash" theme="github-dark" />
 
   <h2 id="offline">Docker &amp; air-gapped delivery</h2>
   <p>Ship a self-contained image to an internal registry:</p>
   <Code code={docker} lang="bash" theme="github-dark" />
-  <p>...or an offline wheel bundle where Docker isn't an option:</p>
+  <p>…or an offline wheel bundle where Docker isn't an option:</p>
   <Code code={offline} lang="bash" theme="github-dark" />
 
   <div class="note">
-    <strong>It always exits 0</strong> and is read-only, so adding this job can never fail your pipeline
-    or mask the real error. <code>allow_failure: true</code> on GitLab is belt-and-braces.
+    <strong>It always exits 0</strong> and is read-only, so adding this job can never fail your
+    pipeline or mask the real error. <code>allow_failure: true</code> on GitLab is belt-and-braces.
   </div>
 </Base>

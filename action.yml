@@ -1,4 +1,4 @@
-name: ci-doctor
+name: ci-doctorr
 description: Explain why a workflow run failed. Read-only postmortem; always succeeds.
 author: fennet82
 
@@ -7,7 +7,7 @@ branding:
   color: blue
 
 # Deliberately a composite action, not a Docker one: it installs the very source
-# tree the caller pinned (`uses: fennet82/ci-doctor@v1` -> that ref's code), so the
+# tree the caller pinned (`uses: fennet82/ci-doctor@master` -> that ref's code), so the
 # action version and the analyzer version can never drift. No registry, no PyPI
 # round-trip, nothing to keep in sync at release time.
 
