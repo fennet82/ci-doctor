@@ -41,7 +41,7 @@ the classifier is wrong, that's a bug with a failing test — not a prompt to tu
 - **Useful with no LLM** — ships a deterministic report out of the box: phase, reason,
   terminal command, evidence excerpt, and templated remediation.
 - **Bring-your-own model** — optional LLM step via `openai` (any OpenAI-compatible endpoint),
-  `litellm`, `anthropic`, or the local `claude` CLI, selected by config.
+  `litellm` (Bedrock/Vertex/Azure), or the local `claude` CLI, selected by config.
 - **GitLab & GitHub** — one provider-neutral core; the GitHub adapter was added with *zero*
   changes to core.
 - **Air-gap friendly** — no telemetry, no update checks, no runtime downloads; ship as a
@@ -82,7 +82,7 @@ cd ci-doctor
 uv sync                       # or: pip install .
 
 # optional LLM backends:
-uv sync --extra anthropic     # or: pip install '.[anthropic]'  /  '.[litellm]'  /  '.[all]'
+uv sync --extra litellm       # or: pip install '.[litellm]'   — only for Bedrock/Vertex/Azure
 ```
 
 Or build the self-contained image:
@@ -124,12 +124,12 @@ gitlab:
 
 llm:
   enabled: true                       # false => deterministic-only report
-  backend: openai                     # openai | litellm | anthropic | claude_code
+  backend: openai                     # openai | litellm | claude_code
   model: qwen2.5-coder:32b
   api_base: http://openai-compatible-endpoint.internal:8000/v1
 ```
 
-Every knob, and the four LLM backends, are documented on the
+Every knob, and the three LLM backends, are documented on the
 [configuration page](https://fennet82.github.io/ci-doctor/configuration/). The LLM step is
 optional throughout — disabled, unconfigured or unreachable, ci-doctor emits the
 deterministic report instead of failing.

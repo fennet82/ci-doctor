@@ -1,6 +1,6 @@
 """Backend registry: selection, readiness, and the claude_code CLI path.
 
-No network, no litellm/anthropic installed — clients are lazy-importing, so
+No network, no litellm installed — clients are lazy-importing, so
 construction and selection are testable without the optional deps.
 """
 
@@ -11,7 +11,6 @@ import pytest
 
 from ci_doctor.config.loader import load_config
 from ci_doctor.llm.backends import (
-    AnthropicLLMClient,
     ClaudeCodeClient,
     LiteLLMClient,
     backend_ready,
@@ -30,7 +29,6 @@ def _llm(**over):
     [
         ("openai", OpenAILLMClient),
         ("litellm", LiteLLMClient),
-        ("anthropic", AnthropicLLMClient),
         ("claude_code", ClaudeCodeClient),
     ],
 )
@@ -57,7 +55,6 @@ def test_backend_ready_rules(monkeypatch):
     assert backend_ready(_llm(backend="openai", model="m")) is False  # needs api_base
     assert backend_ready(_llm(backend="litellm", model="m")) is True
     assert backend_ready(_llm(backend="litellm")) is False  # needs model
-    assert backend_ready(_llm(backend="anthropic")) is True  # model defaults
 
     monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
     assert backend_ready(_llm(backend="claude_code")) is True

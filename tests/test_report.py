@@ -139,9 +139,11 @@ def test_deterministic_category_from_fixture(provider, fixture, expected):
     assert report.category == expected
 
 
-def test_anthropic_backend_needs_no_api_base():
-    """The anthropic backend is ready without api_base — model and auth default."""
-    job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides={"llm": {"backend": "anthropic"}})
+def test_litellm_backend_needs_no_api_base():
+    """litellm is ready on `model` alone — it routes by model name, not endpoint."""
+    job, attr, bundle, cfg = _pipeline(
+        _SIMPLE_LOG, overrides={"llm": {"backend": "litellm", "model": "bedrock/anthropic.claude-v2"}}
+    )
     report = produce_report(job, attr, bundle, cfg, client=FakeClient([_GOOD]))
     assert report.summary == "unit tests failed on assert"
 

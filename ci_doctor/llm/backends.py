@@ -3,10 +3,13 @@
 schema and a JSON-only instruction), so correctness is enforced by the caller's
 pydantic validation + repair retry — not by the backend.
 
-Heavy/optional deps (litellm, anthropic) are imported lazily inside each client so
-the base install stays lean and air-gap-clean; install via `ci-doctor[litellm]` /
-`ci-doctor[anthropic]`. `claude_code` shells out to the local `claude` CLI (stdlib
-subprocess, no dep, but the binary must be on PATH).
+`openai` is the base install and covers anything speaking the OpenAI Chat Completions
+shape, which is most of the field. `litellm` exists for the providers that do *not*
+— Bedrock's SigV4, Vertex's GCP auth, Azure's URL scheme — and is imported lazily so
+the base install stays lean and air-gap-clean (`ci-doctor[litellm]`); it can pull
+tiktoken, which fetches vocab at runtime, so it is unfit for a strict air gap.
+`claude_code` shells out to the local `claude` CLI (stdlib subprocess, no dep, but
+the binary must be on PATH).
 """
 
 import json
@@ -41,8 +44,6 @@ def make_client(cfg: LLMConfig, environ: dict[str, str] | None = None) -> LLMCli
         return OpenAILLMClient(cfg, environ=environ)
     if cfg.backend == "litellm":
         return LiteLLMClient(cfg, environ=environ)
-    if cfg.backend == "anthropic":
-        return AnthropicLLMClient(cfg, environ=environ)
     if cfg.backend == "claude_code":
         return ClaudeCodeClient(cfg, environ=environ)
     raise ValueError(f"unknown llm.backend: {cfg.backend}")
@@ -64,15 +65,14 @@ def backend_ready(cfg: LLMConfig) -> bool:
         return bool(cfg.model and cfg.api_base)
     if cfg.backend == "litellm":
         return bool(cfg.model)
-    if cfg.backend == "anthropic":
-        return True  # model defaults to claude-opus-4-8; auth from env / ant profile
     if cfg.backend == "claude_code":
         return shutil.which("claude") is not None
     return False
 
 
 class LiteLLMClient(LLMClient):
-    """Any litellm-supported provider (OpenAI, Gemini, Bedrock, Vertex, Ollama, …)."""
+    """A provider litellm can reach that the OpenAI shape cannot — Bedrock, Vertex,
+    Azure. For anything OpenAI-compatible prefer `openai`: no extra dependency."""
 
     def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
         """Store config; litellm is imported only when a call is made.
@@ -115,63 +115,6 @@ class LiteLLMClient(LLMClient):
         except Exception:  # noqa: BLE001 - provider may reject response_format; retry without
             resp = litellm.completion(**kwargs)
         return json.loads(_strip_fences(resp.choices[0].message.content or ""))
-
-
-class AnthropicLLMClient(LLMClient):
-    """Official Anthropic SDK. No `temperature` (rejected on claude-opus-4-8)."""
-
-    def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
-        """Store config; the SDK is imported only when a call is made.
-
-        Args:
-            cfg: LLM settings.
-            environ: Environment for the API key. Defaults to os.environ.
-        """
-        self.cfg = cfg
-        self.environ = os.environ if environ is None else environ
-
-    def _client(self):
-        """Build the SDK client.
-
-        Returns:
-            A configured `anthropic.Anthropic`. Every argument is optional — with
-            none set the SDK falls back to its own env/profile auth.
-        """
-        import anthropic
-
-        kwargs: dict = {"timeout": self.cfg.timeout_seconds}
-        if self.cfg.api_key_env and self.environ.get(self.cfg.api_key_env):
-            kwargs["api_key"] = self.environ[self.cfg.api_key_env]
-        if self.cfg.api_base:
-            kwargs["base_url"] = self.cfg.api_base
-        if self.cfg.ca_bundle:
-            from anthropic import DefaultHttpxClient
-
-            kwargs["http_client"] = DefaultHttpxClient(verify=self.cfg.ca_bundle)
-        return anthropic.Anthropic(**kwargs)
-
-    def complete_structured(self, prompt: str, schema: dict) -> dict:
-        """Run one Messages API call.
-
-        Args:
-            prompt: The rendered, already-redacted prompt.
-            schema: JSON Schema of the expected reply, already embedded in the prompt.
-
-        Returns:
-            The parsed reply, concatenated from every text block.
-
-        Raises:
-            json.JSONDecodeError: If the reply is not JSON.
-            Exception: Any API error.
-        """
-        resp = self._client().messages.create(
-            model=self.cfg.model or "claude-opus-4-8",
-            max_tokens=8192,
-            system=_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = "".join(b.text for b in resp.content if b.type == "text")
-        return json.loads(_strip_fences(text))
 
 
 class ClaudeCodeClient(LLMClient):

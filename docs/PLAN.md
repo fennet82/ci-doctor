@@ -126,7 +126,7 @@ with planted secrets against every output channel.
 Left here as a record of what was genuinely open at the start:
 
 - **Which LLM serving stack?** Settled by making it irrelevant — `llm.backend` selects
-  openai / litellm / anthropic / claude_code, and none is required.
+  openai / litellm / claude_code, and none is required.
 - **Post the MR note always, or only when confident?** Only at medium or high
   confidence; a low-confidence guess on a merge request is worse than silence.
 - **Is `handoff_prompt` the right handoff format?** Kept, as a field in `report.json`

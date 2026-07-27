@@ -72,20 +72,15 @@ class LLMConfig(_Strict):
     """
 
     enabled: bool = Field(True, description="Set false for a deterministic-only report with no LLM call.")
-    backend: Literal["openai", "litellm", "anthropic", "claude_code"] = Field(
+    backend: Literal["openai", "litellm", "claude_code"] = Field(
         "openai",
         description=(
-            "openai: any OpenAI-compatible endpoint (needs api_base). litellm: any litellm provider. "
-            "anthropic: the official Anthropic SDK. claude_code: the local `claude` CLI, headless."
+            "openai: any OpenAI-compatible endpoint (needs api_base). litellm: providers the "
+            "OpenAI shape cannot reach — Bedrock, Vertex, Azure. claude_code: the local `claude` CLI."
         ),
     )
-    model: str | None = Field(
-        None,
-        description='Model identifier, e.g. "qwen2.5-coder:32b". Defaults to claude-opus-4-8 on the anthropic backend.',
-    )
-    api_base: str | None = Field(
-        None, description="Base URL of the OpenAI-compatible / litellm / anthropic endpoint."
-    )
+    model: str | None = Field(None, description='Model identifier, e.g. "qwen2.5-coder:32b".')
+    api_base: str | None = Field(None, description="Base URL of the OpenAI-compatible / litellm endpoint.")
     api_key_env: str | None = Field(
         None,
         description="Name of the env var holding the LLM API key. Often unset — local servers need no key.",
