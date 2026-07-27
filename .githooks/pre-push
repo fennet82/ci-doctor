@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# The gate. Everything here is what CI will run anyway — better to find out now
+# than after the round trip.
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+fail=0
+
+echo "pre-push: tests"
+uv run pytest -q || fail=1
+
+echo "pre-push: guardrails"
+# Invariant #2 — core/ must not know a provider exists.
+if grep -rniE 'gitlab|github' ci_doctor/core/; then
+  echo "  core/ references a provider (GUIDELINES.md invariant #2)" >&2
+  fail=1
+fi
+
+# Optional: only runs if you have it. mise install puts it on PATH.
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-push: leaks"
+  gitleaks git --no-banner --redact || fail=1
+else
+  echo "pre-push: leaks (skipped — gitleaks not installed; \`mise install\`)"
+fi
+
+[[ $fail -eq 0 ]] || echo "pre-push: blocked. Use --no-verify only if you mean it." >&2
+exit $fail

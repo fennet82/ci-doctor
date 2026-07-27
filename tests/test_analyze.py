@@ -16,8 +16,7 @@ CASE = "script_failure_noisy"
 def test_build_bundle_excludes_fetch_noise_but_flags_it(provider):
     """A loud cache failure in `fetch` must not displace the real script cause."""
     log = support.read_log(provider, CASE)
-    job = Job(id="1", name="build", status="failed",
-              failure_reason=FailureReason.SCRIPT_FAILURE, log=log)
+    job = Job(id="1", name="build", status="failed", failure_reason=FailureReason.SCRIPT_FAILURE, log=log)
     cfg = load_config(environ={})
     job.sections = support.segment(provider, log)
     assign_phases(job.sections, cfg.phases)
@@ -28,6 +27,6 @@ def test_build_bundle_excludes_fetch_noise_but_flags_it(provider):
     assert bundle.token_estimate > 0
 
     joined = "\n".join(bundle.blamed_lines)
-    assert "assert 1 == 2" in joined                 # the real cause is present
-    assert "Failed to extract cache" not in joined    # the loud fetch noise is not
+    assert "assert 1 == 2" in joined  # the real cause is present
+    assert "Failed to extract cache" not in joined  # the loud fetch noise is not
     assert any("fetch" in s for s in bundle.secondary)  # but flagged as non-causal context

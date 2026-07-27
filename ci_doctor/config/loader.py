@@ -163,7 +163,7 @@ def _env_overlay(environ: dict[str, str]) -> dict:
     for key, value in environ.items():
         if not key.startswith(_ENV_PREFIX):
             continue
-        path = key[len(_ENV_PREFIX):].lower().split("__")
+        path = key[len(_ENV_PREFIX) :].lower().split("__")
         if path[0] not in _TOP_LEVEL:
             continue
         node = out

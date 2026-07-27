@@ -69,7 +69,11 @@ class OpenAILLMClient(LLMClient):
         """
         from openai import OpenAI
 
-        kwargs = {"base_url": self.cfg.api_base, "api_key": self._api_key(), "timeout": self.cfg.timeout_seconds}
+        kwargs = {
+            "base_url": self.cfg.api_base,
+            "api_key": self._api_key(),
+            "timeout": self.cfg.timeout_seconds,
+        }
         if self.cfg.ca_bundle:
             import httpx
 
@@ -98,12 +102,16 @@ class OpenAILLMClient(LLMClient):
         ]
         try:
             resp = client.chat.completions.create(
-                model=self.cfg.model, messages=messages,
-                temperature=self.cfg.temperature, response_format={"type": "json_object"},
+                model=self.cfg.model,
+                messages=messages,
+                temperature=self.cfg.temperature,
+                response_format={"type": "json_object"},
             )
         except Exception:  # noqa: BLE001 - some OpenAI-compatible servers reject response_format
             resp = client.chat.completions.create(
-                model=self.cfg.model, messages=messages, temperature=self.cfg.temperature,
+                model=self.cfg.model,
+                messages=messages,
+                temperature=self.cfg.temperature,
             )
         content = resp.choices[0].message.content or ""
         return json.loads(_strip_fences(content))

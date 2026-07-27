@@ -26,11 +26,11 @@ TRAILER = "__trailer__"
 _MARKER = re.compile(
     r"(?:\x1b\[0K)?"
     r"section_(?P<kind>start|end):(?P<ts>\d+):(?P<name>[A-Za-z0-9_.\-]+)"
-    r"(?:\[[^\]]*\])?"          # options like [collapsed=true] — parsed but ignored
-    r"(?:\r(?:\x1b\[0K)?)?"     # optional CR + line-clear
-    r"\n?"                       # swallow the marker's own trailing newline so it
-                                 # doesn't leak into a section as an empty line, or
-                                 # split depth-0 content between back-to-back sections
+    r"(?:\[[^\]]*\])?"  # options like [collapsed=true] — parsed but ignored
+    r"(?:\r(?:\x1b\[0K)?)?"  # optional CR + line-clear
+    r"\n?"  # swallow the marker's own trailing newline so it
+    # doesn't leak into a section as an empty line, or
+    # split depth-0 content between back-to-back sections
 )
 
 
@@ -64,7 +64,7 @@ def _tokenize(raw: str):
     pos = 0
     for m in _MARKER.finditer(raw):
         if m.start() > pos:
-            tokens.append(("content", raw[pos:m.start()]))
+            tokens.append(("content", raw[pos : m.start()]))
         tokens.append((m.group("kind"), m.group("name"), int(m.group("ts"))))
         pos = m.end()
     if pos < len(raw):

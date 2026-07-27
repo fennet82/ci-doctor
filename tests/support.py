@@ -96,6 +96,30 @@ def pairs_for(cases) -> list[tuple[str, str]]:
     return [(p, case) for case in cases for p in providers_with(case)]
 
 
+def log_lines(provider: str, case: str) -> list[str]:
+    """One provider's log as the *pipeline* sees it, not as it sits on disk.
+
+    Args:
+        provider: Provider name.
+        case: Fixture stem.
+
+    Returns:
+        Every section's lines in log order. Segmentation is what strips a
+        provider's framing (GitHub prefixes every line with an ISO timestamp),
+        so a matcher anchored at `^` only behaves the same across providers on
+        *these* lines — reading the raw file instead tests something the
+        extractor never receives.
+    """
+    return [line.text for sec in _walk(segment(provider, read_log(provider, case))) for line in sec.lines]
+
+
+def _walk(sections):
+    """Yield every section depth-first, parents before their children."""
+    for sec in sections:
+        yield sec
+        yield from _walk(sec.children)
+
+
 def segment(provider: str, raw_log: str):
     """Parse a raw log with the segmenter for that provider's format.
 

@@ -15,8 +15,8 @@ def test_defaults_load_and_validate():
     assert isinstance(cfg, Config)
     assert cfg.provider == "gitlab"
     assert cfg.phases["step_script"] == "script"  # from defaults.yml
-    assert cfg.gitlab.timeout_seconds == 30       # scalar default from schema
-    assert cfg.gitlab.base_url == "https://gitlab.com"   # official default, overridable
+    assert cfg.gitlab.timeout_seconds == 30  # scalar default from schema
+    assert cfg.gitlab.base_url == "https://gitlab.com"  # official default, overridable
 
 
 def test_shipped_matchers_parse():
@@ -54,7 +54,7 @@ def test_env_overlay_nested_and_token_collision():
     env = {
         "CI_DOCTOR_LLM__TEMPERATURE": "0.7",
         "CI_DOCTOR_GITLAB_TOKEN": "supersecret",  # secret, not a config key -> ignored
-        "CI_DOCTOR_LLM_KEY": "k",                 # ditto
+        "CI_DOCTOR_LLM_KEY": "k",  # ditto
     }
     cfg = load_config(environ=env)  # must not raise on the secret vars
     assert cfg.llm.temperature == 0.7
@@ -102,7 +102,7 @@ def test_user_matcher_overrides_default_but_keeps_the_rest(tmp_path):
     assert by_id["pytest"].pattern == "^MY OWN ANCHOR"  # the fields the user set win
     assert by_id["pytest"].priority == 99
     assert by_id["pytest"].start == shipped["pytest"].start  # untouched fields survive
-    assert "my_pack" in by_id                           # a new id is added
+    assert "my_pack" in by_id  # a new id is added
     assert len(by_id) == len(default_config().extraction.matchers) + 1  # nothing was dropped
 
 
@@ -131,8 +131,8 @@ def test_default_config_ignores_the_repo_file(tmp_path, monkeypatch):
     """`default_config()` is the diff baseline, so it must ignore user layers."""
     monkeypatch.chdir(tmp_path)
     _write(tmp_path, "llm:\n  enabled: false\n")
-    assert load_config(environ={}).llm.enabled is False   # picked up as the repo layer
-    assert default_config().llm.enabled is True           # baseline ignores it
+    assert load_config(environ={}).llm.enabled is False  # picked up as the repo layer
+    assert default_config().llm.enabled is True  # baseline ignores it
 
 
 def test_json_schema_documents_every_field():

@@ -65,7 +65,9 @@ def _root(
 
 
 _CONFIG_OPTION = typer.Option(
-    None, "--config", "-f",
+    None,
+    "--config",
+    "-f",
     help="Path to a .ci-doctor.yml. Repeatable — later files override earlier ones.",
 )
 
@@ -121,9 +123,7 @@ def config(
     diff: bool = typer.Option(
         False, "--diff", help="Show only what your config changes against the shipped defaults."
     ),
-    schema: bool = typer.Option(
-        False, "--schema", help="Print the JSON Schema for .ci-doctor.yml and exit."
-    ),
+    schema: bool = typer.Option(False, "--schema", help="Print the JSON Schema for .ci-doctor.yml and exit."),
     validate: bool = typer.Option(
         False, "--validate", help="Load and validate the merged config, then report what failed."
     ),
@@ -236,9 +236,7 @@ def _diff_lines(before: str, after: str) -> list[str]:
     """
     import difflib
 
-    diff = difflib.unified_diff(
-        before.splitlines(keepends=True), after.splitlines(keepends=True), n=1
-    )
+    diff = difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True), n=1)
     return [line.rstrip("\n") for line in diff][2:]
 
 
@@ -330,8 +328,7 @@ def _run_from_file(path: Path) -> Run:
         OSError: If the file cannot be read.
     """
     log = path.read_text()
-    job = Job(id="local", name=path.stem, status="failed",
-              failure_reason=FailureReason.UNKNOWN, log=log)
+    job = Job(id="local", name=path.stem, status="failed", failure_reason=FailureReason.UNKNOWN, log=log)
     return Run(id="local", jobs=[job])
 
 
@@ -356,12 +353,23 @@ def _process(job: Job, cfg):
     log.debug("job %s: %d top-level sections", job.name, len(job.sections))
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
-    log.debug("job %s: attribution phase=%s reason=%s rule=%s confidence=%s",
-              job.name, attr.phase, attr.reason, attr.rule_id, attr.confidence)
+    log.debug(
+        "job %s: attribution phase=%s reason=%s rule=%s confidence=%s",
+        job.name,
+        attr.phase,
+        attr.reason,
+        attr.rule_id,
+        attr.confidence,
+    )
     bundle = build_bundle(job, attr, job.sections, cfg)
     report = produce_report(job, attr, bundle, cfg)
-    log.debug("job %s: report category=%s confidence=%s infra=%s",
-              job.name, report.category, report.confidence, report.is_infra_not_code)
+    log.debug(
+        "job %s: report category=%s confidence=%s infra=%s",
+        job.name,
+        report.category,
+        report.confidence,
+        report.is_infra_not_code,
+    )
     return job, attr, report
 
 
@@ -426,13 +434,15 @@ def _maybe_post_mr(provider, run, results, cfg) -> None:
         typer.echo(f"MR note failed (ignored): {exc}", err=True)
 
 
-_LEVEL_COLORS = Theme({
-    "logging.level.debug": Style(color="blue"),
-    "logging.level.info": Style(color="green"),
-    "logging.level.warning": Style(color="yellow"),
-    "logging.level.error": Style(color="red"),
-    "logging.level.critical": Style(color="red", bold=True),
-})
+_LEVEL_COLORS = Theme(
+    {
+        "logging.level.debug": Style(color="blue"),
+        "logging.level.info": Style(color="green"),
+        "logging.level.warning": Style(color="yellow"),
+        "logging.level.error": Style(color="red"),
+        "logging.level.critical": Style(color="red", bold=True),
+    }
+)
 
 
 def main() -> None:
@@ -445,9 +455,17 @@ def main() -> None:
     # cyan, words yellow/magenta), which drowns out the level colour. Passing
     # highlighter=None does NOT disable it — rich falls back to ReprHighlighter.
     logging.basicConfig(
-        level=logging.INFO, format="%(message)s",
-        handlers=[RichHandler(console=Console(theme=_LEVEL_COLORS), show_time=False,
-                              show_path=False, markup=False, highlighter=NullHighlighter())],
+        level=logging.INFO,
+        format="%(message)s",
+        handlers=[
+            RichHandler(
+                console=Console(theme=_LEVEL_COLORS),
+                show_time=False,
+                show_path=False,
+                markup=False,
+                highlighter=NullHighlighter(),
+            )
+        ],
     )
     try:
         app()

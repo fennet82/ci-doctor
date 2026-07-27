@@ -128,7 +128,7 @@ def _render(lines: list[str], windows: list[_Window]) -> list[str]:
     for w in windows:
         if w.start > prev_end:
             out.append(f"… [{w.start - prev_end} lines elided] …")
-        out.extend(lines[w.start:w.end])
+        out.extend(lines[w.start : w.end])
         prev_end = w.end
     if prev_end < len(lines):
         out.append(f"… [{len(lines) - prev_end} lines elided] …")

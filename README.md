@@ -99,6 +99,10 @@ uv run ci-doctor analyze failing-job.log
 
 # Against a live pipeline (reads $CI_PIPELINE_ID etc. inside CI):
 uv run ci-doctor analyze "$CI_PIPELINE_ID"
+
+# From your laptop, in a clone — the repo is taken from `git remote origin`
+# (with a warning) when GITHUB_REPOSITORY / CI_PROJECT_ID isn't set:
+uv run ci-doctor analyze 18234567890
 ```
 
 ```
@@ -159,6 +163,23 @@ ci-doctor emits the deterministic report instead of failing.
 
 ## Use it in CI
 
+**GitHub Actions** — one step; `run-id` defaults to the run that just failed:
+
+```yaml
+permissions: { actions: read, contents: read, pull-requests: write }
+steps:
+  - id: doctor
+    uses: fennet82/ci-doctor@master   # or pin a release tag
+    with:
+      post-pr-note: 'true'
+  - if: steps.doctor.outputs.is-infra-not-code == 'true'
+    run: echo "::notice::Infrastructure, not the change."
+```
+
+Outputs `phase`, `category`, `confidence`, `is-infra-not-code`, and the two report
+paths, so a workflow can branch on the verdict. Full example in
+[examples/github-actions.example.yml](examples/github-actions.example.yml).
+
 **GitLab** (`.gitlab-ci.yml`) — runs only on failure, always exits 0:
 
 ```yaml
@@ -196,15 +217,16 @@ lives in [`docs/site/`](docs/site) — built with Astro:
 cd docs/site && npm install && npm run dev    # or: npm run build -> dist/
 ```
 
-The original design spec is [docs/PLAN.md](docs/PLAN.md). How to work in this repo —
-where code goes, how to write tests, commit conventions — is
-[CONTRIBUTING.md](CONTRIBUTING.md).
+The original design spec is [docs/PLAN.md](docs/PLAN.md). How the code is built —
+where things go, the invariants, how to write tests — is
+[GUIDELINES.md](GUIDELINES.md); how to get a change in — setup, commits, pre-push
+checks — is [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Development
 
 ```sh
 uv sync
-uv run pytest        # 172 tests, no network, no LLM
+uv run pytest        # 347 tests, no network, no LLM
 ```
 
 ```

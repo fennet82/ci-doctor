@@ -1,0 +1,22 @@
+# gitleaks config for ci-doctor.
+#
+# A tool that scrubs secrets has to be tested against secrets. The redaction suite
+# plants obviously-fake tokens and asserts they come back `[REDACTED]` — so the
+# scanner finds them, correctly, on every run. Allowlisting the whole repo would
+# defeat the point, so the exemption is scoped to those two files and that one rule.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "gitlab-pat"
+description = "GitLab Personal Access Token"
+regex = '''glpat-[0-9a-zA-Z\-\_]{20}'''
+keywords = ["glpat-"]
+
+  [rules.allowlist]
+  description = "Planted fixtures for the redaction round-trip; never real."
+  paths = [
+    '''tests/test_redact\.py''',
+    '''tests/test_report\.py''',
+  ]

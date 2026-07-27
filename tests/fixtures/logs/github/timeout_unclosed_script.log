@@ -1,0 +1,12 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z Secret source: Actions
+2026-07-24T20:04:01.2300000Z Prepare workflow directory
+2026-07-24T20:04:01.6399999Z Complete job name: soak
+2026-07-24T20:04:02.0499999Z ##[group]Run ./long_running_task.sh
+2026-07-24T20:04:02.4600000Z ./long_running_task.sh
+2026-07-24T20:04:02.8699999Z shell: /usr/bin/bash -e {0}
+2026-07-24T20:04:03.2799999Z ##[endgroup]
+2026-07-24T20:04:03.6899999Z still working...
+2026-07-24T21:04:03.6899999Z still working...
+2026-07-24T21:04:04.0999999Z still working...
+2026-07-24T21:04:04.5099999Z ##[error]The operation was canceled.

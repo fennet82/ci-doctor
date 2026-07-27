@@ -11,22 +11,25 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     permissions:
+      actions: read              # read the failed run, its jobs and their logs
       contents: read
-      pull-requests: write       # only needed if you enable PR notes
+      pull-requests: write       # only needed when post-pr-note is true
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv sync
-      - name: Analyze the failed run
-        env:
-          CI_DOCTOR_PROVIDER: github
-          CI_DOCTOR_GITHUB__BASE_URL: https://api.github.com
-          CI_DOCTOR_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          # Optional LLM (any OpenAI-compatible endpoint):
-          # CI_DOCTOR_LLM__MODEL: qwen2.5-coder:32b
-          # CI_DOCTOR_LLM__API_BASE: http://vllm.internal:8000/v1
-        run: uv run ci-doctor analyze "${{ github.event.workflow_run.id }}"
+      - id: doctor
+        # Pin a release tag (e.g. @v0.3.0) once one exists; there is no floating
+        # major tag, because semantic-release publishes exact versions only.
+        uses: fennet82/ci-doctor@master
+        # run-id defaults to the run that triggered this one, so on a workflow_run
+        # event there is nothing else to wire up.
+        with:
+          post-pr-note: 'true'
+          # Optional LLM (any OpenAI-compatible endpoint) — set these as env instead:
+          #   CI_DOCTOR_LLM__MODEL / CI_DOCTOR_LLM__API_BASE
+
+      # The verdict is machine-readable, so you can act on it.
+      - if: steps.doctor.outputs.is-infra-not-code == 'true'
+        run: echo "::notice::Infrastructure, not the change — a retry may be all it needs."
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

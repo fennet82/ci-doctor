@@ -4,10 +4,11 @@ No I/O, no network, no clock (guardrail #7). This decides *where* the job failed
 the LLM never does. The precedence ladder below is first-match-wins and every rule
 records a ``rule_id`` so the report can say exactly why it decided.
 
-The load-bearing anti-noise rule: a ``WARNING:``-prefixed runner line is non-fatal
-by definition (missing cache, missing artifact, failed cache extract all warn and
-the job continues). A section whose only negative evidence is ``WARNING:``-level
-cannot be selected as the blamed phase — see ``_last_error_section``.
+The load-bearing anti-noise rule: a line the *runner* marked as a warning is
+non-fatal by definition (missing cache, missing artifact, failed cache extract all
+warn and the job continues). A section whose only negative evidence is warning-level
+cannot be selected as the blamed phase — see ``_is_warning_line`` for which prefixes
+count, and ``_last_error_section`` for where it bites.
 """
 
 from __future__ import annotations
@@ -19,9 +20,32 @@ from ci_doctor.core.models import FailureReason, Job, Phase, Section
 
 _SYNTHETIC = {"__preamble__", "__trailer__"}
 
-# Conservative error anchors for the structural fallback. The full matcher
-# catalogue (jest, go, maven, ...) is M3's extractor, not the classifier's job.
-_ERROR_RE = re.compile(r"\b(ERROR|FATAL)\b|Traceback \(most recent call last\)|exit code \d+|npm ERR!")
+#: Fatality signals for the structural fallback, and the whole of it. This answers
+#: one coarse question — "did anything in this section actually fail?" — to pick
+#: which *section* to blame. Which *lines* are the evidence is a different question,
+#: asked later, by the config matcher catalogue in `extraction.matchers`.
+#:
+#: So this list stays runner-level: the runner's own error annotations, and a
+#: non-zero exit. No vendor tokens. A pytest/jest/npm signature added here would be
+#: a second, hardcoded copy of the catalogue that no `.ci-doctor.yml` can tune, and
+#: it would buy nothing — a tool that fails at all makes its runner say so.
+_ERROR_RE = re.compile(r"^##\[error\]|\b(ERROR|FATAL)\b|exit code \d+")
+
+#: How a runner marks its *own* line as a warning, which is not the same thing as a
+#: tool printing the word. Two forms, because the two runners we read differ: a
+#: literal `WARNING:` prefix, and the `##[warning]` annotation. A line carrying
+#: either is non-fatal by definition, whatever alarming words follow it.
+#:
+#: Deliberately case-sensitive. `Warning:` and `warning:` are what apt, docker and
+#: pip print from *inside* a step, and that is the step's output, not the runner
+#: excusing it — swallowing those would let a real failure go unblamed.
+#:
+#: Deliberately warnings only, not every non-`error` annotation level. `##[notice]`
+#: and `##[debug]` are also non-fatal, but this predicate does double duty: it also
+#: decides which phases get reported as contributing factors. Widening it to the
+#: whole syntax would surface a phase whose only annotation was a debug line as
+#: "warnings present", which is a lie to the reader for no gain.
+_WARNING_RE = re.compile(r"^(WARNING:|##\[warning\])")
 
 #: Fallback reason when the phase was concluded from log structure rather than
 #: reported by the provider. Keeps a structurally-derived verdict self-consistent.
@@ -47,7 +71,7 @@ class Attribution:
         terminal_evidence: The single most telling line, when one exists.
         rule_id: Which rung of the ladder fired, so the report can say *why* it
             decided rather than only what it decided.
-        secondary_phases: Phases that emitted `WARNING:` lines but were not blamed.
+        secondary_phases: Phases that emitted runner warnings but were not blamed.
             Surfaced as contributing factors — noise worth mentioning, not blaming.
     """
 
@@ -92,26 +116,46 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
     if reason == FailureReason.UNMET_PREREQUISITES:
         return Attribution(Phase.PREPARE, reason, "medium", _terminal(trailer), "reason_unmet_prerequisites")
     if reason == FailureReason.CANCELLED:
-        return Attribution(_open_phase(sections) or Phase.UNKNOWN, reason, "high", _terminal(trailer), "reason_cancelled")
+        return Attribution(
+            _open_phase(sections) or Phase.UNKNOWN, reason, "high", _terminal(trailer), "reason_cancelled"
+        )
     if reason == FailureReason.TIMEOUT:
         # Phase of whatever section was open when time ran out.
-        return Attribution(_open_phase(sections) or Phase.PROVISION, reason, "high", _terminal(trailer), "reason_timeout_open_section")
+        return Attribution(
+            _open_phase(sections) or Phase.PROVISION,
+            reason,
+            "high",
+            _terminal(trailer),
+            "reason_timeout_open_section",
+        )
     if reason == FailureReason.API_FAILURE:
         return Attribution(Phase.UNKNOWN, reason, "medium", _terminal(trailer), "reason_api_failure")
 
     # Rule 3 — script_failure is SCRIPT, full stop. This is the rule that kills the
     # "blamed the cache" bug: the noisy fetch/prepare warnings are never consulted.
     if reason == FailureReason.SCRIPT_FAILURE:
-        return Attribution(Phase.SCRIPT, reason, "high", _terminal_command(sections),
-                           "script_failure_is_script", _warning_phases(sections, Phase.SCRIPT))
+        return Attribution(
+            Phase.SCRIPT,
+            reason,
+            "high",
+            _terminal_command(sections),
+            "script_failure_is_script",
+            _warning_phases(sections, Phase.SCRIPT),
+        )
 
     # --- reason is UNKNOWN: fall back to log structure ---
 
     # Rule 4 — an unclosed section is where execution died (hard abort).
     open_sec = _last_open_section(sections)
     if open_sec is not None:
-        return Attribution(open_sec.phase, _PHASE_REASON[open_sec.phase], "medium",
-                           _last_line(open_sec), "unclosed_section", _warning_phases(sections, open_sec.phase))
+        return Attribution(
+            open_sec.phase,
+            _PHASE_REASON[open_sec.phase],
+            "medium",
+            _last_line(open_sec),
+            "unclosed_section",
+            _warning_phases(sections, open_sec.phase),
+        )
 
     # Rule 5 — parse the terminal trailer line.
     parsed = _parse_trailer(trailer)
@@ -119,11 +163,17 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
         phase, rsn, rule_id, evidence = parsed
         return Attribution(phase, rsn, "high", evidence, rule_id, _warning_phases(sections, phase))
 
-    # Rule 6 — last section with a real (non-WARNING) error line.
+    # Rule 6 — last section with a real (non-warning) error line.
     sec = _last_error_section(sections)
     if sec is not None:
-        return Attribution(sec.phase, _PHASE_REASON[sec.phase], "low",
-                           _first_error_line(sec), "last_error_section", _warning_phases(sections, sec.phase))
+        return Attribution(
+            sec.phase,
+            _PHASE_REASON[sec.phase],
+            "low",
+            _first_error_line(sec),
+            "last_error_section",
+            _warning_phases(sections, sec.phase),
+        )
 
     return Attribution(Phase.UNKNOWN, reason or FailureReason.UNKNOWN, "low", None, "no_signal")
 
@@ -191,13 +241,28 @@ def _open_phase(sections) -> Phase | None:
     return sec.phase if sec is not None else None
 
 
+def _is_warning_line(text: str) -> bool:
+    """Whether a line is the runner flagging something advisory.
+
+    Args:
+        text: One log line.
+
+    Returns:
+        True for a runner's own warning prefix — not for a tool that merely
+        printed the word. Shared by the two rules that care — one to refuse to
+        blame such a line, one to surface its phase as a contributing factor —
+        so a form that fools one cannot fool the other.
+    """
+    return bool(_WARNING_RE.match(text.lstrip()))
+
+
 def _is_error_line(text: str) -> bool:
     """Whether a line is evidence of an actual failure.
 
-    The load-bearing anti-noise rule: a `WARNING:`-prefixed runner line is
-    non-fatal by definition — a missing cache, a missing artifact and a failed
-    cache extract all warn and the job carries on. Treating those as errors is
-    exactly the "blamed the cache" bug.
+    The load-bearing anti-noise rule: a warning-prefixed runner line is non-fatal
+    by definition — a missing cache, a missing artifact and a failed cache extract
+    all warn and the job carries on. Treating those as errors is exactly the
+    "blamed the cache" bug.
 
     Args:
         text: One log line.
@@ -205,9 +270,9 @@ def _is_error_line(text: str) -> bool:
     Returns:
         True if the line looks fatal.
     """
-    if text.lstrip().startswith("WARNING:"):
+    if _is_warning_line(text):
         return False  # non-fatal by definition
-    return bool(_ERROR_RE.search(text))
+    return bool(_ERROR_RE.search(text.lstrip()))
 
 
 def _last_error_section(sections) -> Section | None:
@@ -218,7 +283,7 @@ def _last_error_section(sections) -> Section | None:
 
     Returns:
         The section, or None when only warnings were found. A section whose sole
-        negative evidence is `WARNING:`-level can never be selected here.
+        negative evidence is warning-level can never be selected here.
     """
     result = None
     for sec in _walk(sections):
@@ -319,11 +384,19 @@ def _parse_trailer(trailer: Section | None):
             return (Phase.SCRIPT, FailureReason.RUNNER_SYSTEM, "oom_137", line)
         return (Phase.SCRIPT, FailureReason.SCRIPT_FAILURE, "trailer_exit_code", line)
     if re.search(r"system failure|prepare environment", text):
-        return (Phase.PREPARE, FailureReason.RUNNER_SYSTEM, "trailer_system_failure",
-                _matching_line(trailer, r"system failure|prepare environment"))
+        return (
+            Phase.PREPARE,
+            FailureReason.RUNNER_SYSTEM,
+            "trailer_system_failure",
+            _matching_line(trailer, r"system failure|prepare environment"),
+        )
     if re.search(r"execution took longer than|timeout", text, re.IGNORECASE):
-        return (Phase.PROVISION, FailureReason.TIMEOUT, "trailer_timeout",
-                _matching_line(trailer, r"took longer|timeout"))
+        return (
+            Phase.PROVISION,
+            FailureReason.TIMEOUT,
+            "trailer_timeout",
+            _matching_line(trailer, r"took longer|timeout"),
+        )
     return None
 
 
@@ -335,13 +408,13 @@ def _warning_phases(sections, exclude: Phase) -> list[Phase]:
         exclude: The blamed phase, left out of the result.
 
     Returns:
-        Distinct phases carrying `WARNING:` lines, in log order. These become
+        Distinct phases carrying warning lines, in log order. These become
         contributing factors — worth mentioning to the reader, never the verdict.
     """
     out: list[Phase] = []
     for sec in _walk(sections):
         if sec.name in _SYNTHETIC or sec.phase == exclude:
             continue
-        if any(line.text.lstrip().startswith("WARNING:") for line in sec.lines) and sec.phase not in out:
+        if any(_is_warning_line(line.text) for line in sec.lines) and sec.phase not in out:
             out.append(sec.phase)
     return out

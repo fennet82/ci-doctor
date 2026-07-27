@@ -1,0 +1,54 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z Secret source: Actions
+2026-07-24T20:04:01.2300000Z Prepare workflow directory
+2026-07-24T20:04:01.6399999Z Complete job name: verify
+2026-07-24T20:04:02.0499999Z ##[group]Set up job
+2026-07-24T20:04:02.4600000Z Image: ubuntu-24.04
+2026-07-24T20:04:02.8699999Z ##[endgroup]
+2026-07-24T20:04:03.2799999Z Download action repository 'actions/checkout@v4'
+2026-07-24T20:04:03.6899999Z ##[group]Run actions/checkout@v4
+2026-07-24T20:04:04.0999999Z   with:
+2026-07-24T20:04:04.5099999Z     fetch-depth: 20
+2026-07-24T20:04:04.9200000Z ##[endgroup]
+2026-07-24T20:04:05.3300000Z Syncing repository: acme/payments
+2026-07-24T20:04:05.7399999Z /usr/bin/git checkout --progress --force e2d19a77
+2026-07-24T20:04:06.1499999Z ##[group]Run actions/cache@v4
+2026-07-24T20:04:06.5599999Z   with:
+2026-07-24T20:04:06.9699999Z     path: ~/.m2/repository
+2026-07-24T20:04:07.3799999Z     key: Linux-maven-21
+2026-07-24T20:04:07.7899999Z ##[endgroup]
+2026-07-24T20:04:08.1999999Z Cache restored from key: Linux-maven-21
+2026-07-24T20:04:08.6099999Z ##[group]Run mvn -B -T 1C verify
+2026-07-24T20:04:09.0199999Z mvn -B -T 1C verify
+2026-07-24T20:04:09.4299999Z shell: /usr/bin/bash -e {0}
+2026-07-24T20:04:09.8399999Z ##[endgroup]
+2026-07-24T20:04:10.2500000Z [INFO] Scanning for projects...
+2026-07-24T20:04:10.6600000Z [INFO] Reactor Build Order:
+2026-07-24T20:04:11.0699999Z [INFO]   payments-core
+2026-07-24T20:04:11.4799999Z [INFO]   payments-api
+2026-07-24T20:04:11.8899999Z [INFO]   payments-integration-tests
+2026-07-24T20:04:12.2999999Z [INFO] Building payments-core 4.7.0
+2026-07-24T20:04:12.7099999Z [INFO] Tests run: 214, Failures: 0, Errors: 0, Skipped: 3
+2026-07-24T20:04:13.1199999Z [INFO] Building payments-api 4.7.0
+2026-07-24T20:04:13.5299999Z [INFO] Tests run: 96, Failures: 0, Errors: 0, Skipped: 0
+2026-07-24T20:04:13.9399999Z [INFO] Building payments-integration-tests 4.7.0
+2026-07-24T20:04:14.3499999Z [INFO] Running com.acme.payments.it.SettlementReconciliationIT
+2026-07-24T20:04:14.7599999Z [INFO] Starting embedded Postgres on port 54993
+2026-07-24T20:04:15.1699999Z [INFO] Seeding 1,200,000 ledger rows...
+2026-07-24T20:04:15.5799999Z [INFO] Waiting for async settlement worker to drain queue...
+2026-07-24T20:04:15.9899999Z [INFO] ... still draining (queue depth 41932)
+2026-07-24T20:04:16.3999999Z [INFO] ... still draining (queue depth 41928)
+2026-07-24T20:04:16.8099999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:17.2199999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:17.6299999Z [INFO] worker heartbeat ok (lag 0ms), last committed offset 1044912
+2026-07-24T20:04:18.0399999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:18.4499999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:18.8599999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:19.2699999Z [INFO] worker heartbeat ok (lag 0ms), last committed offset 1044912
+2026-07-24T20:04:19.6799999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:20.0899999Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:20.5000000Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:20.9100000Z [INFO] worker heartbeat ok (lag 0ms), last committed offset 1044912
+2026-07-24T20:04:21.3200000Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:21.7300000Z [INFO] ... still draining (queue depth 41927)
+2026-07-24T20:04:22.1399999Z ##[error]The operation was canceled.

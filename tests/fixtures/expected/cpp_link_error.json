@@ -1,0 +1,13 @@
+{
+  "note": "ld undefined reference at link time (exit 2). No provider metadata, every section closed, so the trailer's exit code decides: SCRIPT. Pins that the language pack's own noise never outranks it, on every provider shipping this log.",
+  "job": {
+    "status": "failed",
+    "failure_reason": "unknown",
+    "raw_failure_reason": ""
+  },
+  "expect": {
+    "phase": "script",
+    "reason": "script_failure",
+    "rule_id": "trailer_exit_code"
+  }
+}

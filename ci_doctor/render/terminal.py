@@ -29,7 +29,7 @@ _SECTION = "ci_doctor_report"
 _CONFIDENCE_STYLE = {"high": "green", "medium": "yellow", "low": "red"}
 
 _LABEL = "bold cyan"
-_SUBLABEL = "bold"      # headers nested inside the evidence panel
+_SUBLABEL = "bold"  # headers nested inside the evidence panel
 
 
 def render_terminal(report: Report, *, no_color: bool = False, wrap_section: bool = False, file=None) -> None:
@@ -61,7 +61,9 @@ def render_terminal(report: Report, *, no_color: bool = False, wrap_section: boo
         header.append("  infra-not-code", style="bold yellow")
     if report.likely_flaky:
         header.append("  likely-flaky", style="bold magenta")
-    console.print(Panel(header, title="ci-doctor", title_align="left", border_style=border, expand=False), end="\n\n")
+    console.print(
+        Panel(header, title="ci-doctor", title_align="left", border_style=border, expand=False), end="\n\n"
+    )
 
     console.print(Text("Root cause", style=_LABEL))
     console.print(Text(report.root_cause), end="\n\n")
@@ -79,13 +81,16 @@ def render_terminal(report: Report, *, no_color: bool = False, wrap_section: boo
             console.print(Text(e.section, style=_SUBLABEL))
             # soft_wrap=False overrides the console default so the panel wraps
             # long lines instead of cropping them at the border.
-            console.print(Panel(body, border_style="blue", expand=True),
-                          end="\n\n", soft_wrap=False)
+            console.print(Panel(body, border_style="blue", expand=True), end="\n\n", soft_wrap=False)
     if report.remediation:
         console.print(Text("Remediation", style=_LABEL))
-        _print_each(console, [
-            Text.assemble((f"  {step.order}. ", "bold green"), _step_text(step)) for step in report.remediation
-        ])
+        _print_each(
+            console,
+            [
+                Text.assemble((f"  {step.order}. ", "bold green"), _step_text(step))
+                for step in report.remediation
+            ],
+        )
 
     console.print(Text("Handoff prompt (copy to your coding agent)", style=_LABEL))
     console.print(Text(report.handoff_prompt), end="\n\n")

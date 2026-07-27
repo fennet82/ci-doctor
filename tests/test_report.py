@@ -102,9 +102,20 @@ def test_infer_category_from_evidence():
     assert _infer_category(FailureReason.TIMEOUT, "") == "timeout"
     assert _infer_category(FailureReason.MISSING_DEPENDENCY, "") == "dependency"
     # script_failure -> guess from the evidence
-    assert _infer_category(FailureReason.SCRIPT_FAILURE, "==== FAILURES ====\nE assert 1 == 2\nFAILED tests/x.py") == "test"
-    assert _infer_category(FailureReason.SCRIPT_FAILURE, "a.ts:1 error TS2345: bad\nnpm ERR! build failed") == "build"
-    assert _infer_category(FailureReason.SCRIPT_FAILURE, "ERROR: Job failed: execution took longer than 1h") == "timeout"
+    assert (
+        _infer_category(
+            FailureReason.SCRIPT_FAILURE, "==== FAILURES ====\nE assert 1 == 2\nFAILED tests/x.py"
+        )
+        == "test"
+    )
+    assert (
+        _infer_category(FailureReason.SCRIPT_FAILURE, "a.ts:1 error TS2345: bad\nnpm ERR! build failed")
+        == "build"
+    )
+    assert (
+        _infer_category(FailureReason.SCRIPT_FAILURE, "ERROR: Job failed: execution took longer than 1h")
+        == "timeout"
+    )
     assert _infer_category(FailureReason.SCRIPT_FAILURE, "exit code 137\nKilled") == "infrastructure"
     assert _infer_category(FailureReason.SCRIPT_FAILURE, "nothing recognizable here") == "unknown"
 
@@ -117,8 +128,9 @@ _CATEGORY_FIXTURES = {
 _CATEGORY_PARAMS = [(p, c, _CATEGORY_FIXTURES[c]) for p, c in support.pairs_for(_CATEGORY_FIXTURES)]
 
 
-@pytest.mark.parametrize("provider,fixture,expected", _CATEGORY_PARAMS,
-                         ids=[f"{p}-{c}" for p, c, _ in _CATEGORY_PARAMS])
+@pytest.mark.parametrize(
+    "provider,fixture,expected", _CATEGORY_PARAMS, ids=[f"{p}-{c}" for p, c, _ in _CATEGORY_PARAMS]
+)
 def test_deterministic_category_from_fixture(provider, fixture, expected):
     """Offline replay, with no metadata and no LLM, still classifies correctly."""
     log = support.read_log(provider, fixture)

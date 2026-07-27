@@ -1,0 +1,79 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z ##[group]Operating System
+2026-07-24T20:04:01.2300000Z Ubuntu
+2026-07-24T20:04:01.6399999Z 24.04.4
+2026-07-24T20:04:02.0499999Z LTS
+2026-07-24T20:04:02.4600000Z ##[endgroup]
+2026-07-24T20:04:02.8699999Z Secret source: Actions
+2026-07-24T20:04:03.2799999Z Prepare workflow directory
+2026-07-24T20:04:03.6899999Z Prepare all required actions
+2026-07-24T20:04:04.0999999Z Complete job name: rust_test_failure
+2026-07-24T20:04:04.5099999Z ##[group]Set up job
+2026-07-24T20:04:04.9200000Z Image: ubuntu-24.04
+2026-07-24T20:04:05.3300000Z Runner name: 'GitHub Actions 12'
+2026-07-24T20:04:05.7399999Z ##[endgroup]
+2026-07-24T20:04:06.1499999Z Download action repository 'actions/checkout@v4'
+2026-07-24T20:04:06.5599999Z Download action repository 'actions/cache@v4'
+2026-07-24T20:04:06.9699999Z ##[group]Run actions/checkout@v4
+2026-07-24T20:04:07.3799999Z   with:
+2026-07-24T20:04:07.7899999Z     fetch-depth: 20
+2026-07-24T20:04:08.1999999Z     lfs: false
+2026-07-24T20:04:08.6099999Z ##[endgroup]
+2026-07-24T20:04:09.0199999Z Syncing repository: acme/ledger
+2026-07-24T20:04:09.4299999Z ##[group]Getting Git version info
+2026-07-24T20:04:09.8399999Z Working directory is '/home/runner/work/ledger/ledger'
+2026-07-24T20:04:10.2500000Z ##[endgroup]
+2026-07-24T20:04:10.6600000Z /usr/bin/git checkout --progress --force 8ad41f02
+2026-07-24T20:04:11.0699999Z ##[group]Run actions/cache@v4
+2026-07-24T20:04:11.4799999Z   with:
+2026-07-24T20:04:11.8899999Z     path: ~/.cache
+2026-07-24T20:04:12.2999999Z     key: Linux-deps-8ad41f02
+2026-07-24T20:04:12.7099999Z ##[endgroup]
+2026-07-24T20:04:13.1199999Z Received 41943040 of 41943040 (100.0%), 40.0 MBs/sec
+2026-07-24T20:04:13.5299999Z Cache restored from key: Linux-deps-8ad41f02
+2026-07-24T20:04:13.9399999Z ##[group]Run cargo --version
+2026-07-24T20:04:14.3499999Z cargo --version
+2026-07-24T20:04:14.7599999Z cargo build --locked
+2026-07-24T20:04:15.1699999Z cargo test --locked
+2026-07-24T20:04:15.5799999Z shell: /usr/bin/bash -e {0}
+2026-07-24T20:04:15.9899999Z ##[endgroup]
+2026-07-24T20:04:16.3999999Z cargo 1.79.0 (ffa9cf99a 2024-06-03)
+2026-07-24T20:04:16.8099999Z    Compiling ledger v0.4.1 (/builds/team/ledger)
+2026-07-24T20:04:17.2199999Z     Finished dev [unoptimized + debuginfo] target(s) in 21.44s
+2026-07-24T20:04:17.6299999Z    Compiling ledger v0.4.1 (/builds/team/ledger)
+2026-07-24T20:04:18.0399999Z     Finished test [unoptimized + debuginfo] target(s) in 18.02s
+2026-07-24T20:04:18.4499999Z      Running unittests src/lib.rs (target/debug/deps/ledger-3c7b1a9d)
+2026-07-24T20:04:18.8599999Z 
+2026-07-24T20:04:19.2699999Z running 24 tests
+2026-07-24T20:04:19.6799999Z test balance::tests::zero_balance ... ok
+2026-07-24T20:04:20.0899999Z test balance::tests::credit_then_debit ... ok
+2026-07-24T20:04:20.5000000Z test posting::tests::rejects_future_date ... ok
+2026-07-24T20:04:20.9100000Z test posting::tests::rounds_half_even ... ok
+2026-07-24T20:04:21.3200000Z test posting::tests::applies_fx_rate ... FAILED
+2026-07-24T20:04:21.7300000Z 
+2026-07-24T20:04:22.1399999Z failures:
+2026-07-24T20:04:22.5499999Z 
+2026-07-24T20:04:22.9599999Z ---- posting::tests::applies_fx_rate stdout ----
+2026-07-24T20:04:23.3699999Z thread 'posting::tests::applies_fx_rate' panicked at src/posting.rs:212:9:
+2026-07-24T20:04:23.7799999Z assertion `left == right` failed: fx conversion lost precision
+2026-07-24T20:04:24.1899999Z   left: 10499
+2026-07-24T20:04:24.5999999Z  right: 10500
+2026-07-24T20:04:25.0099999Z note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-07-24T20:04:25.4199999Z 
+2026-07-24T20:04:25.8299999Z failures:
+2026-07-24T20:04:26.2399999Z     posting::tests::applies_fx_rate
+2026-07-24T20:04:26.6499999Z 
+2026-07-24T20:04:27.0599999Z test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+2026-07-24T20:04:27.4699999Z 
+2026-07-24T20:04:27.8799999Z error: test failed, to rerun pass `--lib`
+2026-07-24T20:04:28.2899999Z ##[error]Process completed with exit code 101.
+2026-07-24T20:04:28.6999999Z ##[group]Post Run actions/checkout@v4
+2026-07-24T20:04:29.1099999Z ##[endgroup]
+2026-07-24T20:04:29.5199999Z /usr/bin/git version
+2026-07-24T20:04:29.9299999Z git version 2.54.0
+2026-07-24T20:04:30.3399999Z ##[group]Post Run actions/upload-artifact@v4
+2026-07-24T20:04:30.7499999Z ##[endgroup]
+2026-07-24T20:04:31.1599999Z Artifact upload complete.
+2026-07-24T20:04:31.5699999Z ##[warning]target/nextest/: no matching files. Ensure that the artifact path is relative to the working directory
+2026-07-24T20:04:31.9799999Z Post job cleanup.
+2026-07-24T20:04:32.3900000Z Cleaning up orphan processes

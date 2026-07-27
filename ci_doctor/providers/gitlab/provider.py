@@ -17,6 +17,7 @@ import gitlab
 from ci_doctor.config.schema import Config
 from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, RunnerInfo, Run
 from ci_doctor.core.ports import CIProvider
+from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.gitlab.reasons import to_failure_reason
 
 log = logging.getLogger("ci_doctor.gitlab")
@@ -90,15 +91,18 @@ class GitLabProvider(CIProvider):
         """Resolve and cache the project from `CI_PROJECT_ID`.
 
         Returns:
-            The python-gitlab project object.
+            The python-gitlab project object. Outside CI there is no
+            `CI_PROJECT_ID`, so the local `origin` supplies the "group/project"
+            path instead — python-gitlab takes either.
 
         Raises:
-            ValueError: If `CI_PROJECT_ID` is not set.
+            ValueError: If the project is set neither in the environment nor by
+                a git origin to fall back on.
         """
         if self._project_obj is None:
-            pid = self.environ.get("CI_PROJECT_ID")
+            pid = self.environ.get("CI_PROJECT_ID") or origin_repo("CI_PROJECT_ID")
             if not pid:
-                raise ValueError("CI_PROJECT_ID is not set; required to locate the pipeline")
+                raise ValueError("CI_PROJECT_ID is not set and git origin gave no project")
             self._project_obj = self.gl.projects.get(pid)
         return self._project_obj
 

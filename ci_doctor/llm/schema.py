@@ -17,8 +17,16 @@ from ci_doctor.core.models import Phase
 #: What kind of failure this was, orthogonal to :class:`Phase` (*where* it failed).
 #: "runtime" means the application itself crashed, as opposed to its tests or build.
 Category = Literal[
-    "build", "test", "dependency", "config", "infrastructure",
-    "timeout", "permissions", "flaky", "runtime", "unknown",
+    "build",
+    "test",
+    "dependency",
+    "config",
+    "infrastructure",
+    "timeout",
+    "permissions",
+    "flaky",
+    "runtime",
+    "unknown",
 ]
 
 
@@ -74,15 +82,15 @@ class Report(BaseModel):
         handoff_prompt: A self-contained prompt to paste into a coding agent.
     """
 
-    summary: str = Field(max_length=140)   # one sentence
+    summary: str = Field(max_length=140)  # one sentence
     failure_phase: Phase
     category: Category
     confidence: Literal["high", "medium", "low"]
-    is_infra_not_code: bool                # "not your fault" signal
+    is_infra_not_code: bool  # "not your fault" signal
     likely_flaky: bool
-    root_cause: str                        # 2-4 sentences
+    root_cause: str  # 2-4 sentences
     contributing_factors: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     remediation: list[RemediationStep] = Field(default_factory=list)
     related_paths: list[str] = Field(default_factory=list)
-    handoff_prompt: str                    # self-contained prompt for a coding agent
+    handoff_prompt: str  # self-contained prompt for a coding agent

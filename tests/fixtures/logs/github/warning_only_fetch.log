@@ -1,0 +1,20 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z Secret source: Actions
+2026-07-24T20:04:01.2300000Z Prepare workflow directory
+2026-07-24T20:04:01.6399999Z Complete job name: verify
+2026-07-24T20:04:02.0499999Z ##[group]Run actions/cache@v4
+2026-07-24T20:04:02.4600000Z   with:
+2026-07-24T20:04:02.8699999Z     path: ~/.cache
+2026-07-24T20:04:03.2799999Z     key: Linux-deps-8ad41f02
+2026-07-24T20:04:03.6899999Z ##[endgroup]
+2026-07-24T20:04:04.0999999Z Cache not found for input keys: Linux-deps-8ad41f02
+2026-07-24T20:04:04.5099999Z ##[warning]Failed to restore cache: ERROR 404: entry not found
+2026-07-24T20:04:04.9200000Z ##[warning]Cache extraction failed: ERROR reading tar archive
+2026-07-24T20:04:05.3300000Z ##[group]Run acme/custom-tool@v2
+2026-07-24T20:04:05.7399999Z   with:
+2026-07-24T20:04:06.1499999Z     mode: strict
+2026-07-24T20:04:06.5599999Z ##[endgroup]
+2026-07-24T20:04:06.9699999Z ERROR: custom tool reported a fatal problem and stopped
+2026-07-24T20:04:07.3799999Z ##[error]The custom tool step failed. See the log above.
+2026-07-24T20:04:07.7899999Z Post job cleanup.
+2026-07-24T20:04:08.1999999Z Cleaning up orphan processes

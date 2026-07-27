@@ -1,0 +1,64 @@
+2026-07-24T20:04:00.4099999Z Current runner version: '2.336.0'
+2026-07-24T20:04:00.8199999Z ##[group]Operating System
+2026-07-24T20:04:01.2300000Z Ubuntu
+2026-07-24T20:04:01.6399999Z 24.04.4
+2026-07-24T20:04:02.0499999Z LTS
+2026-07-24T20:04:02.4600000Z ##[endgroup]
+2026-07-24T20:04:02.8699999Z Secret source: Actions
+2026-07-24T20:04:03.2799999Z Prepare workflow directory
+2026-07-24T20:04:03.6899999Z Prepare all required actions
+2026-07-24T20:04:04.0999999Z Complete job name: go_panic
+2026-07-24T20:04:04.5099999Z ##[group]Set up job
+2026-07-24T20:04:04.9200000Z Image: ubuntu-24.04
+2026-07-24T20:04:05.3300000Z Runner name: 'GitHub Actions 12'
+2026-07-24T20:04:05.7399999Z ##[endgroup]
+2026-07-24T20:04:06.1499999Z Download action repository 'actions/checkout@v4'
+2026-07-24T20:04:06.5599999Z Download action repository 'actions/cache@v4'
+2026-07-24T20:04:06.9699999Z ##[group]Run actions/checkout@v4
+2026-07-24T20:04:07.3799999Z   with:
+2026-07-24T20:04:07.7899999Z     fetch-depth: 20
+2026-07-24T20:04:08.1999999Z     lfs: false
+2026-07-24T20:04:08.6099999Z ##[endgroup]
+2026-07-24T20:04:09.0199999Z Syncing repository: acme/ledger
+2026-07-24T20:04:09.4299999Z ##[group]Getting Git version info
+2026-07-24T20:04:09.8399999Z Working directory is '/home/runner/work/ledger/ledger'
+2026-07-24T20:04:10.2500000Z ##[endgroup]
+2026-07-24T20:04:10.6600000Z /usr/bin/git checkout --progress --force 8ad41f02
+2026-07-24T20:04:11.0699999Z ##[group]Run actions/cache@v4
+2026-07-24T20:04:11.4799999Z   with:
+2026-07-24T20:04:11.8899999Z     path: ~/.cache
+2026-07-24T20:04:12.2999999Z     key: Linux-deps-8ad41f02
+2026-07-24T20:04:12.7099999Z ##[endgroup]
+2026-07-24T20:04:13.1199999Z Received 41943040 of 41943040 (100.0%), 40.0 MBs/sec
+2026-07-24T20:04:13.5299999Z Cache restored from key: Linux-deps-8ad41f02
+2026-07-24T20:04:13.9399999Z ##[group]Run go version
+2026-07-24T20:04:14.3499999Z go version
+2026-07-24T20:04:14.7599999Z go build ./...
+2026-07-24T20:04:15.1699999Z go run ./cmd/indexer
+2026-07-24T20:04:15.5799999Z shell: /usr/bin/bash -e {0}
+2026-07-24T20:04:15.9899999Z ##[endgroup]
+2026-07-24T20:04:16.3999999Z go version go1.22.3 linux/amd64
+2026-07-24T20:04:16.8099999Z 2026/01/05 09:20:11 indexer starting, shard=3
+2026-07-24T20:04:17.2199999Z 2026/01/05 09:20:11 loaded 512 documents
+2026-07-24T20:04:17.6299999Z 2026/01/05 09:20:11 rebuilding shard index
+2026-07-24T20:04:18.0399999Z panic: runtime error: index out of range [512] with length 512
+2026-07-24T20:04:18.4499999Z 
+2026-07-24T20:04:18.8599999Z goroutine 1 [running]:
+2026-07-24T20:04:19.2699999Z example.com/svc/internal/index.(*Shard).Get(...)
+2026-07-24T20:04:19.6799999Z 	/builds/team/svc/internal/index/shard.go:74
+2026-07-24T20:04:20.0899999Z example.com/svc/internal/index.(*Shard).Rebuild(0xc0000b4000)
+2026-07-24T20:04:20.5000000Z 	/builds/team/svc/internal/index/shard.go:112 +0x1e5
+2026-07-24T20:04:20.9100000Z main.main()
+2026-07-24T20:04:21.3200000Z 	/builds/team/svc/cmd/indexer/main.go:38 +0x94
+2026-07-24T20:04:21.7300000Z exit status 2
+2026-07-24T20:04:22.1399999Z ##[error]Process completed with exit code 1.
+2026-07-24T20:04:22.5499999Z ##[group]Post Run actions/checkout@v4
+2026-07-24T20:04:22.9599999Z ##[endgroup]
+2026-07-24T20:04:23.3699999Z /usr/bin/git version
+2026-07-24T20:04:23.7799999Z git version 2.54.0
+2026-07-24T20:04:24.1899999Z ##[group]Post Run actions/upload-artifact@v4
+2026-07-24T20:04:24.5999999Z ##[endgroup]
+2026-07-24T20:04:25.0099999Z Artifact upload complete.
+2026-07-24T20:04:25.4199999Z ##[warning]index/: no matching files. Ensure that the artifact path is relative to the working directory
+2026-07-24T20:04:25.8299999Z Post job cleanup.
+2026-07-24T20:04:26.2399999Z Cleaning up orphan processes

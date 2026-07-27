@@ -76,8 +76,8 @@ def test_config_prints_the_effective_config(monkeypatch, capsys, tmp_path):
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".ci-doctor.yml").write_text("llm:\n  model: my-model\n")
     out = _run(monkeypatch, capsys, "config", "--no-color")
-    assert "my-model" in out          # the user layer
-    assert "tail_lines" in out        # and the untouched defaults
+    assert "my-model" in out  # the user layer
+    assert "tail_lines" in out  # and the untouched defaults
 
 
 def test_config_diff_shows_only_what_the_user_changed(monkeypatch, capsys, tmp_path):
@@ -87,7 +87,7 @@ def test_config_diff_shows_only_what_the_user_changed(monkeypatch, capsys, tmp_p
     out = _run(monkeypatch, capsys, "config", "--diff", "--no-color")
     assert "-  model: null" in out
     assert "+  model: my-model" in out
-    assert "tail_lines" not in out    # unchanged keys stay out of the diff
+    assert "tail_lines" not in out  # unchanged keys stay out of the diff
 
 
 def test_config_diff_is_empty_on_stock_defaults(monkeypatch, capsys, tmp_path):
@@ -102,8 +102,8 @@ def test_repeated_config_flags_apply_left_to_right(monkeypatch, capsys, tmp_path
     (tmp_path / "a.yml").write_text("llm:\n  model: from-a\n  temperature: 0.9\n")
     (tmp_path / "b.yml").write_text("llm:\n  model: from-b\n")
     out = _run(monkeypatch, capsys, "config", "-f", "a.yml", "-f", "b.yml", "--no-color")
-    assert "model: from-b" in out       # the rightmost file wins
-    assert "temperature: 0.9" in out    # keys only the earlier file set survive
+    assert "model: from-b" in out  # the rightmost file wins
+    assert "temperature: 0.9" in out  # keys only the earlier file set survive
 
 
 def test_config_validate_reports_ok_and_failure(monkeypatch, capsys, tmp_path):

@@ -215,8 +215,12 @@ class ClaudeCodeClient(LLMClient):
         if self.cfg.model:
             cmd += ["--model", self.cfg.model]
         proc = subprocess.run(  # prompt on stdin avoids ARG_MAX on large prompts
-            cmd, input=prompt, capture_output=True, text=True,
-            timeout=self.cfg.timeout_seconds, env=self.environ,
+            cmd,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=self.cfg.timeout_seconds,
+            env=self.environ,
         )
         if proc.returncode != 0:
             raise RuntimeError(f"claude CLI failed ({proc.returncode}): {proc.stderr[:500]}")

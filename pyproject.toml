@@ -11,6 +11,7 @@ dependencies = [
     "pyyaml>=6",
     "python-gitlab>=8.4.0",
     "openai>=2.48.0",
+    "pygithub>=2.9.1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,7 @@ ci-doctor = "ci_doctor.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "ruff>=0.15,<0.16",  # 0.16 widened the DEFAULT rule set; adopting it is its own change
 ]
 
 [build-system]
@@ -34,6 +36,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["ci_doctor"]
+
+[tool.ruff]
+# 110, not the default 88: the code was written to it (p99 line is 109 chars), and
+# forcing the long single-line `return Attribution(...)` calls onto five lines each
+# costs more readability than it buys.
+line-length = 110
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -65,17 +65,26 @@ def test_updates_existing_note_idempotently():
     existing = [_Note(f"old report\n\n{MARKER}")]
     prov, notes = _provider(existing)
     prov.post_note(MergeRequestRef(iid="7"), "new report", MARKER)
-    assert notes.created == []            # updated in place, not a second comment
+    assert notes.created == []  # updated in place, not a second comment
     assert existing[0].saved is True
     assert "new report" in existing[0].body
 
 
 def test_mr_resolved_from_ci_env():
     """The MR is read from CI_MERGE_REQUEST_IID, not guessed from branch or SHA."""
-    gl = SimpleNamespace(projects=SimpleNamespace(get=lambda pid: SimpleNamespace(
-        pipelines=SimpleNamespace(get=lambda pid: SimpleNamespace(
-            id=1, ref="mr", sha="x", web_url="", jobs=SimpleNamespace(list=lambda all=True: []))))))
-    prov = GitLabProvider(load_config(environ={}), client=gl,
-                          environ={"CI_PROJECT_ID": "1", "CI_MERGE_REQUEST_IID": "42"})
+    gl = SimpleNamespace(
+        projects=SimpleNamespace(
+            get=lambda pid: SimpleNamespace(
+                pipelines=SimpleNamespace(
+                    get=lambda pid: SimpleNamespace(
+                        id=1, ref="mr", sha="x", web_url="", jobs=SimpleNamespace(list=lambda all=True: [])
+                    )
+                )
+            )
+        )
+    )
+    prov = GitLabProvider(
+        load_config(environ={}), client=gl, environ={"CI_PROJECT_ID": "1", "CI_MERGE_REQUEST_IID": "42"}
+    )
     run = prov.fetch_run("1")
     assert run.mr is not None and run.mr.iid == "42"
