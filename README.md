@@ -163,6 +163,23 @@ ci-doctor emits the deterministic report instead of failing.
 
 ## Use it in CI
 
+**GitHub Actions** — one step; `run-id` defaults to the run that just failed:
+
+```yaml
+permissions: { actions: read, contents: read, pull-requests: write }
+steps:
+  - id: doctor
+    uses: fennet82/ci-doctor@v1
+    with:
+      post-pr-note: 'true'
+  - if: steps.doctor.outputs.is-infra-not-code == 'true'
+    run: echo "::notice::Infrastructure, not the change."
+```
+
+Outputs `phase`, `category`, `confidence`, `is-infra-not-code`, and the two report
+paths, so a workflow can branch on the verdict. Full example in
+[examples/github-actions.example.yml](examples/github-actions.example.yml).
+
 **GitLab** (`.gitlab-ci.yml`) — runs only on failure, always exits 0:
 
 ```yaml

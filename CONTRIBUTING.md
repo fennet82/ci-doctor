@@ -13,21 +13,42 @@ The design spec is [docs/PLAN.md](docs/PLAN.md); the user-facing overview is the
 ## 1. Setup
 
 ```sh
-uv sync
+mise install      # uv, gitleaks, gh, glab, node
+mise run setup    # uv sync + activate the repo's git hooks
 ```
 
-Python ≥ 3.11. No other services, accounts or credentials are needed — the suite is
-fully offline.
+`mise` is optional — `uv sync` alone is enough to run the tests. It exists so the
+binaries the hooks and CI call are the same versions for everyone. Python itself is
+not in `.mise.toml`: uv installs it from `requires-python`, and pinning it twice is
+one more thing to drift. Neither is ruff, for the same reason — it is a dev
+dependency, so `uv.lock` pins it and `uv run ruff` is identical locally and in CI.
 
-## 2. Tests
+No services, accounts or credentials are needed; the suite is fully offline.
+
+## 2. Tests and checks
 
 ```sh
-uv run pytest          # must be green before you push
+mise run test     # or: uv run pytest
+mise run lint     # ruff check + format, Python and markdown
+mise run check    # everything CI runs: test, lint, guardrails, leaks
 ```
 
 The suite blocks real sockets and never calls an LLM, so it runs in seconds. What a
 *good* test looks like, the fixture layout, and which file to put it in are in
 [GUIDELINES.md §4](GUIDELINES.md).
+
+### 2.1 Git hooks
+
+`mise run setup` points `core.hooksPath` at [`.githooks/`](.githooks). They are plain
+shell — read them, they are short.
+
+| Hook | Does |
+|---|---|
+| `pre-commit` | `ruff check --fix` then `ruff format` on staged `*.py`, `ruff format --preview` on staged `*.md`, and re-stages only what it rewrote. Fix runs first: removing an unused import leaves the blank lines it sat between. |
+| `commit-msg` | Rejects anything that is not a Conventional Commit. Not cosmetic — semantic-release parses these to pick the version bump. |
+| `pre-push` | `pytest`, the `core/` guardrail grep, and `gitleaks` if installed. Everything CI runs, before the round trip. |
+
+`--no-verify` skips them. CI does not, so it only moves where you find out.
 
 ## 3. Commits
 

@@ -1,0 +1,9 @@
+# Commits that changed formatting only, and would otherwise bury the real author
+# of every line they touched.
+#
+# Already active if you ran `mise run setup`. Otherwise:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub applies this file automatically.
+
+# style: apply ruff format across the tree
+dd7390b4459a45f54b7bcab5949a5b3f693de830

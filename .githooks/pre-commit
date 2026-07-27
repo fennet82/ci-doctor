@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Format and lint what is being committed, then re-stage what changed.
+#
+# This hook writes to your files. That is the deal you opted into: it fixes
+# rather than rejects, so a commit never fails on something a tool could have
+# done for you. Anything slow lives in pre-push instead.
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Only what is staged, and only what still exists (a staged delete has no file).
+mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR)
+py=(); md=()
+for f in "${staged[@]}"; do
+  [[ -f "$f" ]] || continue
+  case "$f" in
+    *.py)  py+=("$f") ;;
+    # .claude/ is vendored third-party skill docs — not ours to restyle.
+    .claude/*) ;;
+    *.md)  md+=("$f") ;;
+  esac
+done
+[[ ${#py[@]} -eq 0 && ${#md[@]} -eq 0 ]] && exit 0
+
+run() { uv run "$@" 2>&1; }
+
+if [[ ${#py[@]} -gt 0 ]]; then
+  # Fix before format, not after: removing an unused import leaves the blank lines
+  # it sat between, and only a formatting pass *afterwards* collapses them.
+  # --fix only touches what ruff can fix safely; anything left is a real finding.
+  if ! run ruff check --fix "${py[@]}"; then
+    echo "pre-commit: ruff found problems it cannot fix; commit aborted." >&2
+    exit 1
+  fi
+  run ruff format "${py[@]}" >/dev/null || exit 1
+fi
+
+# Markdown formatting is preview-only in ruff, and reformats Python code blocks
+# inside the docs — not prose or tables. Kept in its own call so --preview never
+# reaches the Python files above.
+if [[ ${#md[@]} -gt 0 ]]; then
+  run ruff format --preview "${md[@]}" >/dev/null || exit 1
+fi
+
+# Re-stage only files the hook actually rewrote, so an unrelated dirty worktree
+# is never swept into the commit.
+for f in "${py[@]}" "${md[@]}"; do
+  git diff --quiet -- "$f" || git add -- "$f"
+done

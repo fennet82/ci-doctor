@@ -1,0 +1,120 @@
+name: ci-doctor
+description: Explain why a workflow run failed. Read-only postmortem; always succeeds.
+author: fennet82
+
+branding:
+  icon: activity
+  color: blue
+
+# Deliberately a composite action, not a Docker one: it installs the very source
+# tree the caller pinned (`uses: fennet82/ci-doctor@v1` -> that ref's code), so the
+# action version and the analyzer version can never drift. No registry, no PyPI
+# round-trip, nothing to keep in sync at release time.
+
+inputs:
+  run-id:
+    description: >-
+      Workflow run id to analyze. Defaults to the run that triggered this one on a
+      `workflow_run` event, which is the usual wiring.
+    required: false
+    default: ${{ github.event.workflow_run.id }}
+  token:
+    description: >-
+      Token used to read the run, its jobs and their logs. `secrets.GITHUB_TOKEN`
+      is enough; it needs `actions: read`, plus `pull-requests: write` only when
+      post-pr-note is true.
+    required: false
+    default: ${{ github.token }}
+  repository:
+    description: 'Repository to read, as "owner/name". Defaults to the current one.'
+    required: false
+    default: ${{ github.repository }}
+  job-id:
+    description: Analyze a single job id instead of every failed job in the run.
+    required: false
+  config:
+    description: Path to a .ci-doctor.yml. Defaults to the one in the repo root, if any.
+    required: false
+  post-pr-note:
+    description: >-
+      Post or update one idempotent comment on the associated pull request. Needs
+      `pull-requests: write`. Skipped when confidence is below medium.
+    required: false
+    default: 'false'
+  api-url:
+    description: API base URL. Override for GitHub Enterprise, e.g. https://ghe.internal/api/v3.
+    required: false
+    default: ${{ github.api_url }}
+  working-directory:
+    description: Directory to run in, and where report.md / report.json are written.
+    required: false
+    default: '.'
+
+outputs:
+  phase:
+    description: Where the job failed — provision, prepare, fetch, script or post.
+    value: ${{ steps.analyze.outputs.phase }}
+  category:
+    description: What kind of failure — test, build, dependency, infrastructure, runtime, ...
+    value: ${{ steps.analyze.outputs.category }}
+  confidence:
+    description: How sure the classifier is — high, medium or low.
+    value: ${{ steps.analyze.outputs.confidence }}
+  is-infra-not-code:
+    description: '"true" when the failure looks like infrastructure rather than the change.'
+    value: ${{ steps.analyze.outputs.is-infra-not-code }}
+  markdown-path:
+    description: Path to the rendered Markdown report.
+    value: ${{ steps.analyze.outputs.markdown-path }}
+  json-path:
+    description: Path to the structured JSON report.
+    value: ${{ steps.analyze.outputs.json-path }}
+
+runs:
+  using: composite
+  steps:
+    # Plain pip against the runner's preinstalled Python: one less marketplace
+    # action in the caller's supply chain than pulling in a Python/uv setup action.
+    - name: Install ci-doctor
+      shell: bash
+      run: python3 -m pip install --quiet --disable-pip-version-check "$GITHUB_ACTION_PATH"
+
+    - name: Analyze the failed run
+      id: analyze
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CI_DOCTOR_PROVIDER: github
+        CI_DOCTOR_GITHUB__BASE_URL: ${{ inputs.api-url }}
+        CI_DOCTOR_GITHUB_TOKEN: ${{ inputs.token }}
+        CI_DOCTOR_OUTPUT__MR_NOTE: ${{ inputs.post-pr-note }}
+        GITHUB_REPOSITORY: ${{ inputs.repository }}
+        RUN_ID: ${{ inputs.run-id }}
+        JOB_ID: ${{ inputs.job-id }}
+        CONFIG: ${{ inputs.config }}
+      run: |
+        set -uo pipefail   # not -e: this step must never fail the caller's workflow
+        args=("$RUN_ID")
+        [[ -n "$JOB_ID" ]] && args+=(--job-id "$JOB_ID")
+        [[ -n "$CONFIG" ]] && args+=(--config "$CONFIG")
+        ci-doctor analyze "${args[@]}"
+
+        # Surface the verdict so callers can branch on it (e.g. skip the retry when
+        # it is not infrastructure). Guarded: a missing report must not fail here.
+        python3 - <<'PY' >> "$GITHUB_OUTPUT"
+        import json, pathlib
+        report = pathlib.Path("report.json")
+        first = (json.loads(report.read_text()) or [{}])[0] if report.is_file() else {}
+        print(f"phase={first.get('failure_phase', '')}")
+        print(f"category={first.get('category', '')}")
+        print(f"confidence={first.get('confidence', '')}")
+        print(f"is-infra-not-code={str(first.get('is_infra_not_code', False)).lower()}")
+        print(f"markdown-path={pathlib.Path('report.md').resolve()}")
+        print(f"json-path={report.resolve()}")
+        PY
+
+    - name: Add the report to the job summary
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: '[[ -f report.md ]] && cat report.md >> "$GITHUB_STEP_SUMMARY" || true'

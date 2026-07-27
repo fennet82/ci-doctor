@@ -1,0 +1,66 @@
+# Toolchain for working on ci-doctor. `mise install` gets you every binary the
+# hooks, the tests and the release pipeline expect, at the versions CI uses.
+#
+# Not a runtime dependency of ci-doctor itself — the shipped package needs only
+# Python and its wheels. This is the contributor's bench.
+
+[tools]
+# No python here on purpose: uv installs and pins it from `requires-python` in
+# pyproject.toml, and `uv sync` owns .venv. Listing it in both places is one more
+# thing to drift.
+# ruff is not here either, for the same reason: it is a dev dependency, so uv.lock
+# pins it and `uv run ruff` is the same binary locally and in CI. A second copy on
+# PATH is exactly how local and CI end up disagreeing about what "formatted" means.
+uv = "latest"        # the package manager, the Python it runs on, and the pinned ruff
+gitleaks = "latest"  # secret scanning; the pre-push hook and the `leaks` CI job
+gh = "latest"        # GitHub CLI — release.yml uploads assets with it
+glab = "latest"      # GitLab CLI — the other provider ci-doctor reads
+node = "latest"      # for codegraph (npm), which indexes this repo
+
+[tasks.setup]
+description = "One-time: install deps and switch git to the repo's hooks"
+run = [
+  "uv sync",
+  "git config core.hooksPath .githooks",
+  # So `git blame` skips the one repo-wide reformat.
+  "git config blame.ignoreRevsFile .git-blame-ignore-revs",
+  "echo 'ready — hooks active, run `mise run check` before pushing'",
+]
+
+[tasks.test]
+description = "Run the test suite (no network, no LLM)"
+run = "uv run pytest -q"
+
+[tasks.lint]
+description = "Lint and check formatting, Python and markdown"
+run = [
+  "uv run ruff check ci_doctor tests",
+  "uv run ruff format --check ci_doctor tests",
+  "uv run ruff format --preview --check $(git ls-files '*.md' ':!:.claude/**')",
+]
+
+[tasks.fmt]
+description = "Apply formatting and safe lint fixes"
+run = [
+  # Fix before format: removing an unused import leaves the blank lines it sat
+  # between, and only a formatting pass afterwards collapses them.
+  "uv run ruff check --fix ci_doctor tests",
+  "uv run ruff format ci_doctor tests",
+  "uv run ruff format --preview $(git ls-files '*.md' ':!:.claude/**')",
+]
+
+[tasks.guardrails]
+description = "Invariant #2 — core/ must not name a provider"
+run = "! grep -rniE 'gitlab|github' ci_doctor/core/"
+
+[tasks.leaks]
+description = "Scan history for secrets, same as the CI job"
+run = "gitleaks git --no-banner --redact"
+
+[tasks.check]
+description = "Everything CI runs, in one command"
+depends = ["test", "lint", "guardrails", "leaks"]
+
+[tasks.schema]
+description = "Emit the .ci-doctor.yml JSON Schema (what the release attaches)"
+run = "uv run ci-doctor config --schema"
