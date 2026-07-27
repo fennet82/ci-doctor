@@ -15,7 +15,12 @@ uv = "latest"        # the package manager, the Python it runs on, and the pinne
 gitleaks = "latest"  # secret scanning; the pre-push hook and the `leaks` CI job
 gh = "latest"        # GitHub CLI — release.yml uploads assets with it
 glab = "latest"      # GitLab CLI — the other provider ci-doctor reads
-node = "latest"      # for codegraph (npm), which indexes this repo
+node = "latest"      # the runtime the npm backend below needs
+
+# Indexes this repo into .codegraph/ so agents can look up a symbol and its callers
+# instead of grepping. Declared as a tool, not installed in a task: `mise install`
+# then pins its version like everything else here.
+"npm:@colbymchenry/codegraph" = "latest"
 
 [tasks.setup]
 description = "One-time: install deps and switch git to the repo's hooks"

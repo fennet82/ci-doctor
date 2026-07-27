@@ -13,7 +13,7 @@ The design spec is [docs/PLAN.md](docs/PLAN.md); the user-facing overview is the
 ## 1. Setup
 
 ```sh
-mise install      # uv, gitleaks, gh, glab, node
+mise install      # uv, gitleaks, gh, glab, node, codegraph
 mise run setup    # uv sync + activate the repo's git hooks
 ```
 
@@ -22,6 +22,10 @@ binaries the hooks and CI call are the same versions for everyone. Python itself
 not in `.mise.toml`: uv installs it from `requires-python`, and pinning it twice is
 one more thing to drift. Neither is ruff, for the same reason — it is a dev
 dependency, so `uv.lock` pins it and `uv run ruff` is identical locally and in CI.
+
+`codegraph` comes with it but is not run for you — indexing this repo into
+`.codegraph/` is your call, and the index is local to your machine (the directory
+ignores its own contents).
 
 No services, accounts or credentials are needed; the suite is fully offline.
 
