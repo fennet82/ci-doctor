@@ -10,13 +10,24 @@ from ci_doctor.render.markdown import MarkdownRenderer
 def _report():
     """Build a fully populated report so every renderer branch is exercised."""
     return Report(
-        summary="unit tests failed", failure_phase="script", category="test",
-        confidence="high", is_infra_not_code=False, likely_flaky=False,
+        summary="unit tests failed",
+        failure_phase="script",
+        category="test",
+        confidence="high",
+        is_infra_not_code=False,
+        likely_flaky=False,
         root_cause="test_add asserted 1 == 2",
         contributing_factors=["cache warning (non-causal)"],
-        evidence=[Evidence(section="script", excerpt="E assert 1 == 2", why_it_matters="the failing assertion")],
-        remediation=[RemediationStep(order=1, action="fix the assertion", rationale="assert failed", where="tests/test_x.py")],
-        related_paths=["tests/test_x.py"], handoff_prompt="fix test_add",
+        evidence=[
+            Evidence(section="script", excerpt="E assert 1 == 2", why_it_matters="the failing assertion")
+        ],
+        remediation=[
+            RemediationStep(
+                order=1, action="fix the assertion", rationale="assert failed", where="tests/test_x.py"
+            )
+        ],
+        related_paths=["tests/test_x.py"],
+        handoff_prompt="fix test_add",
     )
 
 
@@ -47,10 +58,12 @@ def test_terminal_preserves_bracketed_log_content():
 
     from ci_doctor.render.terminal import render_terminal
 
-    r = _report().model_copy(update={
-        "root_cause": "##[error]Process completed with exit code 1",
-        "evidence": [Evidence(section="script", excerpt="[gw0] [ 50%] FAILED test", why_it_matters="w")],
-    })
+    r = _report().model_copy(
+        update={
+            "root_cause": "##[error]Process completed with exit code 1",
+            "evidence": [Evidence(section="script", excerpt="[gw0] [ 50%] FAILED test", why_it_matters="w")],
+        }
+    )
     buf = io.StringIO()
     render_terminal(r, no_color=True, file=buf)
     out = buf.getvalue()

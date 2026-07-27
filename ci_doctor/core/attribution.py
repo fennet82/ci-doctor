@@ -116,26 +116,46 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
     if reason == FailureReason.UNMET_PREREQUISITES:
         return Attribution(Phase.PREPARE, reason, "medium", _terminal(trailer), "reason_unmet_prerequisites")
     if reason == FailureReason.CANCELLED:
-        return Attribution(_open_phase(sections) or Phase.UNKNOWN, reason, "high", _terminal(trailer), "reason_cancelled")
+        return Attribution(
+            _open_phase(sections) or Phase.UNKNOWN, reason, "high", _terminal(trailer), "reason_cancelled"
+        )
     if reason == FailureReason.TIMEOUT:
         # Phase of whatever section was open when time ran out.
-        return Attribution(_open_phase(sections) or Phase.PROVISION, reason, "high", _terminal(trailer), "reason_timeout_open_section")
+        return Attribution(
+            _open_phase(sections) or Phase.PROVISION,
+            reason,
+            "high",
+            _terminal(trailer),
+            "reason_timeout_open_section",
+        )
     if reason == FailureReason.API_FAILURE:
         return Attribution(Phase.UNKNOWN, reason, "medium", _terminal(trailer), "reason_api_failure")
 
     # Rule 3 — script_failure is SCRIPT, full stop. This is the rule that kills the
     # "blamed the cache" bug: the noisy fetch/prepare warnings are never consulted.
     if reason == FailureReason.SCRIPT_FAILURE:
-        return Attribution(Phase.SCRIPT, reason, "high", _terminal_command(sections),
-                           "script_failure_is_script", _warning_phases(sections, Phase.SCRIPT))
+        return Attribution(
+            Phase.SCRIPT,
+            reason,
+            "high",
+            _terminal_command(sections),
+            "script_failure_is_script",
+            _warning_phases(sections, Phase.SCRIPT),
+        )
 
     # --- reason is UNKNOWN: fall back to log structure ---
 
     # Rule 4 — an unclosed section is where execution died (hard abort).
     open_sec = _last_open_section(sections)
     if open_sec is not None:
-        return Attribution(open_sec.phase, _PHASE_REASON[open_sec.phase], "medium",
-                           _last_line(open_sec), "unclosed_section", _warning_phases(sections, open_sec.phase))
+        return Attribution(
+            open_sec.phase,
+            _PHASE_REASON[open_sec.phase],
+            "medium",
+            _last_line(open_sec),
+            "unclosed_section",
+            _warning_phases(sections, open_sec.phase),
+        )
 
     # Rule 5 — parse the terminal trailer line.
     parsed = _parse_trailer(trailer)
@@ -146,8 +166,14 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
     # Rule 6 — last section with a real (non-warning) error line.
     sec = _last_error_section(sections)
     if sec is not None:
-        return Attribution(sec.phase, _PHASE_REASON[sec.phase], "low",
-                           _first_error_line(sec), "last_error_section", _warning_phases(sections, sec.phase))
+        return Attribution(
+            sec.phase,
+            _PHASE_REASON[sec.phase],
+            "low",
+            _first_error_line(sec),
+            "last_error_section",
+            _warning_phases(sections, sec.phase),
+        )
 
     return Attribution(Phase.UNKNOWN, reason or FailureReason.UNKNOWN, "low", None, "no_signal")
 
@@ -358,11 +384,19 @@ def _parse_trailer(trailer: Section | None):
             return (Phase.SCRIPT, FailureReason.RUNNER_SYSTEM, "oom_137", line)
         return (Phase.SCRIPT, FailureReason.SCRIPT_FAILURE, "trailer_exit_code", line)
     if re.search(r"system failure|prepare environment", text):
-        return (Phase.PREPARE, FailureReason.RUNNER_SYSTEM, "trailer_system_failure",
-                _matching_line(trailer, r"system failure|prepare environment"))
+        return (
+            Phase.PREPARE,
+            FailureReason.RUNNER_SYSTEM,
+            "trailer_system_failure",
+            _matching_line(trailer, r"system failure|prepare environment"),
+        )
     if re.search(r"execution took longer than|timeout", text, re.IGNORECASE):
-        return (Phase.PROVISION, FailureReason.TIMEOUT, "trailer_timeout",
-                _matching_line(trailer, r"took longer|timeout"))
+        return (
+            Phase.PROVISION,
+            FailureReason.TIMEOUT,
+            "trailer_timeout",
+            _matching_line(trailer, r"took longer|timeout"),
+        )
     return None
 
 

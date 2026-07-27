@@ -16,7 +16,9 @@ import re
 from ci_doctor.config.schema import RedactionConfig
 
 _URL_CREDS = re.compile(r"([a-zA-Z][a-zA-Z0-9+.\-]*://)[^/\s:@]+:[^/\s@]+@")
-_SECRET_ENV_NAME = re.compile(r"TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY", re.IGNORECASE)
+_SECRET_ENV_NAME = re.compile(
+    r"TOKEN|SECRET|PASSWORD|PASSWD|API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY", re.IGNORECASE
+)
 
 #: Secret shapes scrubbed everywhere, keyed by the label that replaces them.
 #: Deliberately conservative and local — no entropy scanning, no network.
@@ -109,18 +111,26 @@ def redact_report(report, cfg: RedactionConfig | None = None, environ: dict[str,
         """Scrub a value if it is a string, else pass it through."""
         return redact_text(s, cfg, environ) if isinstance(s, str) else s
 
-    return report.model_copy(update={
-        "summary": r(report.summary),
-        "root_cause": r(report.root_cause),
-        "handoff_prompt": r(report.handoff_prompt),
-        "contributing_factors": [r(x) for x in report.contributing_factors],
-        "related_paths": [r(x) for x in report.related_paths],
-        "evidence": [
-            e.model_copy(update={"section": r(e.section), "excerpt": r(e.excerpt), "why_it_matters": r(e.why_it_matters)})
-            for e in report.evidence
-        ],
-        "remediation": [
-            s.model_copy(update={"action": r(s.action), "rationale": r(s.rationale), "where": r(s.where)})
-            for s in report.remediation
-        ],
-    })
+    return report.model_copy(
+        update={
+            "summary": r(report.summary),
+            "root_cause": r(report.root_cause),
+            "handoff_prompt": r(report.handoff_prompt),
+            "contributing_factors": [r(x) for x in report.contributing_factors],
+            "related_paths": [r(x) for x in report.related_paths],
+            "evidence": [
+                e.model_copy(
+                    update={
+                        "section": r(e.section),
+                        "excerpt": r(e.excerpt),
+                        "why_it_matters": r(e.why_it_matters),
+                    }
+                )
+                for e in report.evidence
+            ],
+            "remediation": [
+                s.model_copy(update={"action": r(s.action), "rationale": r(s.rationale), "where": r(s.where)})
+                for s in report.remediation
+            ],
+        }
+    )

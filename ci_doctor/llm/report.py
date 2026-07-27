@@ -52,32 +52,53 @@ _CATEGORY = {
 #: ponytail: signature heuristic, known ceiling — the LLM is more accurate; upgrade
 #: path is to let the model set category (enable an llm.backend).
 _CATEGORY_SIGNATURES: list[tuple[str, str]] = [
-    ("infrastructure", r"exit code 137|\bKilled\b|Out of memory|no space left on device|cannot allocate memory"),
+    (
+        "infrastructure",
+        r"exit code 137|\bKilled\b|Out of memory|no space left on device|cannot allocate memory",
+    ),
     # "timed out retrying" is Cypress's assertion-retry wording — a test failure,
     # not a job timeout, so it must not be claimed here.
     ("timeout", r"(?i)execution took longer than|timed out(?! retrying)|timeout exceeded|deadline exceeded"),
-    ("permissions", r"(?i)permission denied|403 forbidden|unauthorized|access denied|denied: requested access"),
+    (
+        "permissions",
+        r"(?i)permission denied|403 forbidden|unauthorized|access denied|denied: requested access",
+    ),
     ("config", r"on .+\.tf line \d+"),
     # Unambiguous build/compile markers, checked before the broad `test` signature
     # below — its \bFAILED\b would otherwise claim "Build FAILED." (dotnet),
     # "Task :app:compileJava FAILED" (gradle) and "FAILED: Build did NOT complete" (bazel).
-    ("build", r"Build did NOT complete|Build FAILED|error (CS|MSB|AD)\d+|error\[E\d+\]|could not compile|\* What went wrong:"),
-    ("test", r"=+ FAILURES =+|--- FAIL\b|^FAIL\b|Tests run:.*Failures: [1-9]|●\s|AssertionError|\bFAILED\b|\bassert(ion)?\b.*(error|failed|==)|pytest"
-             r"|test result: FAILED|^\d+ examples?, [1-9]\d* failures?|There (was|were) \d+ (failure|error)|^FAILURES!"
-             r"|\[FAIL\]|Failed!\s+-\s+Failed:|^\s*\d+\) (Failure|Error):|CypressError|^\s*\d+\) .+ › "
-             r"|expect\(received\)|^\s*\d+ fail\b"),
-    ("dependency", r"(?i)ModuleNotFoundError|cannot find module|could not resolve|no matching distribution|unresolved (import|dependency)|could not find a version"
-                   r"|your requirements could not be resolved|could not find gem|Bundler::(GemNotFound|VersionConflict)"
-                   r"|no matching package named|error NU\d+"
-                   r"|ERR_PNPM_\w+|couldn't find package|YN0082|no candidates found|no version matching|ERR_MODULE_NOT_FOUND"),
-    ("build", r"error TS\d+|BUILD FAILURE|make(\[\d+\])?: \*\*\*|\bcmake\b|compilation (terminated|failed)|cannot find symbol|undefined reference|npm ERR!|failed to solve|\blinker\b|\btsc\b"
-              r"|PHP Parse error|collect2: error|✖ \d+ problems?|Found \d+ errors? in \d+ files?"),
+    (
+        "build",
+        r"Build did NOT complete|Build FAILED|error (CS|MSB|AD)\d+|error\[E\d+\]|could not compile|\* What went wrong:",
+    ),
+    (
+        "test",
+        r"=+ FAILURES =+|--- FAIL\b|^FAIL\b|Tests run:.*Failures: [1-9]|●\s|AssertionError|\bFAILED\b|\bassert(ion)?\b.*(error|failed|==)|pytest"
+        r"|test result: FAILED|^\d+ examples?, [1-9]\d* failures?|There (was|were) \d+ (failure|error)|^FAILURES!"
+        r"|\[FAIL\]|Failed!\s+-\s+Failed:|^\s*\d+\) (Failure|Error):|CypressError|^\s*\d+\) .+ › "
+        r"|expect\(received\)|^\s*\d+ fail\b",
+    ),
+    (
+        "dependency",
+        r"(?i)ModuleNotFoundError|cannot find module|could not resolve|no matching distribution|unresolved (import|dependency)|could not find a version"
+        r"|your requirements could not be resolved|could not find gem|Bundler::(GemNotFound|VersionConflict)"
+        r"|no matching package named|error NU\d+"
+        r"|ERR_PNPM_\w+|couldn't find package|YN0082|no candidates found|no version matching|ERR_MODULE_NOT_FOUND",
+    ),
+    (
+        "build",
+        r"error TS\d+|BUILD FAILURE|make(\[\d+\])?: \*\*\*|\bcmake\b|compilation (terminated|failed)|cannot find symbol|undefined reference|npm ERR!|failed to solve|\blinker\b|\btsc\b"
+        r"|PHP Parse error|collect2: error|✖ \d+ problems?|Found \d+ errors? in \d+ files?",
+    ),
     # The app itself crashed. Deliberately LAST: a traceback also shows up in a
     # pytest failure (test) and in a ModuleNotFoundError crash (dependency), and
     # both of those are the more actionable answer.
-    ("runtime", r"Traceback \(most recent call last\):|^panic: |^fatal error: |rake aborted!|PHP Fatal error"
-                r"|Exception in thread |Uncaught \w*(Error|Exception)|Segmentation fault|core dumped"
-                r"|node:internal/|^Node\.js v\d+"),
+    (
+        "runtime",
+        r"Traceback \(most recent call last\):|^panic: |^fatal error: |rake aborted!|PHP Fatal error"
+        r"|Exception in thread |Uncaught \w*(Error|Exception)|Segmentation fault|core dumped"
+        r"|node:internal/|^Node\.js v\d+",
+    ),
 ]
 
 
@@ -135,7 +156,9 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
 
     schema = Report.model_json_schema()
     prompt = redact_text(_render_prompt(job, attr, bundle, schema), cfg.redaction, environ)
-    log.info("job %s: calling LLM backend=%s model=%s (may take a while)", job.name, cfg.llm.backend, cfg.llm.model)
+    log.info(
+        "job %s: calling LLM backend=%s model=%s (may take a while)", job.name, cfg.llm.backend, cfg.llm.model
+    )
     log.debug("prompt=%d chars", len(prompt))
     report = _call_and_validate(client, prompt, schema)
     if report is None:
@@ -173,7 +196,9 @@ def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
     return None
 
 
-def deterministic_report(job: Job, attr: Attribution, bundle: EvidenceBundle, *, degraded: bool = False) -> Report:
+def deterministic_report(
+    job: Job, attr: Attribution, bundle: EvidenceBundle, *, degraded: bool = False
+) -> Report:
     """Build a full report from the deterministic pipeline alone.
 
     Not a stub: this is a first-class output (`llm.enabled: false`) *and* the
@@ -191,8 +216,11 @@ def deterministic_report(job: Job, attr: Attribution, bundle: EvidenceBundle, *,
     Returns:
         A valid report. Not yet redacted — callers do that.
     """
-    excerpt ="\n".join(bundle.blamed_lines[-15:]) if bundle.blamed_lines else (attr.terminal_evidence or "")
-    is_infra = attr.phase in (Phase.PROVISION, Phase.PREPARE) or attr.reason in (FailureReason.RUNNER_SYSTEM, FailureReason.NO_RUNNER)
+    excerpt = "\n".join(bundle.blamed_lines[-15:]) if bundle.blamed_lines else (attr.terminal_evidence or "")
+    is_infra = attr.phase in (Phase.PROVISION, Phase.PREPARE) or attr.reason in (
+        FailureReason.RUNNER_SYSTEM,
+        FailureReason.NO_RUNNER,
+    )
     remediation = _REMEDIATION.get(attr.reason, "Inspect the log excerpt and address the failing step.")
     if attr.rule_id == "oom_137":
         remediation = "Reduce memory use or raise the runner memory limit (exit 137 = OOM/SIGKILL)."
@@ -201,7 +229,9 @@ def deterministic_report(job: Job, attr: Attribution, bundle: EvidenceBundle, *,
     if degraded:
         factors.append("ci-doctor could not reach the LLM; this is the deterministic fallback report.")
 
-    category = _infer_category(attr.reason, "\n".join(bundle.blamed_lines) + "\n" + (attr.terminal_evidence or ""))
+    category = _infer_category(
+        attr.reason, "\n".join(bundle.blamed_lines) + "\n" + (attr.terminal_evidence or "")
+    )
     return Report(
         summary=f"{job.name} failed in the {attr.phase} phase ({attr.reason})."[:140],
         failure_phase=attr.phase,
@@ -212,9 +242,18 @@ def deterministic_report(job: Job, attr: Attribution, bundle: EvidenceBundle, *,
         root_cause=attr.terminal_evidence
         or f"Deterministic analysis attributes the failure to the {attr.phase} phase (rule '{attr.rule_id}').",
         contributing_factors=factors,
-        evidence=[Evidence(section=str(attr.phase), excerpt=excerpt[:2000],
-                           why_it_matters="Terminal evidence selected by deterministic attribution.")],
-        remediation=[RemediationStep(order=1, action=remediation, rationale=f"reason={attr.reason}, rule={attr.rule_id}")],
+        evidence=[
+            Evidence(
+                section=str(attr.phase),
+                excerpt=excerpt[:2000],
+                why_it_matters="Terminal evidence selected by deterministic attribution.",
+            )
+        ],
+        remediation=[
+            RemediationStep(
+                order=1, action=remediation, rationale=f"reason={attr.reason}, rule={attr.rule_id}"
+            )
+        ],
         related_paths=[],
         handoff_prompt=_handoff(job, attr, excerpt),
     )
@@ -258,13 +297,21 @@ def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: 
         leaves the process.
     """
     system = Template(_load("analyze.system.txt")).safe_substitute(
-        phase=attr.phase, rule_id=attr.rule_id, confidence=attr.confidence, schema=json.dumps(schema),
+        phase=attr.phase,
+        rule_id=attr.rule_id,
+        confidence=attr.confidence,
+        schema=json.dumps(schema),
     )
     user = Template(_load("analyze.user.txt")).safe_substitute(
-        job=job.name, stage=job.stage or "?", failure_reason=str(job.failure_reason),
-        raw_failure_reason=job.raw_failure_reason or "", duration=job.duration,
-        needs=", ".join(job.needs) or "none", terminal=attr.terminal_evidence or "n/a",
-        phase=attr.phase, secondary=", ".join(str(p) for p in attr.secondary_phases) or "none",
+        job=job.name,
+        stage=job.stage or "?",
+        failure_reason=str(job.failure_reason),
+        raw_failure_reason=job.raw_failure_reason or "",
+        duration=job.duration,
+        needs=", ".join(job.needs) or "none",
+        terminal=attr.terminal_evidence or "n/a",
+        phase=attr.phase,
+        secondary=", ".join(str(p) for p in attr.secondary_phases) or "none",
         excerpt="\n".join(bundle.blamed_lines),
     )
     return system + "\n\n---\n\n" + user

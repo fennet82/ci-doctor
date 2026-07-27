@@ -38,7 +38,7 @@ class EvidenceBundle:
 
     blamed_phase: Phase
     blamed_lines: list[str]
-    secondary: list[str]          # one-liner context per secondary phase (non-causal)
+    secondary: list[str]  # one-liner context per secondary phase (non-causal)
     metadata: dict
     token_estimate: int
     truncated: bool = False
@@ -110,8 +110,15 @@ def build_bundle(
     excerpt = extract(clean, cfg.extraction.matchers, cfg.extraction.tail_lines)
     blamed_budget = int(cfg.llm.max_input_tokens * 0.7)
     fitted, truncated = fit(excerpt, blamed_budget)
-    log.debug("blamed phase %s: denoise %d->%d, extract ->%d, fit ->%d lines (truncated=%s)",
-              attr.phase, len(raw), len(clean), len(excerpt), len(fitted), truncated)
+    log.debug(
+        "blamed phase %s: denoise %d->%d, extract ->%d, fit ->%d lines (truncated=%s)",
+        attr.phase,
+        len(raw),
+        len(clean),
+        len(excerpt),
+        len(fitted),
+        truncated,
+    )
 
     secondary = [f"{phase}: warnings present (non-causal)" for phase in attr.secondary_phases]
     metadata = {

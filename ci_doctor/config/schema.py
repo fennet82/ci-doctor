@@ -99,7 +99,9 @@ class LLMConfig(_Strict):
         12000,
         description="Evidence budget. Larger bundles are truncated, and every truncation is visible in the report.",
     )
-    temperature: float = Field(0.1, description="Sampling temperature. Low keeps the postmortem reproducible.")
+    temperature: float = Field(
+        0.1, description="Sampling temperature. Low keeps the postmortem reproducible."
+    )
     timeout_seconds: int = Field(120, description="Timeout for the single LLM call.")
 
 
@@ -172,7 +174,8 @@ class OutputConfig(_Strict):
     markdown_path: str = Field("report.md", description="Path the Markdown report is written to.")
     json_path: str = Field("report.json", description="Path the JSON report is written to.")
     mr_note: bool = Field(
-        False, description="Post or update a note on the MR/PR. Needs a live pipeline, not an offline log replay."
+        False,
+        description="Post or update a note on the MR/PR. Needs a live pipeline, not an offline log replay.",
     )
 
 

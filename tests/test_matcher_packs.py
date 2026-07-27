@@ -28,11 +28,21 @@ CASES = [
     ("dotnet_build_error", ["dotnet_build"], "error CS1061", "build"),
     ("rspec_failure", ["rspec"], "expected: 2700", "test"),
     ("minitest_failure", ["minitest"], "Expected: 2700", "test"),
-    ("ruby_rake_exception", ["ruby_exception"], "undefined method `default_tier' for nil (NoMethodError)", "runtime"),
+    (
+        "ruby_rake_exception",
+        ["ruby_exception"],
+        "undefined method `default_tier' for nil (NoMethodError)",
+        "runtime",
+    ),
     ("bundler_missing_gem", ["bundler"], "Could not find gem 'sidekiq-pro (~> 7.2)'", "dependency"),
     ("phpunit_failure", ["phpunit"], "Failed asserting that 2000 matches expected 1900.", "test"),
     ("php_fatal_error", ["php_fatal"], "must be of type float, string given", "runtime"),
-    ("composer_conflict", ["composer"], "your php version (8.1.27) does not satisfy that requirement", "dependency"),
+    (
+        "composer_conflict",
+        ["composer"],
+        "your php version (8.1.27) does not satisfy that requirement",
+        "dependency",
+    ),
     ("gradle_build_failure", ["gradle"], "Execution failed for task ':app:compileJava'.", "build"),
     ("bazel_build_failure", ["bazel"], "'GL_TEXTURE_2D_ARRAY' was not declared in this scope", "build"),
     ("playwright_failure", ["playwright"], 'Expected string: "$27.00"', "test"),
@@ -59,8 +69,7 @@ IDS = [f"{p}-{c}" for p, c, *_ in PARAMS]
 def _analyze(provider: str, stem: str):
     """Run a fixture through the real deterministic pipeline."""
     log = support.read_log(provider, stem)
-    job = Job(id=stem, name=stem, status="failed",
-              failure_reason=FailureReason.SCRIPT_FAILURE, log=log)
+    job = Job(id=stem, name=stem, status="failed", failure_reason=FailureReason.SCRIPT_FAILURE, log=log)
     job.sections = support.segment(provider, log)
     assign_phases(job.sections, CFG.phases)
     attr = attribute(job, job.sections)
@@ -101,16 +110,28 @@ def test_deterministic_category(provider, stem, matcher_ids, causal, category):
 
 # `runtime` is checked last on purpose: a traceback also appears in a pytest
 # failure and in a missing-import crash, and those answers are more actionable.
-@pytest.mark.parametrize("expected,text", [
-    ("test", "=== FAILURES ===\nTraceback (most recent call last):\nAssertionError: assert 1 == 2"),
-    ("dependency", "Traceback (most recent call last):\nModuleNotFoundError: No module named 'requests'"),
-    ("runtime", "Traceback (most recent call last):\nZeroDivisionError: division by zero"),
-    # node:internal/ frames show up in every JS stack, including a jest failure
-    # and a missing-module crash — neither of which is a "runtime" answer.
-    ("test", "● Cart > applies discount\nexpect(received).toBe(expected)\n    at Module._compile (node:internal/modules/cjs/loader:1356:14)"),
-    ("dependency", "Error [ERR_MODULE_NOT_FOUND]: Cannot find module\n    at node:internal/modules/esm/resolve:264:11\nNode.js v20.11.1"),
-    ("runtime", "Error: missing DATABASE_URL\n    at node:internal/main/run_main_module:28:49\nNode.js v20.11.1"),
-])
+@pytest.mark.parametrize(
+    "expected,text",
+    [
+        ("test", "=== FAILURES ===\nTraceback (most recent call last):\nAssertionError: assert 1 == 2"),
+        ("dependency", "Traceback (most recent call last):\nModuleNotFoundError: No module named 'requests'"),
+        ("runtime", "Traceback (most recent call last):\nZeroDivisionError: division by zero"),
+        # node:internal/ frames show up in every JS stack, including a jest failure
+        # and a missing-module crash — neither of which is a "runtime" answer.
+        (
+            "test",
+            "● Cart > applies discount\nexpect(received).toBe(expected)\n    at Module._compile (node:internal/modules/cjs/loader:1356:14)",
+        ),
+        (
+            "dependency",
+            "Error [ERR_MODULE_NOT_FOUND]: Cannot find module\n    at node:internal/modules/esm/resolve:264:11\nNode.js v20.11.1",
+        ),
+        (
+            "runtime",
+            "Error: missing DATABASE_URL\n    at node:internal/main/run_main_module:28:49\nNode.js v20.11.1",
+        ),
+    ],
+)
 def test_runtime_never_outranks_a_more_actionable_category(expected, text):
     """Pins the signature ordering: a traceback alone never wins over test/dependency."""
     assert _infer_category(FailureReason.SCRIPT_FAILURE, text) == expected

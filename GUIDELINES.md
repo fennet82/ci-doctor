@@ -102,6 +102,7 @@ Use [`tests/support.py`](tests/support.py):
 ```python
 from tests import support
 
+
 @pytest.mark.parametrize("provider", support.providers_with("script_failure_noisy"))
 def test_something(provider):
     log = support.read_log(provider, "script_failure_noisy")

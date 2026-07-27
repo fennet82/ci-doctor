@@ -214,7 +214,9 @@ class GitHubProvider(CIProvider):
         startup = j.status == "startup_failure" or conclusion == "startup_failure"
         # Normalize to the domain's "failed" so core job-selection needs no GitHub knowledge.
         status = "failed" if conclusion in _FAILED_CONCLUSIONS else (j.status or "")
-        runner = RunnerInfo(id=_str_or_none(j.runner_id), description=j.runner_name) if j.runner_name else None
+        runner = (
+            RunnerInfo(id=_str_or_none(j.runner_id), description=j.runner_name) if j.runner_name else None
+        )
         return Job(
             id=str(j.id),
             name=j.name or "",

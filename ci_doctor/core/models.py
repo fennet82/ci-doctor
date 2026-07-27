@@ -20,10 +20,10 @@ class Phase(StrEnum):
     """
 
     PROVISION = "provision"  # waiting for / assigning a runner; job never started
-    PREPARE = "prepare"      # executor setup, secrets, image pull
-    FETCH = "fetch"          # clone, cache restore, artifact download
-    SCRIPT = "script"        # the user's actual commands  <- primary suspect
-    POST = "post"            # after_script, cache archive, artifact upload
+    PREPARE = "prepare"  # executor setup, secrets, image pull
+    FETCH = "fetch"  # clone, cache restore, artifact download
+    SCRIPT = "script"  # the user's actual commands  <- primary suspect
+    POST = "post"  # after_script, cache archive, artifact upload
     UNKNOWN = "unknown"
 
 
@@ -36,10 +36,10 @@ class FailureReason(StrEnum):
     """
 
     SCRIPT_FAILURE = "script_failure"
-    NO_RUNNER = "no_runner"                     # stuck / never scheduled
+    NO_RUNNER = "no_runner"  # stuck / never scheduled
     TIMEOUT = "timeout"
-    RUNNER_SYSTEM = "runner_system"             # executor / infra died
-    MISSING_DEPENDENCY = "missing_dependency"   # upstream job's artifact absent
+    RUNNER_SYSTEM = "runner_system"  # executor / infra died
+    MISSING_DEPENDENCY = "missing_dependency"  # upstream job's artifact absent
     UNMET_PREREQUISITES = "unmet_prerequisites"
     API_FAILURE = "api_failure"
     CANCELLED = "cancelled"
@@ -116,12 +116,12 @@ class Section:
         children: Nested sections; nesting is legal and providers do use it.
     """
 
-    name: str                                  # raw provider name, e.g. "step_script"
-    phase: Phase = Phase.UNKNOWN               # mapped via config
-    header: str | None = None                  # human-readable header line
+    name: str  # raw provider name, e.g. "step_script"
+    phase: Phase = Phase.UNKNOWN  # mapped via config
+    header: str | None = None  # human-readable header line
     start_ts: int | None = None
     end_ts: int | None = None
-    closed: bool = False                       # saw an explicit end marker
+    closed: bool = False  # saw an explicit end marker
     lines: list[LogLine] = field(default_factory=list)
     children: list["Section"] = field(default_factory=list)  # nesting is legal
 
@@ -156,7 +156,7 @@ class Job:
     status: str
     stage: str | None = None
     failure_reason: FailureReason = FailureReason.UNKNOWN
-    raw_failure_reason: str = ""               # keep the provider's original string
+    raw_failure_reason: str = ""  # keep the provider's original string
     allow_failure: bool = False
     started_at: str | None = None
     finished_at: str | None = None
@@ -164,7 +164,7 @@ class Job:
     runner: RunnerInfo | None = None
     needs: list[str] = field(default_factory=list)  # for cascade detection
     web_url: str = ""
-    log: str | None = None                     # None when there is genuinely no log
+    log: str | None = None  # None when there is genuinely no log
     sections: list[Section] = field(default_factory=list)  # filled by the segmenter
 
 

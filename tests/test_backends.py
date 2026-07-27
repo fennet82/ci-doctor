@@ -25,12 +25,15 @@ def _llm(**over):
     return load_config(environ={}, overrides={"llm": over}).llm
 
 
-@pytest.mark.parametrize("backend,cls", [
-    ("openai", OpenAILLMClient),
-    ("litellm", LiteLLMClient),
-    ("anthropic", AnthropicLLMClient),
-    ("claude_code", ClaudeCodeClient),
-])
+@pytest.mark.parametrize(
+    "backend,cls",
+    [
+        ("openai", OpenAILLMClient),
+        ("litellm", LiteLLMClient),
+        ("anthropic", AnthropicLLMClient),
+        ("claude_code", ClaudeCodeClient),
+    ],
+)
 def test_make_client_selects_backend(backend, cls):
     """Each backend name builds its own client class."""
     assert isinstance(make_client(_llm(backend=backend)), cls)
@@ -51,10 +54,10 @@ def test_unknown_backend_raises():
 def test_backend_ready_rules(monkeypatch):
     """Each backend reports ready only when it has everything it needs."""
     assert backend_ready(_llm(backend="openai", model="m", api_base="http://x")) is True
-    assert backend_ready(_llm(backend="openai", model="m")) is False          # needs api_base
+    assert backend_ready(_llm(backend="openai", model="m")) is False  # needs api_base
     assert backend_ready(_llm(backend="litellm", model="m")) is True
-    assert backend_ready(_llm(backend="litellm")) is False                     # needs model
-    assert backend_ready(_llm(backend="anthropic")) is True                    # model defaults
+    assert backend_ready(_llm(backend="litellm")) is False  # needs model
+    assert backend_ready(_llm(backend="anthropic")) is True  # model defaults
 
     monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
     assert backend_ready(_llm(backend="claude_code")) is True
@@ -82,7 +85,8 @@ def test_claude_code_client_raises_on_cli_failure(monkeypatch):
     """A non-zero CLI exit raises, so the caller can fall back deterministically."""
     monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
     monkeypatch.setattr(
-        subprocess, "run",
+        subprocess,
+        "run",
         lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="boom"),
     )
     with pytest.raises(RuntimeError, match="claude CLI failed"):

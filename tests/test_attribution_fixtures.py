@@ -27,7 +27,9 @@ def test_attribution(provider, case):
     log = support.read_log(provider, case)
     meta = spec.get("job", {})
     job = Job(
-        id=case, name=case, status=meta.get("status", "failed"),
+        id=case,
+        name=case,
+        status=meta.get("status", "failed"),
         failure_reason=FailureReason(meta.get("failure_reason", "unknown")),
         raw_failure_reason=meta.get("raw_failure_reason", ""),
         log=log or None,
@@ -46,8 +48,7 @@ def test_attribution(provider, case):
 
 def _section(name, phase, *texts, closed=True):
     """A ready-to-classify section, so these cases need no fixture file."""
-    sec = Section(name=name, closed=closed,
-                  lines=[LogLine(number=i, text=t) for i, t in enumerate(texts, 1)])
+    sec = Section(name=name, closed=closed, lines=[LogLine(number=i, text=t) for i, t in enumerate(texts, 1)])
     sec.phase = phase
     return sec
 
@@ -56,10 +57,13 @@ def _section(name, phase, *texts, closed=True):
 # GitHub's annotation. The fixtures cannot pin this — in both of them the noisy
 # section happens to come *before* the real error, so log order alone would keep
 # it from being blamed.
-@pytest.mark.parametrize("warning", [
-    "WARNING: failed to extract cache: ERROR 404 Not Found",
-    "##[warning]Failed to restore cache: ERROR 404 Not Found",
-])
+@pytest.mark.parametrize(
+    "warning",
+    [
+        "WARNING: failed to extract cache: ERROR 404 Not Found",
+        "##[warning]Failed to restore cache: ERROR 404 Not Found",
+    ],
+)
 def test_a_runner_warning_is_never_the_verdict(warning):
     """The "blamed the cache" bug: a warning that *mentions* an error is not one.
 
@@ -81,10 +85,13 @@ def test_a_runner_warning_is_never_the_verdict(warning):
 # The other half of the same rule, and the reason it is case-sensitive: apt, pip
 # and docker all print "Warning:" from inside a step. That is the step's output,
 # not the runner excusing it, so it must not buy the section an exemption.
-@pytest.mark.parametrize("line", [
-    "Warning: apt does not have a stable CLI interface. ERROR downloading package",
-    "warning: docker build ran with an ERROR in the final layer",
-])
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Warning: apt does not have a stable CLI interface. ERROR downloading package",
+        "warning: docker build ran with an ERROR in the final layer",
+    ],
+)
 def test_a_tools_own_warning_is_not_a_runner_advisory(line):
     """A step printing the word "warning" is still a step that failed."""
     sections = [
@@ -101,10 +108,13 @@ def test_a_tools_own_warning_is_not_a_runner_advisory(line):
 # The mirror of the rule above: the runner's own error annotation. Easy to miss,
 # because the common one ("Process completed with exit code 1") is also caught by
 # the exit-code branch — so only an annotation *without* an exit code proves it.
-@pytest.mark.parametrize("error", [
-    "##[error]The operation was canceled.",
-    "##[error]Unable to download artifact(s): Artifact not found for name: compile",
-])
+@pytest.mark.parametrize(
+    "error",
+    [
+        "##[error]The operation was canceled.",
+        "##[error]Unable to download artifact(s): Artifact not found for name: compile",
+    ],
+)
 def test_a_runner_error_annotation_is_blamed(error):
     """A runner saying "this failed" is fatal even with no exit code in the text."""
     sections = [
@@ -155,7 +165,9 @@ def test_every_log_has_an_expected_verdict():
     `test_matcher_packs.py` to look covered, while its *attribution* stays
     untested.
     """
-    orphans = {p.stem for prov in support.providers() for p in (support.LOGS / prov).glob("*.log")} - set(SPECS)
+    orphans = {p.stem for prov in support.providers() for p in (support.LOGS / prov).glob("*.log")} - set(
+        SPECS
+    )
     assert not orphans, f"no expected/*.json for: {sorted(orphans)}"
 
 

@@ -10,9 +10,18 @@ from ci_doctor.providers.gitlab.provider import GitLabProvider
 def _pipeline_job(**kw):
     """Build a python-gitlab-shaped job double, overridden by kwargs."""
     base = dict(
-        id=0, name="", status="failed", stage=None, allow_failure=False,
-        failure_reason="", started_at=None, finished_at=None, duration=None,
-        runner=None, web_url="", needs=None,
+        id=0,
+        name="",
+        status="failed",
+        stage=None,
+        allow_failure=False,
+        failure_reason="",
+        started_at=None,
+        finished_at=None,
+        duration=None,
+        runner=None,
+        web_url="",
+        needs=None,
     )
     base.update(kw)
     return SimpleNamespace(**base)
@@ -23,7 +32,10 @@ def _fake_gl(pipeline_jobs, traces):
     project = SimpleNamespace(
         pipelines=SimpleNamespace(
             get=lambda pid: SimpleNamespace(
-                id=1, ref="main", sha="deadbeef", web_url="http://gl/pipe/1",
+                id=1,
+                ref="main",
+                sha="deadbeef",
+                web_url="http://gl/pipe/1",
                 jobs=SimpleNamespace(list=lambda all=True: pipeline_jobs),
             )
         ),
@@ -43,12 +55,15 @@ def test_fetch_run_maps_jobs():
     """Pipeline jobs map onto the domain model, runner and tags included."""
     jobs = [
         _pipeline_job(
-            id=101, name="build", stage="build", failure_reason="script_failure",
-            duration=3.2, runner={"id": 5, "description": "r5", "tag_list": ["docker"]},
+            id=101,
+            name="build",
+            stage="build",
+            failure_reason="script_failure",
+            duration=3.2,
+            runner={"id": 5, "description": "r5", "tag_list": ["docker"]},
             web_url="http://gl/j/101",
         ),
-        _pipeline_job(id=102, name="lint", stage="test", allow_failure=True,
-                      failure_reason="script_failure"),
+        _pipeline_job(id=102, name="lint", stage="test", allow_failure=True, failure_reason="script_failure"),
     ]
     run = _provider(jobs, {}).fetch_run("1")
 

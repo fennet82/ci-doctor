@@ -7,11 +7,17 @@ from ci_doctor.core.models import FailureReason, Job, LogLine, Phase, Run, Secti
 def test_domain_model_instantiates():
     """The model nests correctly and its enums compare equal to their strings."""
     sec = Section(name="step_script", phase=Phase.SCRIPT, lines=[LogLine(1, "hi")])
-    job = Job(id="1", name="build", status="failed",
-              failure_reason=FailureReason.SCRIPT_FAILURE, sections=[sec], log="hi\n")
+    job = Job(
+        id="1",
+        name="build",
+        status="failed",
+        failure_reason=FailureReason.SCRIPT_FAILURE,
+        sections=[sec],
+        log="hi\n",
+    )
     run = Run(id="p1", jobs=[job])
     assert run.jobs[0].sections[0].phase == Phase.SCRIPT
-    assert Phase.SCRIPT == "script"                # StrEnum comparison
+    assert Phase.SCRIPT == "script"  # StrEnum comparison
     assert f"{FailureReason.SCRIPT_FAILURE}" == "script_failure"
 
 

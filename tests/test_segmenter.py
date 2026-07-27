@@ -44,11 +44,7 @@ def test_unclosed_section_flagged():
 def test_nesting():
     """Nested sections become children, and both close correctly."""
     log = (
-        "section_start:1:outer\n"
-        "section_start:2:inner\n"
-        "deep line\n"
-        "section_end:3:inner\n"
-        "section_end:4:outer\n"
+        "section_start:1:outer\nsection_start:2:inner\ndeep line\nsection_end:3:inner\nsection_end:4:outer\n"
     )
     secs = _seg(log)
     assert secs[0].name == "outer"
@@ -68,7 +64,7 @@ def test_phase_assignment_and_inheritance():
     """An unknown nested section inherits its parent's phase."""
     log = (
         "section_start:1:step_script\n"
-        "section_start:2:my_custom_step\n"     # unknown -> inherits enclosing SCRIPT
+        "section_start:2:my_custom_step\n"  # unknown -> inherits enclosing SCRIPT
         "x\n"
         "section_end:3:my_custom_step\n"
         "section_end:4:step_script\n"
@@ -79,7 +75,7 @@ def test_phase_assignment_and_inheritance():
     secs = _seg(log)
     assign_phases(secs, {"step_script": "script", "restore_cache": "fetch"})
     assert secs[0].phase == Phase.SCRIPT
-    assert secs[0].children[0].phase == Phase.SCRIPT   # inherited
+    assert secs[0].children[0].phase == Phase.SCRIPT  # inherited
     assert secs[1].phase == Phase.FETCH
 
 
@@ -115,8 +111,8 @@ def test_a_step_owns_the_output_it_printed():
     step = _by_header(_gh(), "Run cargo --version")
     text = "\n".join(line.text for line in step.lines)
 
-    assert "shell: /usr/bin/bash -e {0}" in text          # the header block, inside the group
-    assert "assertion `left == right` failed" in text     # the output, after ##[endgroup]
+    assert "shell: /usr/bin/bash -e {0}" in text  # the header block, inside the group
+    assert "assertion `left == right` failed" in text  # the output, after ##[endgroup]
 
 
 def test_output_does_not_pile_up_in_the_trailer():

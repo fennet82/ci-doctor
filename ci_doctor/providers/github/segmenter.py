@@ -33,8 +33,16 @@ _ENDGROUP = re.compile(r"^##\[endgroup\]\s*$")
 #: Every token `_canonical` can return other than the untouched original. A group
 #: naming one of these is a *step*; any other group is a sub-block of the step
 #: currently running.
-_STEP_TOKENS = {"checkout", "restore_cache", "download_artifacts", "setup_job", "setup",
-                "post", "complete_job", "run"}
+_STEP_TOKENS = {
+    "checkout",
+    "restore_cache",
+    "download_artifacts",
+    "setup_job",
+    "setup",
+    "post",
+    "complete_job",
+    "run",
+}
 
 #: The runner's own "that step is over" annotations. Anything else (a cancellation,
 #: a timeout, the log simply stopping) leaves the step open — which is the signal
@@ -94,8 +102,8 @@ class GitHubSegmenter(LogSegmenter):
             is `closed` only if the runner reported it finished.
         """
         top: list[Section] = []
-        nested: list[Section] = []       # sub-groups open inside the current step
-        current: Section | None = None   # the step that owns the output being read
+        nested: list[Section] = []  # sub-groups open inside the current step
+        current: Section | None = None  # the step that owns the output being read
         counter = 0
         seen_group = False
         preamble: Section | None = None

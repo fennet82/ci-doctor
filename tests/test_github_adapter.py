@@ -62,7 +62,7 @@ def test_full_attribution_through_github_path():
     job.sections = GitHubSegmenter().segment(log)
     assign_phases(job.sections, cfg.phases)
 
-    assert job.sections[0].phase == Phase.FETCH   # checkout -> fetch
+    assert job.sections[0].phase == Phase.FETCH  # checkout -> fetch
     assert job.sections[1].phase == Phase.SCRIPT  # run -> script
     attr = attribute(job, job.sections)
     assert attr.phase == Phase.SCRIPT
@@ -71,28 +71,52 @@ def test_full_attribution_through_github_path():
 
 def _job(**kw):
     """A stand-in for a PyGithub WorkflowJob, with every attribute we read."""
-    return SimpleNamespace(**{"runner_name": None, "runner_id": None, "started_at": None,
-                              "completed_at": None, "html_url": "", **kw})
+    return SimpleNamespace(
+        **{
+            "runner_name": None,
+            "runner_id": None,
+            "started_at": None,
+            "completed_at": None,
+            "html_url": "",
+            **kw,
+        }
+    )
 
 
 def _fake_client(jobs, *, pull_requests=()):
     """An in-memory stand-in for `github.Github`, down to the workflow run."""
-    run = SimpleNamespace(id=999, head_branch="main", head_sha="deadbeef", html_url="http://gh/run/999",
-                          pull_requests=list(pull_requests), jobs=lambda: jobs)
+    run = SimpleNamespace(
+        id=999,
+        head_branch="main",
+        head_sha="deadbeef",
+        html_url="http://gh/run/999",
+        pull_requests=list(pull_requests),
+        jobs=lambda: jobs,
+    )
     return SimpleNamespace(get_repo=lambda name: SimpleNamespace(get_workflow_run=lambda rid: run))
 
 
 def test_provider_maps_jobs_and_normalizes_status():
     """PyGithub jobs map to the domain model and failing conclusions become "failed"."""
     jobs = [
-        _job(id=11, name="build", status="completed", conclusion="failure",
-             runner_name="gh-runner-1", runner_id=7, html_url="http://gh/11",
-             started_at=datetime(2024, 1, 1, tzinfo=timezone.utc)),
+        _job(
+            id=11,
+            name="build",
+            status="completed",
+            conclusion="failure",
+            runner_name="gh-runner-1",
+            runner_id=7,
+            html_url="http://gh/11",
+            started_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        ),
         _job(id=12, name="flaky", status="completed", conclusion="timed_out"),
         _job(id=13, name="ok", status="completed", conclusion="success"),
     ]
-    provider = GitHubProvider(load_config(environ={}), client=_fake_client(jobs),
-                              environ={"GITHUB_REPOSITORY": "acme/app", "GITHUB_REF": "refs/pull/42/merge"})
+    provider = GitHubProvider(
+        load_config(environ={}),
+        client=_fake_client(jobs),
+        environ={"GITHUB_REPOSITORY": "acme/app", "GITHUB_REF": "refs/pull/42/merge"},
+    )
     run = provider.fetch_run("999")
 
     build = run.jobs[0]
@@ -121,12 +145,13 @@ def test_repository_falls_back_to_git_origin(monkeypatch):
     from ci_doctor.providers import git_origin
 
     git_origin.origin_repo.cache_clear()
-    monkeypatch.setattr(git_origin.subprocess, "run", lambda *a, **k: SimpleNamespace(
-        stdout="git@github.com:acme/app.git\n"))
+    monkeypatch.setattr(
+        git_origin.subprocess, "run", lambda *a, **k: SimpleNamespace(stdout="git@github.com:acme/app.git\n")
+    )
     seen = []
-    provider = GitHubProvider(load_config(environ={}),
-                              client=SimpleNamespace(get_repo=lambda name: seen.append(name)),
-                              environ={})
+    provider = GitHubProvider(
+        load_config(environ={}), client=SimpleNamespace(get_repo=lambda name: seen.append(name)), environ={}
+    )
     provider._repo()
     assert seen == ["acme/app"]
     git_origin.origin_repo.cache_clear()
@@ -137,7 +162,10 @@ def test_origin_keeps_nested_gitlab_groups(monkeypatch):
     from ci_doctor.providers import git_origin
 
     git_origin.origin_repo.cache_clear()
-    monkeypatch.setattr(git_origin.subprocess, "run", lambda *a, **k: SimpleNamespace(
-        stdout="https://gitlab.example.com/group/sub/project.git\n"))
+    monkeypatch.setattr(
+        git_origin.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(stdout="https://gitlab.example.com/group/sub/project.git\n"),
+    )
     assert git_origin.origin_repo("CI_PROJECT_ID") == "group/sub/project"
     git_origin.origin_repo.cache_clear()
