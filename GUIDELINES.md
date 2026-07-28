@@ -156,11 +156,22 @@ Pure data — no Python. In `config/defaults.yml` under `extraction.matchers`:
   priority: 85
 ```
 
-Then **add a fixture and a row in `test_matcher_packs.py`** — a matcher that never
-matches fails silently, because the tail window still returns something.
+Then **add the fixture and a row in `test_matcher_packs.py`**, or the pack proves
+nothing — a matcher that never matches fails silently, because the tail window still
+returns something. A fixture is three files, and two tests enforce that:
 
-Windows are `before`/`after` lines around the anchor. Anchor on the **cause**, not on a
-trailing summary line: a summary-only anchor windows *past* the detail above it.
+- `tests/fixtures/logs/gitlab/<case>.log` and `logs/github/<case>.log` — both, always
+  (`test_every_case_is_covered_by_every_provider`).
+- `tests/fixtures/expected/<case>.json` — one provider-neutral verdict shared by both
+  (`test_every_log_has_an_expected_verdict`).
+
+`test_every_shipped_pack_is_covered_by_a_case` then fails if a pack has no `CASES` row.
+
+Anchor on the **cause**, not on a trailing summary line: a summary-only anchor windows
+*past* the detail above it. And anchor on something only *your tool* prints — see the
+two runner/wrong-tool traps in §7 before choosing a regex.
+
+Windows are `before`/`after` lines around the anchor.
 
 `priority` decides who gets cut when the evidence exceeds the token budget: `extract.py`
 sheds whole low-priority windows before `budget.py` truncates what is left. Rank a pack
@@ -268,6 +279,18 @@ Real bugs, kept here so they don't recur:
   position silently mislabels whole ecosystems.
 - **A matcher that matches nothing fails silently** — the tail window still returns
   output, so the test looks fine. Assert on `_windows_for(...)` being non-empty.
+- **A matcher that matches the *runner* is worse than one that matches nothing.** Every
+  failed job ends with `ERROR: Job failed: exit code N` (GitLab) or
+  `##[error]Process completed with exit code N.` (GitHub), so a pack anchored on a bare
+  `^ERROR: .*failed` looks covered by every fixture in the suite while proving nothing.
+  `bazel` shipped that way and opened a priority-85 window on 40 of 41 logs.
+  `test_no_pack_fires_on_the_runners_own_trailer` pins it; only `generic_error` (the
+  fallback) and `oom` (the trailer's `exit code 137` is the *only* OOM signal GitLab
+  gives) are exempt.
+- **A pack can also be "covered" by the wrong tool.** `jest`'s `^FAIL ` matched
+  `go test`'s `FAIL example.com/pkg 0.038s`, and `maven_gradle` only ever fired on
+  gradle's half of its own pattern — both looked green for months. When adding a pack,
+  check what it matches across *every* fixture, not just its own.
 - **Uncommenting the `llm:` block in `defaults.yml` makes the test suite call a real
   model**, taking it from ~2s to ~2min, and breaks
   `test_backends.py::test_backend_ready_rules` (it asserts a backend is *not* ready

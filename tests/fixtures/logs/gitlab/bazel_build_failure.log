@@ -32,6 +32,7 @@ src/render/shader.cc:57:19: error: 'GL_TEXTURE_2D_ARRAY' was not declared in thi
 src/render/shader.cc:58:3: note: suggested alternative: 'GL_TEXTURE_2D'
 Target //src/render:render failed to build
 Use --verbose_failures to see the command lines of failed build steps.
+//src/render:shader_test                                        FAILED in 0.4s
 INFO: Elapsed time: 41.882s, Critical Path: 12.44s
 INFO: 217 processes: 96 internal, 121 linux-sandbox.
 FAILED: Build did NOT complete successfully

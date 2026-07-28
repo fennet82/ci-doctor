@@ -41,7 +41,9 @@ extraction:
       end: '^=+ short test summary'
       priority: 90
     - id: jest
-      start: '^\s*●|^FAIL '
+      # `^FAIL ` alone also matches `go test`'s "FAIL example.com/pkg 0.038s",
+      # so the JS test filename is what makes it jest.
+      start: '^\s*●|^FAIL\s+\S+\.(test|spec)\.[jt]sx?\b'
       end: '^Tests:'
       priority: 90
     - id: go_test
@@ -110,7 +112,9 @@ extraction:
       after: 8
       priority: 88
     - id: rust_compile
-      pattern: '^error(\[E\d+\])?: |^error: could not compile'
+      # A bare `^error: ` is not rust enough — bun prints "error: expect(...)".
+      # The coded form plus rustc's own driver messages are unambiguous.
+      pattern: '^error\[E\d+\]: |^error: (could not compile|aborting due to|linking with)'
       after: 8
       priority: 82
 
@@ -170,7 +174,12 @@ extraction:
 
     # --- Bazel ------------------------------------------------------------
     - id: bazel
-      pattern: '^ERROR: .*(failed|FAILED)|^FAILED: Build did NOT complete|FAILED in \d'
+      # The `path:line:col:` is what makes this bazel and not the runner: a bare
+      # `^ERROR: .*failed` also matches "ERROR: Job failed: exit code 1", which
+      # ends every failed GitLab job.
+      # `FAILED in \d` needs the `//target` prefix too — gradle ends with
+      # "BUILD FAILED in 34s", which is not bazel.
+      pattern: '^ERROR: \S+:\d+:\d+: .*(failed|FAILED)|^FAILED: Build did NOT complete|^//\S+\s+FAILED in \d'
       before: 2
       after: 10
       priority: 85

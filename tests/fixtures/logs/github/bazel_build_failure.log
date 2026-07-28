@@ -47,6 +47,7 @@
 2026-07-24T20:04:19.2699999Z src/render/shader.cc:58:3: note: suggested alternative: 'GL_TEXTURE_2D'
 2026-07-24T20:04:19.6799999Z Target //src/render:render failed to build
 2026-07-24T20:04:20.0899999Z Use --verbose_failures to see the command lines of failed build steps.
+2026-07-24T20:04:20.5000000Z //src/render:shader_test                                        FAILED in 0.4s
 2026-07-24T20:04:20.5000000Z INFO: Elapsed time: 41.882s, Critical Path: 12.44s
 2026-07-24T20:04:20.9100000Z INFO: 217 processes: 96 internal, 121 linux-sandbox.
 2026-07-24T20:04:21.3200000Z FAILED: Build did NOT complete successfully
