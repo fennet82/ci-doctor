@@ -88,12 +88,16 @@ elision markers make it visible.
 #### Coupled change: stop stripping blank lines
 
 `defaults.yml` ships `denoise.noise_patterns: ['^\s*$']`, which deletes every
-blank line before `extract` runs. Blank lines are the most common block boundary
-there is, so `end: '^\s*$'` would be unreachable — the boundary is destroyed
-upstream of the matcher that needs it. Remove that noise pattern.
-`dedupe_repeats` already collapses runs of blanks, so the volume argument is
-thin, and `generic_error` (the fallback pack, for tools with no signature)
-depends on a blank line as its only available boundary.
+blank line before `extract` runs, so any `end: '^\s*$'` would be unreachable —
+the boundary is destroyed upstream of the matcher that needs it. Remove that
+noise pattern; `dedupe_repeats` already collapses runs of blanks, so the volume
+argument is thin.
+
+This matters for `eslint` and for `generic_error` — the fallback pack for tools
+with no signature, where a blank line is the only boundary available. It is *not*
+a universal boundary: `npm_build_failure.log:37,44` shows blank lines *inside* a
+tsc diagnostic, which is why `tsc` bounds on `error TS\d+:|^Found \d+ error`
+instead.
 
 ### Migration
 
@@ -110,15 +114,31 @@ Mechanical part: `pattern:` → `start:`, and `after: N` → an `end` regex.
 `go_panic`, `cc_cpp`, `eslint`, `python_lint`, `terraform`, `pnpm`, `yarn`,
 `bun`, `node_runtime`.
 
-**Packs with no fixture — `end` is unverified guesswork until one is added** (7):
-`pytest`, `jest`, `go_test`, `maven_gradle`, `tsc`, `npm`, `docker_build`.
-Each needs a real captured log added under `tests/fixtures/logs/<provider>/`
-plus a row in `test_matcher_packs.CASES`. This is where the correctness risk of
-the whole change sits: a wrong `end` does not fail loudly, it pads the evidence
-to `max_window_lines`.
+**Packs with a log on disk but no `CASES` row** (5, across 4 logs): `pytest`
+(`pytest_failure_verbose.log`), `npm` and `tsc` (both in `npm_build_failure.log`),
+`go_test` (`go_test_failure.log`), `docker_build` (`docker_build_oom.log`). The
+logs already carry the anchors; the work is adding the `CASES` rows, after which
+the `end` regexes are verifiable like any other pack.
+
+**Packs with no coverage at all** (2): `maven_gradle` — `maven_job_timeout.log`
+contains zero `[ERROR]`/`BUILD FAILURE` anchors, it is a timeout fixture — and
+`jest`. Both need a real captured log under `tests/fixtures/logs/<provider>/`.
+`jest` already uses `start`/`end` and carries over unchanged, so only
+`maven_gradle` requires an `end` authored without a log to check it against.
+That single pack is where the correctness risk of the migration sits: a wrong
+`end` does not fail loudly, it pads the evidence to `max_window_lines`.
 
 `oom` and `generic_error` need no `end` (before-only and blank-line-bounded
 respectively).
+
+#### Rule: prefixed blocks need no `end`
+
+When a tool prefixes *every* line of its block (`npm ERR!`, mypy's
+`file.py:12: error:`, eslint's `12:5  error`), each line anchors its own window
+and adjacent windows merge into the block for free. `end` is only required for
+blocks with an **unprefixed body** — rustc, pytest, Python tracebacks, tsc's
+pretty output. This decides the shape for a large part of the catalogue and
+removes `end` from the migration for those packs entirely.
 
 Representative rewrites:
 
@@ -147,6 +167,20 @@ Representative rewrites:
   end: '✖ \d+ problems?'
   before: 2
   priority: 78
+
+# tsc's pretty code frame starts at column 0, so `^\S` would cut the window
+# short; bound on the next diagnostic or the summary instead.
+- id: tsc
+  start: 'error TS\d+:'
+  end: 'error TS\d+:|^Found \d+ error'
+  before: 1
+  priority: 80
+
+# every line is prefixed, so each anchors its own window and they merge.
+- id: npm
+  start: 'npm ERR!'
+  before: 2
+  priority: 75
 ```
 
 ### What is deliberately NOT built
@@ -188,7 +222,9 @@ the front. Users on Ollama must raise `num_ctx` or lower `max_input_tokens`.
   `^\S`), a case proving `max_window_lines` caps a never-firing `end`, and a case
   pinning the `_drop_to_fit` equal-priority tiebreak.
 - `test_matcher_packs.py`: all 25 existing cases must keep passing unchanged —
-  that is the regression net for the migration. Add the 7 missing fixtures.
+  that is the regression net for the migration. Add `CASES` rows for the 5 packs
+  whose logs already exist (`pytest`, `npm`, `tsc`, `go_test`, `docker_build`),
+  and new logs for `maven_gradle` and `jest`.
 - `test_config.py`: `after` removal is a schema change; assert an old-style
   config with `after:` fails validation with a clear message rather than being
   silently ignored.
@@ -244,6 +280,7 @@ change, not before.
 
 ## Order of work
 
-1. §1 matchers — schema, `extract.py`, all 35 packs, the 7 missing fixtures, tests.
+1. §1 matchers — schema, `extract.py`, all 35 packs, 5 new `CASES` rows, 2 new
+   fixture logs (`maven_gradle`, `jest`), tests.
 2. §2 PyPI — small and independent, can ride along in any commit.
 3. §3 docs — written against the shape that shipped in §1.
