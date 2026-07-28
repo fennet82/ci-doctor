@@ -57,6 +57,21 @@ CASES = [
     ("yarn_missing_package", ["yarn"], 'Couldn\'t find package "@acme/design-tokens@^3.1.0"', "dependency"),
     ("bun_test_failure", ["bun"], "error: expect(received).toBe(expected)", "test"),
     ("node_uncaught_error", ["node_runtime"], "Error: missing DATABASE_URL in production", "runtime"),
+    ("pytest_failure_verbose", ["pytest"], "assert 3000 == 2700", "test"),
+    ("jest_test_failure", ["jest"], "Cart › applies a percentage discount to the subtotal", "test"),
+    ("go_test_failure", ["go_test"], "drift not detected", "test"),
+    ("maven_build_failure", ["maven_gradle"], "incompatible types: java.util.Optional", "build"),
+    # One log, two packs: `npm run build` shells out to tsc, so the wrapper's
+    # epilogue and the compiler's diagnosis both live here.
+    ("npm_build_failure", ["tsc", "npm"], "Argument of type 'string | undefined'", "build"),
+    # `infrastructure`, not `build`: the compiler died because the runner ran out
+    # of memory, so the actionable answer is the runner, not the C++.
+    (
+        "docker_build_oom",
+        ["docker_build", "oom"],
+        "Killed signal terminated program cc1plus",
+        "infrastructure",
+    ),
 ]
 
 # Cross every case with the providers that ship a log for it, so a future
@@ -106,6 +121,59 @@ def test_deterministic_category(provider, stem, matcher_ids, causal, category):
     job, attr, bundle = _analyze(provider, stem)
     report = deterministic_report(job, attr, bundle)
     assert report.category == category
+
+
+# Every failed job ends with the runner saying so, in the runner's own words. A
+# pack that fires on *that* line has coverage on paper for every fixture in the
+# suite while proving nothing about the tool it claims to match — which is how
+# `bazel` came to open a priority-85 window on 40 of 41 logs, on the strength of
+# `^ERROR: .*(failed|FAILED)` matching "ERROR: Job failed: exit code 1".
+RUNNER_TRAILERS = [
+    # GitLab
+    "ERROR: Job failed",
+    "ERROR: Job failed: exit code 1",
+    "ERROR: Job failed: exit code 2",
+    "ERROR: Job failed: exit code 255",
+    "ERROR: Job failed: execution took longer than 1h0m0s",
+    "ERROR: Job failed: missing dependency failure",
+    "ERROR: Job failed (system failure): prepare environment: exit status 1",
+    'ERROR: Preparation failed: failed to pull image "registry.internal/ci/builder:2025.09"',
+    # GitHub
+    "##[error]Process completed with exit code 1.",
+    "##[error]The operation was canceled.",
+    "##[error]Unable to download artifact(s): Artifact not found for name: compile",
+]
+
+# The two packs that read the runner's framing on purpose. `generic_error` is the
+# fallback for tools with no signature at all, and `exit code 137` in the trailer
+# is the *only* place a GitLab job says it was OOM-killed.
+FRAMING_READERS = {"generic_error", "oom"}
+
+
+@pytest.mark.parametrize("matcher_id", sorted(set(MATCHERS) - FRAMING_READERS))
+def test_no_pack_fires_on_the_runners_own_trailer(matcher_id):
+    """A language pack must recognise its tool, not the runner announcing failure."""
+    hits = [line for line in RUNNER_TRAILERS if _windows_for([line], [MATCHERS[matcher_id]])]
+    assert not hits, f"{matcher_id} matches runner framing, not its tool: {hits}"
+
+
+def test_every_shipped_pack_is_covered_by_a_case():
+    """A pack with no `CASES` row is a pack nothing proves ever fires.
+
+    `generic_error` is exempt: it is the fallback for tools with no signature,
+    so it is asserted below instead — the shared "windows rather than swallows"
+    check contradicts a matcher whose whole job is to be greedy.
+    """
+    uncovered = set(MATCHERS) - {mid for _stem, ids, *_ in CASES for mid in ids} - {"generic_error"}
+    assert not uncovered, f"no fixture case exercises: {sorted(uncovered)}"
+
+
+@pytest.mark.parametrize("provider", support.providers())
+def test_generic_error_catches_a_tool_with_no_pack(provider):
+    """The fallback fires when an unrecognised tool reports a fatal problem."""
+    lines = support.log_lines(provider, "warning_only_fetch")
+    out = extract(lines, [MATCHERS["generic_error"]], tail_lines=0)
+    assert any("custom tool reported a fatal problem" in line for line in out)
 
 
 # `runtime` is checked last on purpose: a traceback also appears in a pytest

@@ -1,0 +1,59 @@
+Running with gitlab-runner 16.9.1 (d773c4a1)
+  on private-runner-11 Yt2Hm9Kd, system ID: s_0f1e2d3c4b5a
+Preparing the "docker" executor
+  Using Docker executor with image maven:3.9-eclipse-temurin-21 ...
+section_start:1736400000:prepare_executor
+Using Docker executor with image maven:3.9-eclipse-temurin-21 ...
+Using docker image sha256:33cc44dd55ee for maven:3.9-eclipse-temurin-21 with digest maven@sha256:7788...
+section_end:1736400014:prepare_executor
+section_start:1736400014:prepare_script
+Preparing environment
+Running on runner-yt2hm9kd-project-63-concurrent-2...
+section_end:1736400015:prepare_script
+section_start:1736400015:get_sources
+Fetching changes with git depth set to 50...
+Checking out 9f21b40c as detached HEAD...
+section_end:1736400022:get_sources
+section_start:1736400022:restore_cache
+Checking cache for maven-repo-21...
+Successfully extracted cache
+section_end:1736400038:restore_cache
+section_start:1736400038:step_script
+$ mvn -B -ntp verify
+[INFO] Scanning for projects...
+[INFO] ------------------< com.acme:ledger-service >-------------------
+[INFO] Building ledger-service 3.4.1
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ ledger-service ---
+[INFO] Copying 6 resources from src/main/resources to target/classes
+[INFO] --- maven-compiler-plugin:3.13.0:compile (default-compile) @ ledger-service ---
+[INFO] Compiling 84 source files with javac [debug release 21] to target/classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR :
+[INFO] -------------------------------------------------------------
+[ERROR] /builds/team/ledger/src/main/java/com/acme/ledger/PostingService.java:[62,38] incompatible types: java.util.Optional<java.math.BigDecimal> cannot be converted to java.math.BigDecimal
+[ERROR] /builds/team/ledger/src/main/java/com/acme/ledger/PostingService.java:[71,9] cannot find symbol
+[ERROR]   symbol:   method recordAudit(java.lang.String)
+[ERROR]   location: class com.acme.ledger.PostingService
+[INFO] 3 errors
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  24.881 s
+[INFO] Finished at: 2026-01-09T11:20:38Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project ledger-service: Compilation failure
+[ERROR] -> [Help 1]
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+section_end:1736400096:step_script
+section_start:1736400096:after_script
+Running after_script
+$ echo "build failed, skipping deploy"
+build failed, skipping deploy
+section_end:1736400097:after_script
+section_start:1736400097:upload_artifacts_on_failure
+Uploading artifacts for failed job
+WARNING: target/*.jar: no matching files. Ensure that the artifact path is relative to the working directory
+section_end:1736400099:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1

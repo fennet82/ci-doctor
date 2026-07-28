@@ -1,7 +1,39 @@
 # Matcher boundaries, PyPI metadata, and concept docs
 
 Date: 2026-07-28
-Status: proposed, awaiting review
+Status: §0 done; §1-§3 proposed, awaiting review
+
+---
+
+## 0. Fixture coverage (done)
+
+Prerequisite to the migration: every pack needed a log to verify its new `end`
+against. Measuring it found that coverage was real for 31 of 35 packs and
+*phantom* for four — the matcher fired only on another tool's output, or on the
+runner's own framing:
+
+| pack | what it actually matched | fix |
+|---|---|---|
+| `bazel` | `ERROR: Job failed: exit code 1` — GitLab's universal job trailer, so it opened a priority-85 window on 40 of 41 logs | require `path:line:col:`; require `//target` before `FAILED in \d` (gradle prints `BUILD FAILED in 34s`) |
+| `jest` | `FAIL example.com/svc/internal/reconcile` — `go test` | require a `.test.`/`.spec.` JS filename |
+| `maven_gradle` | `FAILURE: Build failed with an exception.` — gradle, never maven's `[ERROR]` half | new maven fixture |
+| `rust_compile` | `error: expect(received).toBe(expected)` — bun | drop the bare `^error: `, keep `error[E\d+]` and rustc's driver messages |
+
+`bazel` was a live bug, not just a test gap: it shipped, and it ranked above the
+real evidence under budget pressure on every GitLab job.
+
+Added: `jest_test_failure` and `maven_build_failure` fixtures (gitlab + github +
+shared verdict), a `//target FAILED in 0.4s` line to the bazel fixture so that
+alternative is exercised, and six `CASES` rows covering `pytest`, `jest`,
+`go_test`, `maven_gradle`, `tsc`, `npm`, `docker_build` and `oom`.
+
+Guards so this cannot recur: `test_no_pack_fires_on_the_runners_own_trailer`
+(every pack except `generic_error` and `oom`, which read the runner's framing on
+purpose) and `test_every_shipped_pack_is_covered_by_a_case`. `generic_error` gets
+its own assertion rather than a `CASES` row — the shared "windows rather than
+swallows" check contradicts a fallback whose job is to be greedy.
+
+Every pack now has a log under both providers, and 424 tests pass.
 
 Three pieces of work, in dependency order. The matcher change lands first because
 the docs describe it.
@@ -114,19 +146,9 @@ Mechanical part: `pattern:` → `start:`, and `after: N` → an `end` regex.
 `go_panic`, `cc_cpp`, `eslint`, `python_lint`, `terraform`, `pnpm`, `yarn`,
 `bun`, `node_runtime`.
 
-**Packs with a log on disk but no `CASES` row** (5, across 4 logs): `pytest`
-(`pytest_failure_verbose.log`), `npm` and `tsc` (both in `npm_build_failure.log`),
-`go_test` (`go_test_failure.log`), `docker_build` (`docker_build_oom.log`). The
-logs already carry the anchors; the work is adding the `CASES` rows, after which
-the `end` regexes are verifiable like any other pack.
-
-**Packs with no coverage at all** (2): `maven_gradle` — `maven_job_timeout.log`
-contains zero `[ERROR]`/`BUILD FAILURE` anchors, it is a timeout fixture — and
-`jest`. Both need a real captured log under `tests/fixtures/logs/<provider>/`.
-`jest` already uses `start`/`end` and carries over unchanged, so only
-`maven_gradle` requires an `end` authored without a log to check it against.
-That single pack is where the correctness risk of the migration sits: a wrong
-`end` does not fail loudly, it pads the evidence to `max_window_lines`.
+Every pack now has a covering fixture under both providers (§0), so every `end`
+regex written here is verifiable the moment it is written. Nothing in the
+migration is authored blind.
 
 `oom` and `generic_error` need no `end` (before-only and blank-line-bounded
 respectively).
@@ -221,10 +243,8 @@ the front. Users on Ollama must raise `num_ctx` or lower `max_input_tokens`.
   variable-length block is captured whole (a 60-line rust diagnostic bounded by
   `^\S`), a case proving `max_window_lines` caps a never-firing `end`, and a case
   pinning the `_drop_to_fit` equal-priority tiebreak.
-- `test_matcher_packs.py`: all 25 existing cases must keep passing unchanged —
-  that is the regression net for the migration. Add `CASES` rows for the 5 packs
-  whose logs already exist (`pytest`, `npm`, `tsc`, `go_test`, `docker_build`),
-  and new logs for `maven_gradle` and `jest`.
+- `test_matcher_packs.py`: all 31 cases from §0 must keep passing unchanged —
+  that is the regression net for the migration.
 - `test_config.py`: `after` removal is a schema change; assert an old-style
   config with `after:` fails validation with a clear message rather than being
   silently ignored.
@@ -280,7 +300,7 @@ change, not before.
 
 ## Order of work
 
-1. §1 matchers — schema, `extract.py`, all 35 packs, 5 new `CASES` rows, 2 new
-   fixture logs (`maven_gradle`, `jest`), tests.
+0. ~~Fixture coverage~~ — done.
+1. §1 matchers — schema, `extract.py`, all 35 packs, tests.
 2. §2 PyPI — small and independent, can ride along in any commit.
 3. §3 docs — written against the shape that shipped in §1.

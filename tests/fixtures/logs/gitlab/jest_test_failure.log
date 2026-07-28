@@ -1,0 +1,72 @@
+Running with gitlab-runner 16.10.0 (be4e0e33)
+  on green-2.saas-linux-medium-amd64 Nb7Vc3Xq, system ID: s_1a2b3c4d5e6f
+Preparing the "docker+machine" executor
+  Using Docker executor with image node:20-alpine ...
+section_start:1736300000:resolve_secrets
+Resolving secrets
+section_end:1736300002:resolve_secrets
+section_start:1736300002:prepare_executor
+Using Docker executor with image node:20-alpine ...
+Using docker image sha256:aabb1122ccdd for node:20-alpine with digest node@sha256:99ee...
+section_end:1736300016:prepare_executor
+section_start:1736300016:prepare_script
+Preparing environment
+Running on runner-nb7vc3xq-project-42-concurrent-0...
+section_end:1736300017:prepare_script
+section_start:1736300017:get_sources
+Fetching changes...
+Checking out 5c93de10 as detached HEAD...
+section_end:1736300023:get_sources
+section_start:1736300023:restore_cache
+Checking cache for node-modules-20-default...
+Successfully extracted cache
+section_end:1736300036:restore_cache
+section_start:1736300036:step_script
+$ npm ci --no-audit --no-fund
+added 1902 packages in 24s
+$ npx jest --ci --runInBand
+PASS  src/cart/totals.test.ts
+PASS  src/cart/coupon.test.ts
+FAIL  src/cart/discount.test.ts
+  ● Cart › applies a percentage discount to the subtotal
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2700
+    Received: 3000
+
+      14 |     const cart = new Cart([{ sku: 'A-1', price: 3000 }]);
+      15 |     cart.applyCoupon('SAVE10');
+    > 16 |     expect(cart.total()).toBe(2700);
+         |                          ^
+      17 |   });
+
+      at Object.<anonymous> (src/cart/discount.test.ts:16:26)
+
+  ● Cart › refuses a coupon past its expiry date
+
+    Received function did not throw
+
+      28 |     cart.applyCoupon('EXPIRED2024');
+    > 29 |     expect(() => cart.total()).toThrow(CouponExpiredError);
+         |                                ^
+
+      at Object.<anonymous> (src/cart/discount.test.ts:29:32)
+
+PASS  src/checkout/session.test.ts
+Test Suites: 1 failed, 3 passed, 4 total
+Tests:       2 failed, 46 passed, 48 total
+Snapshots:   0 total
+Time:        11.402 s
+Ran all test suites.
+section_end:1736300081:step_script
+section_start:1736300081:after_script
+Running after_script
+$ echo "tests failed, skipping coverage upload"
+tests failed, skipping coverage upload
+section_end:1736300082:after_script
+section_start:1736300082:upload_artifacts_on_failure
+Uploading artifacts for failed job
+Uploading artifacts as "archive" to coordinator... 201 Created
+section_end:1736300084:upload_artifacts_on_failure
+ERROR: Job failed: exit code 1
