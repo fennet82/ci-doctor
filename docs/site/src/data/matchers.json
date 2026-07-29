@@ -1,0 +1,382 @@
+[
+  {
+    "group": "Test frameworks and the build drivers that wrap them",
+    "packs": [
+      {
+        "id": "pytest",
+        "kind": "block",
+        "match": "^=+ FAILURES =+",
+        "end": "^=+ short test summary",
+        "before": 0,
+        "after": 0,
+        "priority": 90
+      },
+      {
+        "id": "jest",
+        "kind": "block",
+        "match": "^\\s*\u25cf|^FAIL\\s+\\S+\\.(test|spec)\\.[jt]sx?\\b",
+        "end": "^Tests:",
+        "before": 0,
+        "after": 0,
+        "priority": 90
+      },
+      {
+        "id": "go_test",
+        "kind": "anchor",
+        "match": "^--- FAIL",
+        "end": "",
+        "before": 2,
+        "after": 15,
+        "priority": 85
+      },
+      {
+        "id": "maven_gradle",
+        "kind": "anchor",
+        "match": "\\[ERROR\\]|FAILURE: Build failed|BUILD FAILURE",
+        "end": "",
+        "before": 3,
+        "after": 15,
+        "priority": 80
+      },
+      {
+        "id": "tsc",
+        "kind": "anchor",
+        "match": "error TS\\d+:",
+        "end": "",
+        "before": 1,
+        "after": 3,
+        "priority": 80
+      },
+      {
+        "id": "npm",
+        "kind": "anchor",
+        "match": "npm ERR!",
+        "end": "",
+        "before": 2,
+        "after": 10,
+        "priority": 75
+      }
+    ]
+  },
+  {
+    "group": "Other JS package managers + the node runtime itself",
+    "packs": [
+      {
+        "id": "pnpm",
+        "kind": "anchor",
+        "match": "ERR_PNPM_\\w+|^\\s*ELIFECYCLE\\b",
+        "end": "",
+        "before": 1,
+        "after": 10,
+        "priority": 82
+      },
+      {
+        "id": "yarn",
+        "kind": "anchor",
+        "match": "^error [A-Z]|\u27a4 YN\\d{4}",
+        "end": "",
+        "before": 1,
+        "after": 8,
+        "priority": 82
+      },
+      {
+        "id": "bun",
+        "kind": "anchor",
+        "match": "error: script \".+\" exited with code|error: No version matching|^\\s*\u2717 |^\\s*\\d+ fail\\b",
+        "end": "",
+        "before": 2,
+        "after": 12,
+        "priority": 84
+      },
+      {
+        "id": "node_runtime",
+        "kind": "anchor",
+        "match": "^\\s*at .+\\(node:internal|^Node\\.js v\\d+\\.|ERR_MODULE_NOT_FOUND|ERR_REQUIRE_ESM|UnhandledPromiseRejection",
+        "end": "",
+        "before": 12,
+        "after": 6,
+        "priority": 84
+      }
+    ]
+  },
+  {
+    "group": "Containers, and the runner killing the job",
+    "packs": [
+      {
+        "id": "docker_build",
+        "kind": "anchor",
+        "match": "failed to solve|executor failed running",
+        "end": "",
+        "before": 3,
+        "after": 8,
+        "priority": 75
+      },
+      {
+        "id": "oom",
+        "kind": "anchor",
+        "match": "exit code 137|Killed|Out of memory",
+        "end": "",
+        "before": 5,
+        "after": 2,
+        "priority": 95
+      }
+    ]
+  },
+  {
+    "group": "Rust (cargo)",
+    "packs": [
+      {
+        "id": "rust_test",
+        "kind": "block",
+        "match": "^failures:$",
+        "end": "^test result:",
+        "before": 0,
+        "after": 0,
+        "priority": 90
+      },
+      {
+        "id": "rust_panic",
+        "kind": "anchor",
+        "match": "^thread '.*' panicked at",
+        "end": "",
+        "before": 2,
+        "after": 8,
+        "priority": 88
+      },
+      {
+        "id": "rust_compile",
+        "kind": "anchor",
+        "match": "^error\\[E\\d+\\]: |^error: (could not compile|aborting due to|linking with)",
+        "end": "",
+        "before": 0,
+        "after": 8,
+        "priority": 82
+      }
+    ]
+  },
+  {
+    "group": ".NET (dotnet build / dotnet test)",
+    "packs": [
+      {
+        "id": "dotnet_test",
+        "kind": "anchor",
+        "match": "\\[FAIL\\]|^\\s*Failed\\s+\\S+\\s+\\[\\d|^Failed!\\s+-\\s+Failed:",
+        "end": "",
+        "before": 1,
+        "after": 12,
+        "priority": 88
+      },
+      {
+        "id": "dotnet_build",
+        "kind": "anchor",
+        "match": "error (CS|MSB|NU|AD)\\d+",
+        "end": "",
+        "before": 1,
+        "after": 3,
+        "priority": 82
+      }
+    ]
+  },
+  {
+    "group": "Ruby (rspec / minitest / bundler)",
+    "packs": [
+      {
+        "id": "rspec",
+        "kind": "block",
+        "match": "^Failures:$",
+        "end": "^\\d+ examples?, \\d+ failures?",
+        "before": 0,
+        "after": 0,
+        "priority": 90
+      },
+      {
+        "id": "minitest",
+        "kind": "anchor",
+        "match": "^\\s*\\d+\\) (Failure|Error):",
+        "end": "",
+        "before": 0,
+        "after": 10,
+        "priority": 88
+      },
+      {
+        "id": "ruby_exception",
+        "kind": "anchor",
+        "match": "\\.rb:\\d+:in .+\\(\\w*(Error|Exception)\\)",
+        "end": "",
+        "before": 2,
+        "after": 10,
+        "priority": 80
+      },
+      {
+        "id": "bundler",
+        "kind": "anchor",
+        "match": "Could not find gem|Bundler::(GemNotFound|VersionConflict)",
+        "end": "",
+        "before": 1,
+        "after": 6,
+        "priority": 80
+      }
+    ]
+  },
+  {
+    "group": "PHP (phpunit / composer)",
+    "packs": [
+      {
+        "id": "phpunit",
+        "kind": "block",
+        "match": "^There (was|were) \\d+ (failure|error)",
+        "end": "^(FAILURES|ERRORS|OK)",
+        "before": 0,
+        "after": 0,
+        "priority": 90
+      },
+      {
+        "id": "php_fatal",
+        "kind": "anchor",
+        "match": "PHP (Fatal|Parse) error|^Fatal error:",
+        "end": "",
+        "before": 1,
+        "after": 8,
+        "priority": 85
+      },
+      {
+        "id": "composer",
+        "kind": "anchor",
+        "match": "Your requirements could not be resolved",
+        "end": "",
+        "before": 1,
+        "after": 12,
+        "priority": 80
+      }
+    ]
+  },
+  {
+    "group": "Gradle (its own block; maven_gradle catches the [ERROR] style)",
+    "packs": [
+      {
+        "id": "gradle",
+        "kind": "block",
+        "match": "^\\* What went wrong:",
+        "end": "^\\* (Try|Get more help)",
+        "before": 0,
+        "after": 0,
+        "priority": 88
+      }
+    ]
+  },
+  {
+    "group": "Bazel",
+    "packs": [
+      {
+        "id": "bazel",
+        "kind": "anchor",
+        "match": "^ERROR: \\S+:\\d+:\\d+: .*(failed|FAILED)|^FAILED: Build did NOT complete|^//\\S+\\s+FAILED in \\d",
+        "end": "",
+        "before": 2,
+        "after": 10,
+        "priority": 85
+      }
+    ]
+  },
+  {
+    "group": "Browser e2e (Playwright / Cypress)",
+    "packs": [
+      {
+        "id": "playwright",
+        "kind": "anchor",
+        "match": "^\\s*\\d+\\) .+ \u203a ",
+        "end": "",
+        "before": 0,
+        "after": 20,
+        "priority": 88
+      },
+      {
+        "id": "cypress",
+        "kind": "anchor",
+        "match": "CypressError|Timed out retrying after \\d+ms",
+        "end": "",
+        "before": 3,
+        "after": 12,
+        "priority": 88
+      }
+    ]
+  },
+  {
+    "group": "Language runtimes not covered by a framework matcher",
+    "packs": [
+      {
+        "id": "python_traceback",
+        "kind": "anchor",
+        "match": "^\\s*Traceback \\(most recent call last\\):",
+        "end": "",
+        "before": 1,
+        "after": 25,
+        "priority": 85
+      },
+      {
+        "id": "go_panic",
+        "kind": "anchor",
+        "match": "^panic: |^fatal error: ",
+        "end": "",
+        "before": 2,
+        "after": 20,
+        "priority": 88
+      },
+      {
+        "id": "cc_cpp",
+        "kind": "anchor",
+        "match": "CMake Error|make(\\[\\d+\\])?: \\*\\*\\* |undefined reference to|collect2: error",
+        "end": "",
+        "before": 3,
+        "after": 8,
+        "priority": 80
+      }
+    ]
+  },
+  {
+    "group": "Linters / type checkers / IaC",
+    "packs": [
+      {
+        "id": "eslint",
+        "kind": "anchor",
+        "match": "^\\s*\\d+:\\d+\\s+error\\s+|\u2716 \\d+ problems?",
+        "end": "",
+        "before": 2,
+        "after": 6,
+        "priority": 78
+      },
+      {
+        "id": "python_lint",
+        "kind": "anchor",
+        "match": "^\\S+\\.py:\\d+:(\\d+:)? (error|[EFWCN]\\d+)",
+        "end": "",
+        "before": 0,
+        "after": 3,
+        "priority": 78
+      },
+      {
+        "id": "terraform",
+        "kind": "anchor",
+        "match": "^\\s*\u2502\\s*Error: |on .+\\.tf line \\d+",
+        "end": "",
+        "before": 1,
+        "after": 12,
+        "priority": 80
+      }
+    ]
+  },
+  {
+    "group": "Fallback: a tool with no pack of its own",
+    "packs": [
+      {
+        "id": "generic_error",
+        "kind": "anchor",
+        "match": "^(ERROR|FATAL)\\b",
+        "end": "",
+        "before": 5,
+        "after": 20,
+        "priority": 50
+      }
+    ]
+  }
+]

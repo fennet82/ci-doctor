@@ -1,6 +1,7 @@
 ---
 import { Code } from 'astro:components';
 import Base from '../layouts/Base.astro';
+import { url } from '../lib/url';
 
 const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags`;
 
@@ -95,6 +96,13 @@ redaction:
 <Base title="Configuration">
   <h1>Configuration</h1>
   <p class="lead">One layered, pydantic-validated config. Unknown keys are an error, not a silent typo.</p>
+
+  <div class="note">
+    This page is the reference — every key and its default. For what the keys
+    <em>mean</em> — phases, attribution, denoising, matchers, budget, redaction — start with
+    <a href={url('/concepts/')}>Concepts</a>. The shipped matcher packs are listed on
+    <a href={url('/matchers/')}>Matchers</a>.
+  </div>
 
   <h2>How layers combine</h2>
   <Code code={layering} lang="text" theme="github-dark" />
