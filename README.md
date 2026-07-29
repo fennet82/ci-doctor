@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/site/public/ci-doctor-logo-dark.svg">
-    <img src="docs/site/public/ci-doctor-logo.png" alt="ci-doctor" width="540">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/fennet82/ci-doctor/master/docs/site/public/ci-doctor-logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/fennet82/ci-doctor/master/docs/site/public/ci-doctor-logo.png" alt="ci-doctor" width="540">
   </picture>
 </p>
 
@@ -153,7 +153,7 @@ Outputs `phase`, `category`, `confidence`, `is-infra-not-code`, and the two repo
 paths, so a workflow can branch on the verdict. Inputs, PR comments and GitHub
 Enterprise are on the [action page](https://fennet82.github.io/ci-doctor/action/);
 the full workflow is in
-[examples/github-actions.example.yml](examples/github-actions.example.yml).
+[examples/github-actions.example.yml](https://github.com/fennet82/ci-doctor/blob/master/examples/github-actions.example.yml).
 
 > **Listing on GitHub Marketplace is a one-time manual step** and cannot be
 > scripted: draft or edit a release in the GitHub UI, tick *Publish this Action
@@ -179,7 +179,7 @@ ci-doctor:
     paths: [report.md, report.json]
 ```
 
-Both providers have a complete, commented workflow in [`examples/`](examples/).
+Both providers have a complete, commented workflow in [`examples/`](https://github.com/fennet82/ci-doctor/tree/master/examples/).
 
 ## Air-gapped / offline
 
@@ -200,12 +200,18 @@ standard `HTTPS_PROXY` / `NO_PROXY` / `REQUESTS_CA_BUNDLE` variables are honoure
 
 **[fennet82.github.io/ci-doctor](https://fennet82.github.io/ci-doctor)** — overview,
 requirements, configuration, usage, the GitHub Action, and CI/CD examples. Source in
-[`docs/site/`](docs/site) (Astro); `mise run docs` previews it locally.
+[`docs/site/`](https://github.com/fennet82/ci-doctor/tree/master/docs/site) (Astro); `mise run docs` previews it locally.
+
+Start with **[Concepts](https://fennet82.github.io/ci-doctor/concepts/)** — the pipeline
+end to end, what each module decides, and what a phase, a matcher or a redaction pass
+actually is. **[Matchers](https://fennet82.github.io/ci-doctor/matchers/)** lists every
+shipped pack; that page is generated from `config/defaults.yml`, so run
+`mise run docs:data` after changing a pack (a test fails if it drifts).
 
 For contributors: how the code is built — where things go, the invariants, how to write
-tests — is [GUIDELINES.md](GUIDELINES.md); how to get a change in — setup, commits,
-pre-push checks — is [CONTRIBUTING.md](CONTRIBUTING.md). The original design spec, kept
-for provenance, is [docs/PLAN.md](docs/PLAN.md).
+tests — is [GUIDELINES.md](https://github.com/fennet82/ci-doctor/blob/master/GUIDELINES.md); how to get a change in — setup, commits,
+pre-push checks — is [CONTRIBUTING.md](https://github.com/fennet82/ci-doctor/blob/master/CONTRIBUTING.md). The original design spec, kept
+for provenance, is [docs/PLAN.md](https://github.com/fennet82/ci-doctor/blob/master/docs/PLAN.md).
 
 ## Development
 
@@ -218,4 +224,4 @@ The suite blocks real sockets and never calls an LLM, so it runs in seconds.
 
 ## License
 
-[MIT](LICENSE) © Elad Cohen
+[MIT](https://github.com/fennet82/ci-doctor/blob/master/LICENSE) © Elad Cohen

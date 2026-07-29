@@ -4,7 +4,7 @@ version = "1.1.1"
 description = "Postmortem CI failure analyzer: deterministic phase attribution plus one LLM explanation. Read-only, air-gap friendly."
 requires-python = ">=3.11"
 license = "MIT"
-license-files = ["LICENSE"]
+license-files = ["LICEN[CS]E*"]
 dependencies = [
     "typer>=0.12",
     "pydantic>=2.5",
@@ -13,6 +13,24 @@ dependencies = [
     "openai>=2.48.0",
     "pygithub>=2.9.1",
 ]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://fennet82.github.io/ci-doctor/"
+Repository = "https://github.com/fennet82/ci-doctor"
+Issues = "https://github.com/fennet82/ci-doctor/issues"
+Changelog = "https://github.com/fennet82/ci-doctor/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Optional LLM backends (base install stays lean/air-gap-clean). openai is included
