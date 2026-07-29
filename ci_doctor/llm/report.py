@@ -194,6 +194,25 @@ def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
     return None
 
 
+def _capped(text: str, limit: int = 2000) -> str:
+    """Cap the excerpt for the report field, announcing the cut.
+
+    Keeps the tail, matching `budget.fit`: the failure lives at the end. The
+    marker is the point — a silent cut is a lie about the evidence, and this is
+    the last place the evidence can be lost before a human reads it.
+
+    Args:
+        text: The excerpt.
+        limit: Maximum characters to keep.
+
+    Returns:
+        The text, or its last `limit` characters behind an elision marker.
+    """
+    if len(text) <= limit:
+        return text
+    return f"… [{len(text) - limit} characters elided] …\n{text[-limit:]}"
+
+
 def deterministic_report(
     job: Job, attr: Attribution, bundle: EvidenceBundle, *, degraded: bool = False
 ) -> Report:
@@ -214,7 +233,11 @@ def deterministic_report(
     Returns:
         A valid report. Not yet redacted — callers do that.
     """
-    excerpt = "\n".join(bundle.blamed_lines[-15:]) if bundle.blamed_lines else (attr.terminal_evidence or "")
+    # No second cut here: `blamed_lines` is already denoised, windowed by matcher
+    # priority and budget-fitted. Re-trimming it to a fixed line count discards the
+    # selection the whole pipeline just made — it decapitated the *first* of two
+    # rust compile errors, which is the one that caused the second.
+    excerpt = "\n".join(bundle.blamed_lines) if bundle.blamed_lines else (attr.terminal_evidence or "")
     is_infra = attr.phase in (Phase.PROVISION, Phase.PREPARE) or attr.reason in (
         FailureReason.RUNNER_SYSTEM,
         FailureReason.NO_RUNNER,
@@ -243,7 +266,7 @@ def deterministic_report(
         evidence=[
             Evidence(
                 section=str(attr.phase),
-                excerpt=excerpt[:2000],
+                excerpt=_capped(excerpt),
                 why_it_matters="Terminal evidence selected by deterministic attribution.",
             )
         ],

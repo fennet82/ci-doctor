@@ -279,6 +279,13 @@ Real bugs, kept here so they don't recur:
   position silently mislabels whole ecosystems.
 - **A matcher that matches nothing fails silently** — the tail window still returns
   output, so the test looks fine. Assert on `_windows_for(...)` being non-empty.
+- **The report is the last place evidence can be lost, and it was losing it.**
+  `deterministic_report` re-trimmed `bundle.blamed_lines` to a hardcoded `[-15:]`,
+  throwing away the selection that denoise + matcher priority + `budget.fit` had just
+  made — silently, with `bundle.truncated` still `False`. On a two-error rust build it
+  kept E0599 and decapitated E0308, the error that *caused* it. Never re-cut the bundle
+  by a fixed count; it is already budgeted. If a display cap is genuinely needed, it
+  announces itself (`_capped`), like every other cut in the pipeline.
 - **A matcher that matches the *runner* is worse than one that matches nothing.** Every
   failed job ends with `ERROR: Job failed: exit code N` (GitLab) or
   `##[error]Process completed with exit code N.` (GitHub), so a pack anchored on a bare

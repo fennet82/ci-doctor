@@ -115,6 +115,31 @@ def test_causal_line_survives_into_the_bundle(provider, stem, matcher_ids, causa
     assert "Preparing the " not in joined
 
 
+@pytest.mark.parametrize("provider,stem,matcher_ids,causal,_category", PARAMS, ids=IDS)
+def test_causal_line_survives_into_the_report(provider, stem, matcher_ids, causal, _category):
+    """The evidence the pipeline selected is the evidence the reader is shown.
+
+    Surviving into the bundle is not enough — the report is the only artefact a
+    user ever sees, so a cut applied there loses the diagnosis just as thoroughly.
+    """
+    job, attr, bundle = _analyze(provider, stem)
+    report = deterministic_report(job, attr, bundle)
+    assert causal in report.evidence[0].excerpt, f"{stem}: {causal!r} was cut from the report excerpt"
+
+
+def test_every_diagnostic_in_a_multi_error_build_reaches_the_report():
+    """A second compile error is evidence, not spare context.
+
+    rustc reports every error it found before giving up, and the first one is
+    usually the cause of the rest. A report showing only the tail decapitates the
+    root cause while looking complete.
+    """
+    job, attr, bundle = _analyze("gitlab", "rust_compile_error")
+    excerpt = deterministic_report(job, attr, bundle).evidence[0].excerpt
+    for code in ("error[E0308]: mismatched types", "error[E0599]: no method named"):
+        assert code in excerpt, f"{code!r} missing — only part of the build's errors reached the report"
+
+
 @pytest.mark.parametrize("provider,stem,matcher_ids,causal,category", PARAMS, ids=IDS)
 def test_deterministic_category(provider, stem, matcher_ids, causal, category):
     """Each fixture classifies to its expected category with no LLM involved."""
