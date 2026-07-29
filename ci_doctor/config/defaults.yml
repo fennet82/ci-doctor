@@ -36,6 +36,7 @@ extraction:
   # Anchored matchers, highest priority survives budget pressure. `start`/`end`
   # capture a block; `pattern` captures a single line plus before/after context.
   matchers:
+    # --- Test frameworks and the build drivers that wrap them --------------
     - id: pytest
       start: '^=+ FAILURES =+'
       end: '^=+ short test summary'
@@ -91,6 +92,7 @@ extraction:
       before: 12
       after: 6
       priority: 84
+    # --- Containers, and the runner killing the job ------------------------
     - id: docker_build
       pattern: 'failed to solve|executor failed running'
       before: 3
@@ -228,6 +230,7 @@ extraction:
       after: 12
       priority: 80
 
+    # --- Fallback: a tool with no pack of its own --------------------------
     - id: generic_error
       pattern: '^(ERROR|FATAL)\b'
       before: 5

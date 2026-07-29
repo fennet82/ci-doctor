@@ -191,6 +191,10 @@ Every field you add to `config/schema.py` needs a `description=` — it becomes 
 the published `ci-doctor.schema.json`, and `test_json_schema_documents_every_field` fails
 without it.
 
+The docs site's matcher catalogue is **generated** from `defaults.yml`, including the
+`# --- Group ---` comment headers that organise it. After adding or retuning a pack, run
+`mise run docs:data`; `test_docs_data_is_current` fails if the committed JSON drifts.
+
 ### 5.2 Where a pattern goes: the classifier or the catalogue
 
 There are two places a "this looks like a failure" regex could land, and they answer

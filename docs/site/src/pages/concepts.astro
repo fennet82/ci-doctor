@@ -1,0 +1,427 @@
+---
+import { Code } from 'astro:components';
+import Base from '../layouts/Base.astro';
+import { url } from '../lib/url';
+
+// Each pipeline stage: the module that owns it, and the config that tunes it.
+const stages = [
+  { n: 1, name: 'Acquire', mod: 'providers/', what: 'Fetch the failed run and its job logs over the provider API, or read a saved log from disk.', cfg: 'provider, gitlab, github' },
+  { n: 2, name: 'Segment', mod: 'providers/*/segmenter.py', what: 'Cut the raw log into named sections. Each CI system frames a job differently; this is the last place that difference is visible.', cfg: '—' },
+  { n: 3, name: 'Map phases', mod: 'core/phases.py', what: 'Label each section with a phase: provision, prepare, fetch, script, post.', cfg: 'phases' },
+  { n: 4, name: 'Attribute', mod: 'core/attribution.py', what: 'Decide which phase actually failed, from job metadata and log structure. Pure, deterministic, no model.', cfg: '— (deliberately)' },
+  { n: 5, name: 'Denoise', mod: 'core/denoise.py', what: 'Strip ANSI colour, collapse progress bars, fold repeated lines, drop configured noise.', cfg: 'denoise' },
+  { n: 6, name: 'Extract', mod: 'core/extract.py', what: 'Run every matcher over the blamed section and keep the windows they anchor. Every gap is marked.', cfg: 'extraction.matchers' },
+  { n: 7, name: 'Budget', mod: 'core/budget.py', what: 'Shed the lowest-priority windows, then trim what survives to the token budget.', cfg: 'llm.max_input_tokens' },
+  { n: 8, name: 'Explain', mod: 'llm/', what: 'One optional model call, given only the budgeted evidence. Answers why, never where.', cfg: 'llm' },
+  { n: 9, name: 'Redact', mod: 'core/redact.py', what: 'Scrub secrets. Runs twice — on the prompt before it leaves the process, and on the finished report.', cfg: 'redaction' },
+  { n: 10, name: 'Render', mod: 'render/', what: 'Terminal, report.md, report.json, and optionally one idempotent note on the MR/PR.', cfg: 'output' },
+];
+
+const modules = [
+  { path: 'cli.py', role: 'The only place the pieces are wired together. Typer commands, logging, and the `exit 0` guarantee.' },
+  { path: 'config/schema.py', role: 'The pydantic model, and the source of truth for the published JSON Schema. Unknown keys are an error.' },
+  { path: 'config/loader.py', role: 'Layers the config: schema defaults, defaults.yml, your file, env, flags. Owns the merge-by-id rule.' },
+  { path: 'config/defaults.yml', role: 'The data-heavy baseline — phase map, matcher packs, noise patterns. Data, not code.' },
+  { path: 'core/models.py', role: 'The domain: Job, Section, LogLine, Phase, FailureReason. Everything downstream speaks only this.' },
+  { path: 'core/ports.py', role: 'The protocols a provider must satisfy (fetch a run, segment a log). How core stays provider-blind.' },
+  { path: 'core/attribution.py', role: 'The classifier. A pure function of metadata and log structure — no I/O, no clock, no config.' },
+  { path: 'core/extract.py', role: 'Matchers, windows, merging, and the elision markers that make every cut visible.' },
+  { path: 'core/analyze.py', role: 'The orchestrator: denoise, extract and budget the blamed section into one EvidenceBundle.' },
+  { path: 'providers/gitlab/', role: 'Adapter: REST client, log segmenter, and the mapping from GitLab failure reasons to the domain enum.' },
+  { path: 'providers/github/', role: 'The same three pieces for GitHub Actions. Adding a provider means adding a directory, not editing core.' },
+  { path: 'llm/report.py', role: 'Builds the report — deterministically when there is no model, and the category signatures either way.' },
+  { path: 'llm/backends.py', role: 'openai, litellm, claude_code. All prompt-and-parse; the caller validates the JSON.' },
+  { path: 'render/', role: 'Terminal (rich), Markdown and JSON writers. Presentation only — no decisions live here.' },
+];
+
+const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags`;
+
+const windowExample = `# denoised log, blamed section
+   Compiling ledger v0.4.1
+error[E0308]: mismatched types      <- matcher anchors here
+   --> src/posting.rs:88:31          |
+    |                                |  window: the lines kept
+88  |     let rate: Decimal = ...     |
+    = note: expected \`Decimal\`      <-
+… [14 lines elided] …                  <- the gap is announced, never silent
+error: could not compile \`ledger\``;
+---
+<Base title="Concepts" description="How ci-doctor decides where a job failed, and what each part of the codebase does.">
+  <h1>Concepts</h1>
+  <p class="lead">
+    What the moving parts are called, what each one decides, and where it lives in the
+    code. Read this once and the <a href={url('/configuration/')}>configuration</a>
+    reference stops being a list of unexplained knobs.
+  </p>
+
+  <div class="note">
+    <strong>The one rule everything else follows.</strong> Deterministic code decides
+    <em>where</em> the job failed; the LLM only explains <em>why</em>. Phase attribution
+    runs before any model is called, so a loud but harmless cache warning can never be
+    blamed over the real <code>exit code 1</code>. If the classifier is wrong, that is a
+    bug with a failing test — not a prompt to tune.
+  </div>
+
+  <h2>The pipeline</h2>
+  <p>
+    One pass, ten stages, no loops. Each stage narrows the log; the last four are the only
+    ones that ever see fewer lines than the job actually printed.
+  </p>
+
+  <ol class="pipeline">
+    {stages.map((s) => (
+      <li class="stage">
+        <div class="stage-head">
+          <span class="stage-n">{s.n}</span>
+          <span class="stage-name">{s.name}</span>
+          <code class="stage-mod">{s.mod}</code>
+        </div>
+        <p class="stage-what">{s.what}</p>
+        <p class="stage-cfg">tuned by <code>{s.cfg}</code></p>
+      </li>
+    ))}
+  </ol>
+
+  <h2>Architecture</h2>
+  <p>
+    Three bands. Providers know their CI system and nothing else; core knows the domain and
+    no provider; outputs render what core decided. The arrow through the middle is the only
+    way data crosses.
+  </p>
+
+  <div class="arch" role="img" aria-label="Architecture: provider adapters feed the provider-neutral core through ports; the core feeds the LLM and renderers.">
+    <div class="band">
+      <span class="band-label">Adapters</span>
+      <div class="band-boxes">
+        <span class="box">providers/gitlab/</span>
+        <span class="box">providers/github/</span>
+        <span class="box muted">providers/&lt;yours&gt;/</span>
+      </div>
+      <p class="band-note">REST client · log segmenter · failure-reason map</p>
+    </div>
+
+    <div class="seam">
+      <span class="seam-label">core/ports.py — the only contract</span>
+    </div>
+
+    <div class="band accent">
+      <span class="band-label">Core (provider-neutral)</span>
+      <div class="band-boxes">
+        <span class="box">models</span>
+        <span class="box">phases</span>
+        <span class="box">attribution</span>
+        <span class="box">denoise</span>
+        <span class="box">extract</span>
+        <span class="box">budget</span>
+        <span class="box">redact</span>
+      </div>
+      <p class="band-note">Pure. No network, no clock, and no provider ever named here.</p>
+    </div>
+
+    <div class="seam">
+      <span class="seam-label">EvidenceBundle — all the report step is allowed to see</span>
+    </div>
+
+    <div class="band">
+      <span class="band-label">Outputs</span>
+      <div class="band-boxes">
+        <span class="box">llm/ <span class="opt">optional</span></span>
+        <span class="box">render/terminal</span>
+        <span class="box">render/markdown</span>
+        <span class="box">render/json</span>
+      </div>
+      <p class="band-note">With no model, the deterministic report is the output — not a stub.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Why the middle band is sealed.</strong> <code>grep -ri gitlab ci_doctor/core/</code>
+    must return nothing, and CI fails if it does. That is what makes adding a CI system a
+    matter of dropping in a directory rather than threading a third case through the
+    classifier.
+  </div>
+
+  <h2>What each module does</h2>
+  <table>
+    <thead><tr><th>Path</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      {modules.map((m) => (
+        <tr><td><code>{m.path}</code></td><td>{m.role}</td></tr>
+      ))}
+    </tbody>
+  </table>
+
+  <h2>The vocabulary</h2>
+
+  <h3>Section</h3>
+  <p>
+    A named region of a job log. GitLab emits <code>section_start:…:step_script</code>
+    markers; GitHub emits <code>##[group]</code> headers and step boundaries. The segmenter
+    turns either into the same tree, and that is the last point where the two formats differ.
+  </p>
+
+  <h3>Phase</h3>
+  <p>
+    What a section was <em>for</em>, independent of what the CI system calls it:
+    <code>provision</code> (getting a runner at all), <code>prepare</code> (the image and
+    environment), <code>fetch</code> (source, cache, artifacts), <code>script</code> (your
+    commands), <code>post</code> (cleanup, artifact upload). The
+    <code>phases</code> config maps section names onto these, and you extend it for your own
+    custom sections.
+  </p>
+
+  <h3>Attribution</h3>
+  <p>
+    Choosing which phase actually failed. An ordered rule set — an unclosed section beats a
+    reported reason, which beats the last section containing a real error, which beats the
+    trailer's exit code. It is a pure function with no config and no model, so its verdict
+    is reproducible and every rule has a fixture behind it. A runner's
+    <code>WARNING:</code> is never fatal; a tool printing <code>warning:</code> from inside
+    a step still is, because that is the step's own output.
+  </p>
+
+  <h3>Denoise</h3>
+  <p>
+    Cutting volume before anything is selected. Per line: strip ANSI escapes, collapse
+    <code>\r</code> progress-bar rewrites to their final state, optionally drop the runner's
+    timestamp prefix, then drop configured noise patterns. Finally, runs of identical lines
+    fold into one with a <code>(×47)</code> count. A line that looks like an error is never
+    removed by a noise pattern — the escape hatch that stops an over-broad rule from
+    deleting the one line that explains the failure.
+  </p>
+
+  <h3>Matcher, window, priority</h3>
+  <p>
+    A matcher is a regex that recognises one tool's failure output. Where it fires, it
+    anchors a <strong>window</strong> — the run of lines actually worth showing. Overlapping
+    windows merge; the space between them is replaced by an explicit count.
+  </p>
+  <Code code={windowExample} lang="text" theme="github-dark" />
+  <p>
+    <strong>Priority</strong> decides who survives when the evidence exceeds the budget.
+    Rank a pack by how <em>diagnostic</em> it is, not how loud: <code>npm ERR!</code> always
+    trails the compiler errors that caused it, so it must lose to <code>tsc</code>. The
+    full catalogue is on the <a href={url('/matchers/')}>matchers</a> page.
+  </p>
+
+  <h3>Budget</h3>
+  <p>
+    The evidence has to fit the model's input limit. Two passes, in order: shed whole
+    low-priority windows, then trim whatever survived. Trimming keeps the tail, because the
+    failure lives at the end of a log — and it announces what it dropped.
+  </p>
+
+  <h3>Redaction</h3>
+  <p>
+    Scrubbing secrets out of everything that leaves the process. A local regex set (private
+    keys, <code>glpat-</code> tokens, AWS keys, <code>Authorization:</code> headers,
+    credentials embedded in URLs) plus the literal values of any environment variable whose
+    <em>name</em> looks secret — a stand-in for the CI's masked-variable list, so a token
+    with no recognisable shape is still caught.
+  </p>
+  <p>
+    It runs <strong>twice</strong>: on the prompt before it is sent, and on the finished
+    report before it is printed or posted. Once is not enough — a model can quote a secret
+    straight out of the log it was shown. There is no entropy scanning and no network call;
+    replacements read <code>[REDACTED:&lt;kind&gt;]</code> so the report stays legible.
+  </p>
+
+  <h3>Evidence bundle</h3>
+  <p>
+    Everything the report step gets, and all it gets: the blamed phase, its denoised and
+    budgeted lines, one non-causal note per warning-only phase, job metadata, the token
+    estimate, and whether anything was truncated. Truncation is always surfaced — a silent
+    cut would be a lie about the evidence.
+  </p>
+
+  <h2>Configuration layering</h2>
+  <p>Every knob above is set by the same five-layer merge:</p>
+  <Code code={layering} lang="text" theme="github-dark" />
+  <p>
+    Mappings deep-merge, lists and scalars replace. The one exception is a list whose entries
+    all carry an <code>id</code> — today only <code>extraction.matchers</code> — which merges
+    per id, so your packs add to the shipped ones instead of wiping them. See
+    <a href={url('/configuration/')}>Configuration</a> for the full reference.
+  </p>
+
+  <h2>The invariants</h2>
+  <p>These are enforced by tests, not convention. The first three are load-bearing:</p>
+  <ul class="tight">
+    <li><strong>The LLM never selects the failure phase.</strong> Attribution is deterministic and auditable.</li>
+    <li><strong>No provider identifiers in <code>core/</code>.</strong> Checked by grep in CI.</li>
+    <li><strong>Always <code>exit 0</code>.</strong> ci-doctor can never change your pipeline's outcome or mask the real failure.</li>
+    <li>Nothing reaches the public internet by default — no telemetry, no update checks, no runtime downloads.</li>
+    <li>Never emit unredacted log content: redaction runs on the prompt <em>and</em> the report.</li>
+    <li>Every truncation is visible (<code>… [N lines elided] …</code>), never a silent cut.</li>
+  </ul>
+</Base>
+
+<style>
+  /* ---------- pipeline ---------- */
+  .pipeline {
+    list-style: none;
+    margin: 1.75rem 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .stage {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    padding: 0.9rem 1.1rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* The connector between consecutive stages. */
+  .stage + .stage::before {
+    content: '';
+    position: absolute;
+    top: -0.6rem;
+    left: 1.85rem;
+    width: 1px;
+    height: 0.6rem;
+    background: var(--border-strong);
+  }
+
+  .stage-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .stage-n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  .stage-name { font-weight: 650; letter-spacing: -0.01em; }
+
+  .stage-mod {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.1em 0.45em;
+    white-space: nowrap;
+  }
+
+  .stage-what {
+    margin: 0.45rem 0 0 2.1rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+
+  .stage-cfg {
+    margin: 0.3rem 0 0 2.1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .stage-cfg code {
+    font-size: 0.94em;
+    white-space: normal;
+  }
+
+  @media (max-width: 560px) {
+    .stage-what,
+    .stage-cfg { margin-left: 0; }
+    .stage + .stage::before { left: 1.1rem; }
+  }
+
+  /* ---------- architecture ---------- */
+  .arch { margin: 1.75rem 0; }
+
+  .band {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .band.accent {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: var(--accent-soft);
+  }
+
+  .band-label {
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .band-boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .box {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    padding: 0.32em 0.7em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--fg);
+    white-space: nowrap;
+  }
+  .box.muted {
+    color: var(--muted);
+    border-style: dashed;
+  }
+  .box .opt {
+    font-family: var(--sans);
+    font-size: 0.85em;
+    color: var(--muted);
+  }
+
+  .band-note {
+    margin: 0.7rem 0 0;
+    font-size: 0.86rem;
+    color: var(--muted);
+    max-width: none;
+  }
+
+  /* The arrow joining two bands, with the contract that crosses it. */
+  .seam {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    position: relative;
+  }
+  .seam::before,
+  .seam::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-strong);
+  }
+  .seam-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 0 0.2rem;
+  }
+</style>

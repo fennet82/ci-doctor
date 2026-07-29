@@ -70,6 +70,10 @@ depends = ["test", "lint", "guardrails", "leaks"]
 description = "Emit the .ci-doctor.yml JSON Schema (what the release attaches)"
 run = "uv run ci-doctor config --schema"
 
+[tasks."docs:data"]
+description = "Regenerate the docs matcher catalogue from defaults.yml"
+run = "uv run python scripts/gen_docs_data.py"
+
 # The site is served from /ci-doctor, so the dev URL carries the base too.
 [tasks.docs]
 description = "Preview the docs site at http://localhost:4321/ci-doctor"
