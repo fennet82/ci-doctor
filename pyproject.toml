@@ -45,6 +45,7 @@ ci-doctor = "ci_doctor.cli:main"
 dev = [
     "pytest>=8",
     "pytest-cov>=7.1.0",
+    "pytest-github-actions-annotate-failures>=0.4.2",
     "ruff>=0.15,<0.16",  # 0.16 widened the DEFAULT rule set; adopting it is its own change
     # ty is pre-1.0, so its diagnostics still move between releases. Pinned below 0.1
     # for the same reason ruff is pinned below 0.16: a checker that quietly grows new

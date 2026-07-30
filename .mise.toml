@@ -45,7 +45,7 @@ run = "uv run pytest -q --cov"
 # without that, `uv run --python 3.11` would swap your working environment and
 # leave you on whichever version ran last. The venvs are cached, so only the
 # first run pays for the interpreter download.
-[tasks."test:all"]
+[tasks."test:matrix"]
 description = "Run the suite on every supported Python (3.11-3.14), like CI"
 run = '''
 fail=0

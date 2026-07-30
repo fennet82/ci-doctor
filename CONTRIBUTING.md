@@ -32,14 +32,14 @@ No services, accounts or credentials are needed; the suite is fully offline.
 ## 2. Tests and checks
 
 ```sh
-mise run test      # or: uv run pytest
-mise run test:all  # the suite on 3.11, 3.12, 3.13 and 3.14, like the CI matrix
-mise run cov       # the suite with coverage, against the floor CI enforces
-mise run lint      # ruff check + format (Python and markdown), then ty
-mise run check     # everything CI runs: test, lint, guardrails, leaks
+mise run test         # or: uv run pytest
+mise run test:matrix  # the suite on 3.11-3.14, like the CI matrix
+mise run cov          # the suite with coverage, against the floor CI enforces
+mise run lint         # ruff check + format (Python and markdown), then ty
+mise run check        # everything CI runs: test, lint, guardrails, leaks
 ```
 
-`test:all` gives each version its own `.venv-3.x` (uv marks them ignored itself) so
+`test:matrix` gives each version its own `.venv-3.x` (uv marks them ignored itself) so
 your default `.venv` is never rebuilt underneath you. Only the first run pays for
 the interpreter downloads. One version is enough for the normal loop — reach for
 this before a push that touches syntax or a stdlib call, or when CI reddens on a
@@ -57,6 +57,25 @@ lower it to turn a red build green.
 **Types** are checked by [ty](https://github.com/astral-sh/ty) over `ci_doctor`, not
 `tests`: a type error in the shipped package is something a user hits. ty is pre-1.0
 and pinned in `pyproject.toml`, so a new release cannot redden an unrelated PR.
+
+The three lists of supported Python versions — the `pyproject.toml` classifiers, the
+`ci.yml` matrix and the `test:matrix` task — are pinned to each other by
+`tests/test_python_versions.py`. Add a version in one place and that test tells you
+the other two. It is the same trick `test_docs_data_is_current` plays on the docs.
+
+### 2.2 Reading the results on GitHub
+
+There is no coverage tab like GitLab's, so the run page carries it instead:
+
+| What | Where it shows up |
+|---|---|
+| Coverage table, per Python version | The run's **Summary** page, written to `$GITHUB_STEP_SUMMARY`. Missing line numbers included. |
+| Failing tests | Annotated **inline on the PR diff**, via the `pytest-github-actions-annotate-failures` dev dependency. It emits GitHub's `::error` commands and is silent everywhere else, so local output is unchanged. |
+| Type and lint errors | The `lint` job's log. |
+
+All of it is native — no third-party action, no account, nothing to authorise. The
+one thing this does *not* give you is coverage **history**; a hosted service like
+Codecov is the only way to get a trend line, at the cost of an account and a token.
 
 ### 2.1 Git hooks
 

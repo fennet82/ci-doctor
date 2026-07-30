@@ -35,7 +35,22 @@ jobs:
       # No network and no LLM by design — tests/conftest.py blocks real sockets.
       # --cov enforces the floor in [tool.coverage.report]; it is off locally because
       # it triples the runtime, so this job is where the gate actually bites.
+      # A failing test also annotates the diff inline, via the
+      # pytest-github-actions-annotate-failures dev dependency — it emits GitHub's
+      # ::error workflow commands and stays silent anywhere else, so no step here.
       - run: uv run pytest -q --cov
+      # GitHub's answer to GitLab's report artifacts: $GITHUB_STEP_SUMMARY is markdown
+      # rendered on the run page, per job. Native, so no third-party action and no
+      # account. always() because the coverage of a red run is exactly when you want
+      # it; --fail-under=0 because pytest already gated above and a second failure
+      # here would only obscure which check actually broke. `|| true` for the same
+      # reason: with no data coverage writes its own "No data to report." into the
+      # summary, which is the whole message — it should not also redden the step.
+      - name: Coverage summary
+        if: always()
+        run: |
+          echo "### Coverage — Python ${{ matrix.python-version }}" >> "$GITHUB_STEP_SUMMARY"
+          uv run coverage report --format=markdown --fail-under=0 >> "$GITHUB_STEP_SUMMARY" || true
 
   lint:
     runs-on: ubuntu-latest
