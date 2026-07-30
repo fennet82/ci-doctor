@@ -60,7 +60,7 @@ shell — read them, they are short.
 |---|---|
 | `pre-commit` | `ruff check --fix` then `ruff format` on staged `*.py`, `ruff format --preview` on staged `*.md`, and re-stages only what it rewrote. Fix runs first: removing an unused import leaves the blank lines it sat between. |
 | `commit-msg` | Rejects anything that is not a Conventional Commit. Not cosmetic — semantic-release parses these to pick the version bump. |
-| `pre-push` | `pytest`, the `core/` guardrail grep, and `gitleaks` if installed. Everything CI runs, before the round trip. |
+| `pre-push` | `pytest`, `ty`, the `core/` guardrail grep, and `gitleaks` if installed. Everything CI runs, before the round trip. |
 
 `--no-verify` skips them. CI does not, so it only moves where you find out.
 

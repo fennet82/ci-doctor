@@ -8,6 +8,10 @@ fail=0
 echo "pre-push: tests"
 uv run pytest -q || fail=1
 
+echo "pre-push: types"
+# ci_doctor only, matching the CI job — tests are not type-checked.
+uv run ty check ci_doctor || fail=1
+
 echo "pre-push: guardrails"
 # Invariant #2 — core/ must not know a provider exists.
 if grep -rniE 'gitlab|github' ci_doctor/core/; then
