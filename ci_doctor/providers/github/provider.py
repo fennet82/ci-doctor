@@ -9,7 +9,9 @@ target for the log blob, and we fetch that ourselves.
 
 import logging
 import re
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from github import Auth, Github, GithubException
 
@@ -26,7 +28,7 @@ log = logging.getLogger("ci_doctor.github")
 _FAILED_CONCLUSIONS = {"failure", "timed_out", "startup_failure", "cancelled"}
 
 
-def _read_token(cfg: GitHubConfig, environ: dict[str, str]) -> str | None:
+def _read_token(cfg: GitHubConfig, environ: Mapping[str, str]) -> str | None:
     """Resolve the API token, file first.
 
     Args:
@@ -48,7 +50,7 @@ def _read_token(cfg: GitHubConfig, environ: dict[str, str]) -> str | None:
 class GitHubProvider(CIProvider):
     """Read-only GitHub Actions adapter over PyGithub."""
 
-    def __init__(self, config: Config, client=None, environ: dict[str, str] | None = None):
+    def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
         """Connect to GitHub, unless a client is injected.
 
         Args:
@@ -64,7 +66,7 @@ class GitHubProvider(CIProvider):
         self._repo_obj = None
         #: Raw PyGithub jobs kept from fetch_run, keyed by id: the log lives behind
         #: a method on the job object and the API exposes no by-id job lookup.
-        self._raw_jobs: dict[str, object] = {}
+        self._raw_jobs: dict[str, Any] = {}
         self.gh = client if client is not None else self._connect()
 
     # --- connection -------------------------------------------------------

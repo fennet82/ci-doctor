@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ci_doctor.core.models import Phase
+from ci_doctor.core.models import Confidence, Phase
 
 #: What kind of failure this was, orthogonal to :class:`Phase` (*where* it failed).
 #: "runtime" means the application itself crashed, as opposed to its tests or build.
@@ -83,7 +83,7 @@ class Report(BaseModel):
     summary: str = Field(max_length=140)  # one sentence
     failure_phase: Phase
     category: Category
-    confidence: Literal["high", "medium", "low"]
+    confidence: Confidence
     is_infra_not_code: bool  # "not your fault" signal
     likely_flaky: bool
     root_cause: str  # 2-4 sentences

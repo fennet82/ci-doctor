@@ -9,6 +9,7 @@ model is actually configured and called.
 
 import json
 import os
+from typing import Any
 
 from ci_doctor.config.schema import LLMConfig
 from ci_doctor.core.ports import LLMClient
@@ -67,7 +68,7 @@ class OpenAILLMClient(LLMClient):
         """
         from openai import OpenAI
 
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "base_url": self.cfg.api_base,
             "api_key": self._api_key(),
             "timeout": self.cfg.timeout_seconds,

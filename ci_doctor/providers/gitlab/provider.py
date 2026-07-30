@@ -8,6 +8,7 @@ on older instances degrade to sensible defaults instead of crashing.
 """
 
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 
 import gitlab
@@ -24,7 +25,7 @@ log = logging.getLogger("ci_doctor.gitlab")
 class GitLabProvider(CIProvider):
     """Read-only GitLab adapter over python-gitlab."""
 
-    def __init__(self, config: Config, client=None, environ: dict[str, str] | None = None):
+    def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
         """Connect to GitLab, unless a client is injected.
 
         Args:

@@ -7,6 +7,12 @@ provider name over core/ must return nothing (keep this file free of them too).
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Literal
+
+#: How much to trust a verdict. A Literal rather than a StrEnum because it is
+#: serialised straight into the report schema, where the enum would change the
+#: emitted JSON Schema for no gain.
+Confidence = Literal["high", "medium", "low"]
 
 
 class Phase(StrEnum):

@@ -10,6 +10,7 @@ and must not fetch anything.
 
 import os
 import re
+from collections.abc import Mapping
 
 from ci_doctor.config.schema import RedactionConfig
 
@@ -46,7 +47,7 @@ def _compiled(cfg: RedactionConfig):
     return pats
 
 
-def _env_secret_literals(environ: dict[str, str]) -> list[str]:
+def _env_secret_literals(environ: Mapping[str, str]) -> list[str]:
     """Collect the *values* of secret-named environment variables.
 
     A best-effort stand-in for the CI's masked-variable list: if the runner
@@ -64,7 +65,9 @@ def _env_secret_literals(environ: dict[str, str]) -> list[str]:
     return sorted(vals, key=len, reverse=True)  # longest first, so substrings don't pre-empt
 
 
-def redact_text(text: str, cfg: RedactionConfig | None = None, environ: dict[str, str] | None = None) -> str:
+def redact_text(
+    text: str, cfg: RedactionConfig | None = None, environ: Mapping[str, str] | None = None
+) -> str:
     """Scrub secrets from a string.
 
     Args:
@@ -89,7 +92,7 @@ def redact_text(text: str, cfg: RedactionConfig | None = None, environ: dict[str
     return text
 
 
-def redact_report(report, cfg: RedactionConfig | None = None, environ: dict[str, str] | None = None):
+def redact_report(report, cfg: RedactionConfig | None = None, environ: Mapping[str, str] | None = None):
     """Scrub every free-text field of a report.
 
     Applied to the finished report, after the LLM has spoken — a model can quote

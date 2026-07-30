@@ -14,7 +14,7 @@ count, and ``_last_error_section`` for where it bites.
 import re
 from dataclasses import dataclass, field
 
-from ci_doctor.core.models import FailureReason, Job, Phase, Section
+from ci_doctor.core.models import Confidence, FailureReason, Job, Phase, Section
 
 _SYNTHETIC = {"__preamble__", "__trailer__"}
 
@@ -75,7 +75,7 @@ class Attribution:
 
     phase: Phase
     reason: FailureReason
-    confidence: str  # "high" | "medium" | "low"
+    confidence: Confidence
     terminal_evidence: str | None
     rule_id: str
     secondary_phases: list[Phase] = field(default_factory=list)

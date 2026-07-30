@@ -12,7 +12,7 @@ import logging
 import os
 from copy import deepcopy
 from importlib import resources
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -149,7 +149,7 @@ def _coerce(raw: str) -> Any:
         return raw
 
 
-def _env_overlay(environ: dict[str, str]) -> dict:
+def _env_overlay(environ: Mapping[str, str]) -> dict:
     """CI_DOCTOR_LLM__MODEL=x -> {"llm": {"model": "x"}}. "__" nests.
 
     Only vars whose first segment is a known top-level config field are consumed.
@@ -174,7 +174,7 @@ def _env_overlay(environ: dict[str, str]) -> dict:
 def load_config(
     repo_config: str | Path | Iterable[str | Path] | None = None,
     overrides: dict | None = None,
-    environ: dict[str, str] | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> Config:
     """Assemble and validate the effective config from every layer.
 

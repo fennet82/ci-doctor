@@ -33,13 +33,23 @@ No services, accounts or credentials are needed; the suite is fully offline.
 
 ```sh
 mise run test     # or: uv run pytest
-mise run lint     # ruff check + format, Python and markdown
+mise run cov      # the suite with coverage, against the floor CI enforces
+mise run lint     # ruff check + format (Python and markdown), then ty
 mise run check    # everything CI runs: test, lint, guardrails, leaks
 ```
 
 The suite blocks real sockets and never calls an LLM, so it runs in seconds. What a
 *good* test looks like, the fixture layout, and which file to put it in are in
 [GUIDELINES.md §4](GUIDELINES.md).
+
+**Coverage** has a floor, not a target: `fail_under` in `pyproject.toml`. It is off
+by default because measuring it triples the runtime and the local loop is meant to
+stay fast — CI always measures. Raise the floor when you close a real gap; never
+lower it to turn a red build green.
+
+**Types** are checked by [ty](https://github.com/astral-sh/ty) over `ci_doctor`, not
+`tests`: a type error in the shipped package is something a user hits. ty is pre-1.0
+and pinned in `pyproject.toml`, so a new release cannot redden an unrelated PR.
 
 ### 2.1 Git hooks
 
@@ -93,6 +103,7 @@ and the pipeline will run as normal.
 
 ```sh
 uv run pytest                      # all green, no exceptions
+uv run ty check ci_doctor          # no type errors in the shipped package
 grep -ri gitlab ci_doctor/core/    # must be empty (invariant #2)
 grep -ri github ci_doctor/core/    # must be empty
 ```

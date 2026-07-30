@@ -98,7 +98,10 @@ class LiteLLMClient(LLMClient):
             json.JSONDecodeError: If the reply is not JSON.
             Exception: Any provider error.
         """
-        import litellm
+        # Unresolved by design: the `litellm` extra is optional (see the module
+        # docstring). Making the type checker resolve it would mean installing the
+        # dependency whose whole point is not being in the base install.
+        import litellm  # ty: ignore[unresolved-import]
 
         litellm.telemetry = False  # no phone-home
         api_key = self.environ.get(self.cfg.api_key_env) if self.cfg.api_key_env else None

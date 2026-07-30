@@ -20,7 +20,7 @@ from ci_doctor.core.analyze import EvidenceBundle
 from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.models import FailureReason, Job, Phase
 from ci_doctor.core.redact import redact_report, redact_text
-from ci_doctor.llm.schema import Evidence, RemediationStep, Report
+from ci_doctor.llm.schema import Category, Evidence, RemediationStep, Report
 
 log = logging.getLogger("ci_doctor.llm")
 
@@ -35,7 +35,7 @@ _REMEDIATION = {
 }
 #: Reasons that determine the category outright, no log inspection needed.
 #: `script_failure` is deliberately absent — it needs the evidence signatures below.
-_CATEGORY = {
+_CATEGORY: dict[FailureReason, Category] = {
     FailureReason.NO_RUNNER: "infrastructure",
     FailureReason.RUNNER_SYSTEM: "infrastructure",
     FailureReason.TIMEOUT: "timeout",
@@ -49,7 +49,7 @@ _CATEGORY = {
 #:
 #: ponytail: signature heuristic, known ceiling — the LLM is more accurate; upgrade
 #: path is to let the model set category (enable an llm.backend).
-_CATEGORY_SIGNATURES: list[tuple[str, str]] = [
+_CATEGORY_SIGNATURES: list[tuple[Category, str]] = [
     (
         "infrastructure",
         r"exit code 137|\bKilled\b|Out of memory|no space left on device|cannot allocate memory",
@@ -100,7 +100,7 @@ _CATEGORY_SIGNATURES: list[tuple[str, str]] = [
 ]
 
 
-def _infer_category(reason: FailureReason, text: str) -> str:
+def _infer_category(reason: FailureReason, text: str) -> Category:
     """Classify a failure without asking a model.
 
     Args:
