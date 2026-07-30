@@ -40,6 +40,23 @@ run = "uv run pytest -q"
 description = "Run the suite with coverage and enforce the floor CI enforces"
 run = "uv run pytest -q --cov"
 
+# The same matrix ci.yml runs. Each version gets its own .venv-3.x via
+# UV_PROJECT_ENVIRONMENT so the default .venv is never rebuilt underneath you —
+# without that, `uv run --python 3.11` would swap your working environment and
+# leave you on whichever version ran last. The venvs are cached, so only the
+# first run pays for the interpreter download.
+[tasks."test:all"]
+description = "Run the suite on every supported Python (3.11-3.14), like CI"
+run = '''
+fail=0
+for v in 3.11 3.12 3.13 3.14; do
+  echo "--- python $v"
+  UV_PROJECT_ENVIRONMENT=".venv-$v" uv run --python "$v" pytest -q || fail=1
+done
+[ $fail -eq 0 ] || echo "test:all: at least one version failed" >&2
+exit $fail
+'''
+
 [tasks.lint]
 description = "Lint and check formatting, Python and markdown"
 run = [

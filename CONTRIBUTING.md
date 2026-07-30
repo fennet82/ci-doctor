@@ -32,11 +32,18 @@ No services, accounts or credentials are needed; the suite is fully offline.
 ## 2. Tests and checks
 
 ```sh
-mise run test     # or: uv run pytest
-mise run cov      # the suite with coverage, against the floor CI enforces
-mise run lint     # ruff check + format (Python and markdown), then ty
-mise run check    # everything CI runs: test, lint, guardrails, leaks
+mise run test      # or: uv run pytest
+mise run test:all  # the suite on 3.11, 3.12, 3.13 and 3.14, like the CI matrix
+mise run cov       # the suite with coverage, against the floor CI enforces
+mise run lint      # ruff check + format (Python and markdown), then ty
+mise run check     # everything CI runs: test, lint, guardrails, leaks
 ```
+
+`test:all` gives each version its own `.venv-3.x` (uv marks them ignored itself) so
+your default `.venv` is never rebuilt underneath you. Only the first run pays for
+the interpreter downloads. One version is enough for the normal loop — reach for
+this before a push that touches syntax or a stdlib call, or when CI reddens on a
+version you don't have.
 
 The suite blocks real sockets and never calls an LLM, so it runs in seconds. What a
 *good* test looks like, the fixture layout, and which file to put it in are in
