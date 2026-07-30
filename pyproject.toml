@@ -44,7 +44,12 @@ ci-doctor = "ci_doctor.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15,<0.16",  # 0.16 widened the DEFAULT rule set; adopting it is its own change
+    # ty is pre-1.0, so its diagnostics still move between releases. Pinned below 0.1
+    # for the same reason ruff is pinned below 0.16: a checker that quietly grows new
+    # rules turns an unrelated PR red. Bumping it is its own change.
+    "ty>=0.0.65,<0.1",
 ]
 
 [build-system]
@@ -62,6 +67,20 @@ line-length = 110
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Coverage is opt-in per run (`--cov`) rather than in addopts: it triples the suite's
+# wall time, and the local loop is meant to stay under five seconds. CI always passes
+# the flag, so the floor below is enforced on every push regardless.
+[tool.coverage.run]
+source = ["ci_doctor"]
+branch = true
+
+[tool.coverage.report]
+# The floor, not a target. Set to where the suite already stood so it catches a
+# regression instead of blessing one; raise it when a real gap gets closed, and
+# never lower it to make a red build green.
+fail_under = 84
+show_missing = true
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

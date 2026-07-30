@@ -36,12 +36,17 @@ run = [
 description = "Run the test suite (no network, no LLM)"
 run = "uv run pytest -q"
 
+[tasks.cov]
+description = "Run the suite with coverage and enforce the floor CI enforces"
+run = "uv run pytest -q --cov"
+
 [tasks.lint]
 description = "Lint and check formatting, Python and markdown"
 run = [
   "uv run ruff check ci_doctor tests",
   "uv run ruff format --check ci_doctor tests",
   "uv run ruff format --preview --check $(git ls-files '*.md' ':!:.claude/**')",
+  "uv run ty check ci_doctor",
 ]
 
 [tasks.fmt]

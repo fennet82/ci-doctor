@@ -19,14 +19,23 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # pyproject claims 3.11–3.14 in requires-python and the classifiers. Testing one
+    # version would make that a claim nobody checks — a 3.11 syntax error would ship.
+    strategy:
+      fail-fast: false   # knowing it breaks on 3.11 *and* 3.14 is worth the minutes
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ matrix.python-version }}
       - run: uv sync
       # No network and no LLM by design — tests/conftest.py blocks real sockets.
-      - run: uv run pytest -q
+      # --cov enforces the floor in [tool.coverage.report]; it is off locally because
+      # it triples the runtime, so this job is where the gate actually bites.
+      - run: uv run pytest -q --cov
 
   lint:
     runs-on: ubuntu-latest
@@ -44,6 +53,10 @@ jobs:
       # ruff's stable rules. It reformats Python blocks inside docs, not prose.
       - name: ruff format (markdown code blocks)
         run: uv run ruff format --preview --check $(git ls-files '*.md' ':!:.claude/**')
+      # ci_doctor only, not tests/: the shipped package is what a type error can
+      # actually break for a user. Tests are free to be loose about types.
+      - name: ty
+        run: uv run ty check ci_doctor
 
   docs:
     runs-on: ubuntu-latest
