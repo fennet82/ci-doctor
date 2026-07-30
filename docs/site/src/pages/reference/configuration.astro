@@ -1,7 +1,7 @@
 ---
 import { Code } from 'astro:components';
-import Base from '../layouts/Base.astro';
-import { url } from '../lib/url';
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
 
 const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags`;
 
@@ -101,7 +101,7 @@ redaction:
     This page is the reference — every key and its default. For what the keys
     <em>mean</em> — phases, attribution, denoising, matchers, budget, redaction — start with
     <a href={url('/concepts/')}>Concepts</a>. The shipped matcher packs are listed on
-    <a href={url('/matchers/')}>Matchers</a>.
+    <a href={url('/concepts/matchers/')}>Matchers</a>.
   </div>
 
   <h2>How layers combine</h2>

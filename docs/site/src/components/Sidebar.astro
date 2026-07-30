@@ -1,0 +1,224 @@
+---
+/**
+ * The whole site, always visible. Every section and every page in it, derived
+ * from src/lib/nav.ts — so navigation never depends on remembering which
+ * section a page was filed under.
+ *
+ * Under 1000px it collapses into a drawer the header's button opens.
+ */
+import { nav } from '../lib/nav';
+import { url } from '../lib/url';
+
+interface Props {
+  /** Astro.url.pathname — already resolved, base and all. */
+  here: string;
+}
+const { here } = Astro.props;
+
+const trim = (path: string) => path.replace(/\/+$/, '') || '/';
+const isHere = (href: string) => trim(here) === trim(url(href));
+const inSection = (section: (typeof nav)[number]) =>
+  isHere(section.href) || section.pages.some((p) => isHere(p.href));
+
+/**
+ * Where a section's label points. Its own index page when it has one — every
+ * section does today, via `src/pages/<section>/index.astro`. A section without
+ * one falls through to its first page rather than being a dead label.
+ */
+const landing = (section: (typeof nav)[number]) =>
+  section.hasIndex === false && section.pages.length > 0 ? section.pages[0].href : section.href;
+---
+
+<nav class="sidebar" id="sidebar" aria-label="Documentation">
+  <ul class="sections">
+    {nav.map((s) =>
+      s.pages.length === 0 ? (
+        <li class="section">
+          <a
+            href={url(s.href)}
+            class:list={['section-head', 'solo', { active: isHere(s.href) }]}
+            aria-current={isHere(s.href) ? 'page' : undefined}
+          >
+            {s.label}
+          </a>
+        </li>
+      ) : (
+        <li class:list={['section', { current: inSection(s) }]}>
+          {/* <details> rather than a scripted accordion: keyboard support, the
+              open/close state and the disclosure semantics all come for free.
+              Open only for the section you are currently in — otherwise the
+              highlighted page would be hidden behind a closed section. */}
+          <details open={inSection(s)}>
+            {/* Two targets on one row: the chevron (and the empty space beside
+                it) toggles, the label navigates. A section head that only
+                toggled left its own index page unreachable. */}
+            <summary class="section-head">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+              <a
+                href={url(landing(s))}
+                class:list={['section-link', { active: isHere(s.href) }]}
+                aria-current={isHere(s.href) ? 'page' : undefined}
+                title={s.blurb}
+              >
+                {s.label}
+              </a>
+            </summary>
+            <ul class="pages">
+              {s.pages.map((p) => (
+                <li>
+                  <a
+                    href={url(p.href)}
+                    class:list={{ active: isHere(p.href) }}
+                    aria-current={isHere(p.href) ? 'page' : undefined}
+                    title={p.blurb}
+                  >
+                    {p.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </li>
+      )
+    )}
+  </ul>
+</nav>
+
+<script>
+  // A click on the section label must navigate, not toggle. The label sits
+  // inside <summary>, so the click would bubble there and fire the disclosure's
+  // activation behaviour as well; stopping propagation leaves the link's own
+  // navigation as the only thing that happens.
+  document.querySelectorAll('.sidebar summary a').forEach((link) => {
+    link.addEventListener('click', (e) => e.stopPropagation());
+  });
+</script>
+
+<style>
+  .sidebar {
+    /* Sticks under the header and scrolls independently once the tree is long. */
+    position: sticky;
+    top: var(--header-h);
+    align-self: start;
+    height: calc(100vh - var(--header-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Flush to the viewport's left edge, in line with the header's toggle. */
+    padding: 2rem 0.6rem 3rem var(--gutter);
+    border-right: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .section + .section {
+    margin-top: 0.35rem;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+    color: var(--fg);
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    /* The default disclosure triangle; the chevron replaces it. */
+    list-style: none;
+  }
+  .section-head::-webkit-details-marker { display: none; }
+
+  .section-head:hover {
+    background: var(--bg-subtle);
+    text-decoration: none;
+  }
+  .section-head.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  /* A childless section (the home page) has no chevron, so align its label. */
+  .section-head.solo { padding-left: 1.3rem; }
+
+  /* The label fills the rest of the row, so the clickable-to-navigate area is
+     the whole width rather than just the few characters of text. */
+  .section-link {
+    flex: 1;
+    color: inherit;
+    font: inherit;
+  }
+  .section-link:hover { text-decoration: underline; }
+  .section-link.active { color: var(--accent); }
+
+  .chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  details[open] > .section-head .chevron { transform: rotate(90deg); }
+
+  details > .pages { margin-top: 0.15rem; }
+  details + * { margin-top: 0; }
+
+  /* The rail: a page's own marker replaces this segment when it is current.
+     Aligned under the chevron so the tree reads as one vertical line. */
+  .pages {
+    border-left: 1px solid var(--border);
+    margin: 0 0 0.5rem 1.1rem;
+  }
+
+  .pages a {
+    display: block;
+    padding: 0.3rem 0.7rem;
+    margin-left: -1px;
+    border-left: 2px solid transparent;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  .pages a:hover {
+    color: var(--fg);
+    border-left-color: var(--border-strong);
+    text-decoration: none;
+  }
+  .pages a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Dim the sections you are not in. Closed already says it; this keeps the
+     one you are reading the obvious anchor in the list. */
+  .section:not(.current) > details > .section-head {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  @media (max-width: 1000px) {
+    .sidebar {
+      position: fixed;
+      top: var(--header-h);
+      bottom: 0;
+      left: 0;
+      z-index: 30;
+      width: min(19rem, 82vw);
+      height: auto;
+      padding: 1.5rem 1rem 3rem;
+      background: var(--bg);
+      box-shadow: var(--shadow-md);
+      transform: translateX(-100%);
+      transition: transform 0.18s ease;
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+  }
+</style>

@@ -23,7 +23,14 @@
 
   --radius: 12px;
   --radius-sm: 7px;
-  --maxw: 940px;
+  /* Reading measure for the content column. The chrome — header, sidebar,
+     footer — is full-bleed and deliberately NOT capped to this, so nothing
+     floats in the middle of a wide screen with dead space either side. */
+  --maxw: 1040px;
+  --sidebar-w: 13.5rem;
+  --gutter: 1rem;
+  /* The sticky header's height — the sidebar sticks directly under it. */
+  --header-h: 3.6rem;
   --shadow-sm: 0 1px 2px rgb(16 21 28 / 0.05), 0 1px 3px rgb(16 21 28 / 0.06);
   --shadow-md: 0 4px 12px rgb(16 21 28 / 0.07), 0 2px 4px rgb(16 21 28 / 0.05);
 
@@ -84,6 +91,36 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* ---------- scrollbars ----------
+   Thin and theme-aware everywhere: the sidebar, code blocks and wide tables all
+   scroll, and the OS default is a heavy grey slab in the middle of the design. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* The transparent border + background-clip is what makes the thumb read as a
+   slim pill with breathing room rather than a bar wedged against the edge. */
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: content-box;
 }
 
 html {
@@ -149,14 +186,16 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border);
 }
 
+/* Full-bleed: the bar spans the viewport, so the toggle sits at the left edge
+   in line with the sidebar under it. */
 .nav {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  padding: 0.7rem 1.25rem;
+  padding: 0.7rem var(--gutter);
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.6rem;
 }
+
+.nav-spacer { margin-left: auto; }
 
 .brand {
   display: inline-flex;
@@ -169,31 +208,6 @@ a:hover { text-decoration: underline; }
 }
 .brand:hover { text-decoration: none; }
 .brand img { width: 26px; height: 26px; }
-
-.nav-links {
-  display: flex;
-  gap: 0.25rem;
-  margin-left: auto;
-  align-items: center;
-}
-.nav-links a {
-  color: var(--muted);
-  font-size: 0.93rem;
-  font-weight: 500;
-  padding: 0.35rem 0.7rem;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
-.nav-links a:hover {
-  color: var(--fg);
-  background: var(--bg-subtle);
-  text-decoration: none;
-}
-.nav-links a.active {
-  color: var(--fg);
-  background: var(--accent-soft);
-  font-weight: 600;
-}
 
 .icon-btn {
   display: inline-flex;
@@ -209,7 +223,11 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   padding: 0;
 }
-.icon-btn:hover { color: var(--fg); border-color: var(--border-strong); }
+.icon-btn:hover {
+  color: var(--fg);
+  border-color: var(--border-strong);
+  text-decoration: none; /* it is sometimes an <a> */
+}
 .icon-btn svg { width: 17px; height: 17px; }
 
 /* One button, two glyphs: CSS picks which is visible from the resolved theme. */
@@ -223,34 +241,42 @@ a:hover { text-decoration: underline; }
 :root[data-theme='light'] .icon-btn .sun { display: block; }
 :root[data-theme='light'] .icon-btn .moon { display: none; }
 
-.nav-toggle { display: none; }
-
-@media (max-width: 760px) {
-  .nav-toggle { display: inline-flex; }
-  .nav-links {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.15rem;
-    padding: 0.6rem 1rem 0.9rem;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
-  }
-  .nav-links.open { display: flex; }
-  .nav-links a { padding: 0.6rem 0.75rem; font-size: 1rem; }
-}
+/* Leftmost in the header: it toggles the sidebar in both of the sidebar's modes
+   — collapsed/expanded on desktop, closed/open drawer on narrow screens. */
+.nav-toggle { order: -1; }
 
 /* ---------- layout ---------- */
 
+/* Sidebar flush to the left edge, content taking everything that is left. The
+   grid itself is full-bleed; only the prose inside `main` is capped, and it
+   centres in whatever room the sidebar leaves. */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  align-items: start;
+}
+
 main {
+  min-width: 0;
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 3rem 1.25rem 5rem;
+  padding: 3rem 2rem 5rem;
+}
+
+/* Collapsed: the sidebar leaves entirely and the content re-centres across the
+   full viewport. Nothing else needs to change — everything is already full-bleed. */
+@media (min-width: 1001px) {
+  :root[data-sidebar='collapsed'] .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root[data-sidebar='collapsed'] .sidebar {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .shell { display: block; }
+  main { padding: 2.25rem var(--gutter) 4rem; }
 }
 
 h1 {
@@ -454,9 +480,7 @@ ul.tight li::marker { color: var(--muted); }
   font-size: 0.87rem;
 }
 .site-footer .inner {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  padding: 2rem 1.25rem;
+  padding: 2rem var(--gutter);
   display: flex;
   gap: 1rem;
   justify-content: space-between;

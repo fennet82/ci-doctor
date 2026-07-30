@@ -1,0 +1,97 @@
+[
+  {
+    "section": "resolve_secrets",
+    "phase": "prepare",
+    "provider": "GitLab"
+  },
+  {
+    "section": "prepare_executor",
+    "phase": "prepare",
+    "provider": "GitLab"
+  },
+  {
+    "section": "prepare_script",
+    "phase": "prepare",
+    "provider": "GitLab"
+  },
+  {
+    "section": "get_sources",
+    "phase": "fetch",
+    "provider": "GitLab"
+  },
+  {
+    "section": "restore_cache",
+    "phase": "fetch",
+    "provider": "GitLab"
+  },
+  {
+    "section": "download_artifacts",
+    "phase": "fetch",
+    "provider": "GitLab"
+  },
+  {
+    "section": "step_script",
+    "phase": "script",
+    "provider": "GitLab"
+  },
+  {
+    "section": "after_script",
+    "phase": "post",
+    "provider": "GitLab"
+  },
+  {
+    "section": "archive_cache",
+    "phase": "post",
+    "provider": "GitLab"
+  },
+  {
+    "section": "archive_cache_on_failure",
+    "phase": "post",
+    "provider": "GitLab"
+  },
+  {
+    "section": "upload_artifacts_on_success",
+    "phase": "post",
+    "provider": "GitLab"
+  },
+  {
+    "section": "upload_artifacts_on_failure",
+    "phase": "post",
+    "provider": "GitLab"
+  },
+  {
+    "section": "cleanup_file_variables",
+    "phase": "post",
+    "provider": "GitLab"
+  },
+  {
+    "section": "setup_job",
+    "phase": "prepare",
+    "provider": "GitHub Actions"
+  },
+  {
+    "section": "setup",
+    "phase": "prepare",
+    "provider": "GitHub Actions"
+  },
+  {
+    "section": "checkout",
+    "phase": "fetch",
+    "provider": "GitHub Actions"
+  },
+  {
+    "section": "run",
+    "phase": "script",
+    "provider": "GitHub Actions"
+  },
+  {
+    "section": "post",
+    "phase": "post",
+    "provider": "GitHub Actions"
+  },
+  {
+    "section": "complete_job",
+    "phase": "post",
+    "provider": "GitHub Actions"
+  }
+]

@@ -1,0 +1,232 @@
+---
+import Base from '../../layouts/Base.astro';
+import Mermaid from '../../components/Mermaid.astro';
+import PageCards from '../../components/PageCards.astro';
+import { nav } from '../../lib/nav';
+import { url } from '../../lib/url';
+
+const section = nav.find((s) => s.href === '/concepts/')!;
+
+const architecture = `flowchart TD
+  SRC["provider API<br>or a saved log file"]
+
+  subgraph AD["providers/ — the only code that names a CI system"]
+    SEG["segmenter.py<br>raw log → Section tree"]
+    RSN["reasons.py<br>provider status → FailureReason"]
+  end
+
+  subgraph CO["core/ — provider-neutral, pure, offline"]
+    PH["phases.py<br>Section → Phase"]
+    ATT["attribution.py<br>WHICH PHASE FAILED"]
+    DEN["denoise.py<br>strip · collapse · fold"]
+    EXT["extract.py<br>matchers → windows"]
+    BUD["budget.py<br>fit to max_input_tokens"]
+  end
+
+  EV[["EvidenceBundle<br>all the report step may see"]]
+
+  subgraph OU["outputs"]
+    REP["llm/report.py<br>deterministic report"]
+    LLM["llm/ backend<br>explains WHY · optional"]
+    RED["core/redact.py<br>scrub again"]
+    REN["render/<br>terminal · md · json · MR note"]
+  end
+
+  SRC --> SEG
+  SRC --> RSN
+  SEG -- "core/ports.py — the only contract" --> PH
+  PH --> ATT
+  RSN --> ATT
+  ATT -- "the blamed section, and only it" --> DEN
+  DEN --> EXT
+  EXT --> BUD
+  BUD --> EV
+  EV --> REP
+  REP -. "redacted prompt" .-> LLM
+  LLM -. "cause + fix, validated" .-> REP
+  REP --> RED
+  RED --> REN`;
+---
+<Base title="Concepts" description="How ci-doctor decides where a job failed, and what each part of the codebase does.">
+  <h1>Concepts</h1>
+  <p class="lead">
+    What the moving parts are called, what each one decides, and where it lives in the code.
+    Read this section once and the <a href={url('/reference/configuration/')}>configuration</a>
+    reference stops being a list of unexplained knobs.
+  </p>
+
+  <div class="note">
+    <strong>The one rule everything else follows.</strong> Deterministic code decides
+    <em>where</em> the job failed; the LLM only explains <em>why</em>. Phase attribution
+    runs before any model is called, so a loud but harmless cache warning can never be
+    blamed over the real <code>exit code 1</code>. If the classifier is wrong, that is a
+    bug with a failing test — not a prompt to tune.
+  </div>
+
+  <PageCards pages={section.pages} />
+
+  <h2>The shape of the whole thing</h2>
+  <p>
+    Where each module sits, and what actually flows between them. Note the two dotted edges:
+    they are the only ones a model touches, and they carry evidence that has already been
+    selected and redacted.
+  </p>
+
+  <Mermaid
+    code={architecture}
+    label="Architecture: provider adapters segment the log and normalise the failure reason; core assigns phases, attributes the failure, then denoises, extracts and budgets the blamed section into an EvidenceBundle; the report is built deterministically, optionally explained by a model, redacted, and rendered."
+    caption="Solid edges are deterministic and offline. The dotted pair is the one optional model call."
+  />
+
+  <h2>The same code as layers</h2>
+  <p>
+    Three bands. Providers know their CI system and nothing else; core knows the domain and
+    no provider; outputs render what core decided. The seam through the middle is the only
+    way data crosses.
+  </p>
+
+  <div class="arch" role="img" aria-label="Architecture: provider adapters feed the provider-neutral core through ports; the core feeds the LLM and renderers.">
+    <div class="band">
+      <span class="band-label">Adapters</span>
+      <div class="band-boxes">
+        <span class="box">providers/gitlab/</span>
+        <span class="box">providers/github/</span>
+        <span class="box muted">providers/&lt;yours&gt;/</span>
+      </div>
+      <p class="band-note">REST client · log segmenter · failure-reason map</p>
+    </div>
+
+    <div class="seam">
+      <span class="seam-label">core/ports.py — the only contract</span>
+    </div>
+
+    <div class="band accent">
+      <span class="band-label">Core (provider-neutral)</span>
+      <div class="band-boxes">
+        <span class="box">models</span>
+        <span class="box">phases</span>
+        <span class="box">attribution</span>
+        <span class="box">denoise</span>
+        <span class="box">extract</span>
+        <span class="box">budget</span>
+        <span class="box">redact</span>
+      </div>
+      <p class="band-note">Pure. No network, no clock, and no provider ever named here.</p>
+    </div>
+
+    <div class="seam">
+      <span class="seam-label">EvidenceBundle — all the report step is allowed to see</span>
+    </div>
+
+    <div class="band">
+      <span class="band-label">Outputs</span>
+      <div class="band-boxes">
+        <span class="box">llm/ <span class="opt">optional</span></span>
+        <span class="box">render/terminal</span>
+        <span class="box">render/markdown</span>
+        <span class="box">render/json</span>
+      </div>
+      <p class="band-note">With no model, the deterministic report is the output — not a stub.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Why the middle band is sealed.</strong> <code>grep -ri gitlab ci_doctor/core/</code>
+    must return nothing, and CI fails if it does. That is what makes adding a CI system a
+    matter of dropping in a directory rather than threading a third case through the
+    classifier. <a href={url('/concepts/code-map/')}>The code map</a> walks it file by file.
+  </div>
+
+  <h2>The invariants</h2>
+  <p>These are enforced by tests, not convention. The first three are load-bearing:</p>
+  <ul class="tight">
+    <li><strong>The LLM never selects the failure phase.</strong> Attribution is deterministic and auditable.</li>
+    <li><strong>No provider identifiers in <code>core/</code>.</strong> Checked by grep in CI.</li>
+    <li><strong>Always <code>exit 0</code>.</strong> ci-doctor can never change your pipeline's outcome or mask the real failure.</li>
+    <li>Nothing reaches the public internet by default — no telemetry, no update checks, no runtime downloads.</li>
+    <li>Never emit unredacted log content: redaction runs on the prompt <em>and</em> the report.</li>
+    <li>Every truncation is visible (<code>… [N lines elided] …</code>), never a silent cut.</li>
+  </ul>
+</Base>
+
+<style>
+  .arch { margin: 1.75rem 0; }
+
+  .band {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .band.accent {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: var(--accent-soft);
+  }
+
+  .band-label {
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .band-boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .box {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    padding: 0.32em 0.7em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--fg);
+    white-space: nowrap;
+  }
+  .box.muted {
+    color: var(--muted);
+    border-style: dashed;
+  }
+  .box .opt {
+    font-family: var(--sans);
+    font-size: 0.85em;
+    color: var(--muted);
+  }
+
+  .band-note {
+    margin: 0.7rem 0 0;
+    font-size: 0.86rem;
+    color: var(--muted);
+    max-width: none;
+  }
+
+  /* The arrow joining two bands, with the contract that crosses it. */
+  .seam {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    position: relative;
+  }
+  .seam::before,
+  .seam::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-strong);
+  }
+  .seam-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 0 0.2rem;
+  }
+</style>

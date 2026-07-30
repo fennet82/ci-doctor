@@ -1,0 +1,147 @@
+---
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
+
+// Each pipeline stage: the module that owns it, and the config that tunes it.
+const stages = [
+  { n: 1, name: 'Acquire', mod: 'providers/', what: 'Fetch the failed run and its job logs over the provider API, or read a saved log from disk.', cfg: 'provider, gitlab, github' },
+  { n: 2, name: 'Segment', mod: 'providers/*/segmenter.py', what: 'Cut the raw log into named sections. Each CI system frames a job differently; this is the last place that difference is visible.', cfg: '—' },
+  { n: 3, name: 'Map phases', mod: 'core/phases.py', what: 'Label each section with a phase: provision, prepare, fetch, script, post.', cfg: 'phases' },
+  { n: 4, name: 'Attribute', mod: 'core/attribution.py', what: 'Decide which phase actually failed, from job metadata and log structure. Pure, deterministic, no model.', cfg: '— (deliberately)' },
+  { n: 5, name: 'Denoise', mod: 'core/denoise.py', what: 'Strip ANSI colour, collapse progress bars, fold repeated lines, drop configured noise.', cfg: 'denoise' },
+  { n: 6, name: 'Extract', mod: 'core/extract.py', what: 'Run every matcher over the blamed section and keep the windows they anchor. Every gap is marked.', cfg: 'extraction.matchers' },
+  { n: 7, name: 'Budget', mod: 'core/budget.py', what: 'Shed the lowest-priority windows, then trim what survives to the token budget.', cfg: 'llm.max_input_tokens' },
+  { n: 8, name: 'Explain', mod: 'llm/', what: 'One optional model call, given only the budgeted evidence. Answers why, never where.', cfg: 'llm' },
+  { n: 9, name: 'Redact', mod: 'core/redact.py', what: 'Scrub secrets. Runs twice — on the prompt before it leaves the process, and on the finished report.', cfg: 'redaction' },
+  { n: 10, name: 'Render', mod: 'render/', what: 'Terminal, report.md, report.json, and optionally one idempotent note on the MR/PR.', cfg: 'output' },
+];
+---
+<Base title="The pipeline" description="The ten stages ci-doctor runs a failed job log through, and the config that tunes each one.">
+  <h1>The pipeline</h1>
+  <p class="lead">
+    One pass, ten stages, no loops. Each stage narrows the log; the last four are the only
+    ones that ever see fewer lines than the job actually printed.
+  </p>
+
+  <ol class="pipeline">
+    {stages.map((s) => (
+      <li class="stage">
+        <div class="stage-head">
+          <span class="stage-n">{s.n}</span>
+          <span class="stage-name">{s.name}</span>
+          <code class="stage-mod">{s.mod}</code>
+        </div>
+        <p class="stage-what">{s.what}</p>
+        <p class="stage-cfg">tuned by <code>{s.cfg}</code></p>
+      </li>
+    ))}
+  </ol>
+
+  <div class="note">
+    <strong>Stage 4 is the one that matters.</strong> Attribution runs <em>before</em> any
+    model is called and has no config at all, which is what makes the verdict reproducible.
+    Everything after it only ever operates on the section it blamed.
+    <a href={url('/concepts/attribution/')}>Sections &amp; attribution →</a>
+  </div>
+
+  <p>
+    Stages 5–7 are how a 40,000-line log becomes a few dozen lines worth reading —
+    <a href={url('/concepts/evidence/')}>Evidence</a> covers those. To see the same ten
+    stages as a dataflow graph, with the module boundaries drawn in, go back to
+    <a href={url('/concepts/')}>the Concepts overview</a>.
+  </p>
+
+  <p>
+    You can watch the whole thing run with <code>ci-doctor analyze -v</code>: it logs the
+    section count, the attribution verdict and rule, and a
+    <code>denoise → extract → fit</code> line with the surviving line count at each step.
+  </p>
+</Base>
+
+<style>
+  .pipeline {
+    list-style: none;
+    margin: 1.75rem 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .stage {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    padding: 0.9rem 1.1rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* The connector between consecutive stages. */
+  .stage + .stage::before {
+    content: '';
+    position: absolute;
+    top: -0.6rem;
+    left: 1.85rem;
+    width: 1px;
+    height: 0.6rem;
+    background: var(--border-strong);
+  }
+
+  .stage-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .stage-n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  .stage-name { font-weight: 650; letter-spacing: -0.01em; }
+
+  .stage-mod {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.1em 0.45em;
+    white-space: nowrap;
+  }
+
+  .stage-what {
+    margin: 0.45rem 0 0 2.1rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+
+  .stage-cfg {
+    margin: 0.3rem 0 0 2.1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .stage-cfg code {
+    font-size: 0.94em;
+    white-space: normal;
+  }
+
+  @media (max-width: 560px) {
+    .stage-what,
+    .stage-cfg { margin-left: 0; }
+    .stage + .stage::before { left: 1.1rem; }
+  }
+</style>

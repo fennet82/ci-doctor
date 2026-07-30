@@ -1,7 +1,7 @@
 ---
 import { Code } from 'astro:components';
-import Base from '../layouts/Base.astro';
-import { url } from '../lib/url';
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
 
 const minimal = `name: ci-doctor
 on:
@@ -53,13 +53,14 @@ const ghe = `      - uses: fennet82/ci-doctor@master
 ---
 
 <Base
-  title="GitHub Action"
+  title="GitHub Actions"
   description="Drop-in GitHub Action that explains why a workflow run failed. Read-only, always succeeds."
 >
-  <h1>GitHub Action</h1>
+  <h1>GitHub Actions</h1>
   <p class="lead">
     One step, no install. It reads the run that triggered it, works out what broke, and
-    writes a report — without ever failing your workflow.
+    writes a report — without ever failing your workflow. This page is both the setup guide
+    and the full action reference.
   </p>
 
   <h2>Minimal setup</h2>
@@ -122,7 +123,7 @@ const ghe = `      - uses: fennet82/ci-doctor@master
   <h2>Add an LLM explanation</h2>
   <p>
     Optional. Without it you still get the full deterministic report. Any OpenAI-compatible
-    endpoint works — see <a href={url('/configuration/')}>Configuration</a> for the other backends.
+    endpoint works — see <a href={url('/reference/configuration/')}>Configuration</a> for the other backends.
   </p>
   <Code code={withLlm} lang="yaml" theme="github-dark" />
 

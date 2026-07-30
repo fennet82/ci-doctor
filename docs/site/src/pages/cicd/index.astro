@@ -1,0 +1,31 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageCards from '../../components/PageCards.astro';
+import { nav } from '../../lib/nav';
+import { url } from '../../lib/url';
+
+const section = nav.find((s) => s.href === '/cicd/')!;
+---
+<Base title="CI setup" description="Wire ci-doctor into GitLab CI, GitHub Actions, or an air-gapped network.">
+  <h1>CI setup</h1>
+  <p class="lead">
+    Wire it into the <em>post</em> stage so it explains failures without ever changing the
+    outcome. Pick your pipeline:
+  </p>
+
+  <PageCards pages={section.pages} />
+
+  <h2>The shape is the same everywhere</h2>
+  <ul class="tight">
+    <li><strong>Runs only on failure.</strong> A post-stage job gated on the pipeline's result, not a step in your build.</li>
+    <li><strong>Read-only, and always exits 0.</strong> Adding it cannot fail your pipeline or mask the real error.</li>
+    <li><strong>Needs one read-scoped token</strong> to fetch the failed run's logs — and nothing else.</li>
+    <li><strong>The model is optional.</strong> Without one you get the deterministic report, not a stub.</li>
+  </ul>
+  <p>
+    What differs between providers is only where the run id comes from and how a note gets
+    posted back. <a href={url('/start/requirements/')}>Requirements</a> covers the token
+    scopes; <a href={url('/reference/configuration/')}>Configuration</a> covers every key you
+    can set from the job.
+  </p>
+</Base>

@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import PageCards from '../../components/PageCards.astro';
+import { nav } from '../../lib/nav';
+import { url } from '../../lib/url';
+
+const section = nav.find((s) => s.href === '/reference/')!;
+---
+<Base title="Reference" description="Every ci-doctor command, flag and configuration key, with its default.">
+  <h1>Reference</h1>
+  <p class="lead">
+    The exhaustive pages. Look things up here; understand them on
+    <a href={url('/concepts/')}>Concepts</a>.
+  </p>
+
+  <PageCards pages={section.pages} />
+
+  <h2>Two things worth knowing before you look anything up</h2>
+  <p>
+    <strong>Unknown config keys are an error.</strong> The schema is
+    <code>extra="forbid"</code>, so a typo fails loudly at load rather than being silently
+    ignored. Every release also ships <code>ci-doctor.schema.json</code>, generated from the
+    same pydantic model that does the validating — point your editor at it and typos never
+    reach a commit.
+  </p>
+  <p>
+    <strong>Ask, don't guess.</strong> Config surprises are almost always a layer you forgot
+    was applied. <code>ci-doctor config --diff</code> shows only what your file, environment
+    and flags changed relative to the shipped defaults.
+  </p>
+
+  <div class="note">
+    Looking for the shipped matcher packs? They are a generated catalogue on
+    <a href={url('/concepts/matchers/')}>Matchers</a>, next to the explanation of how a pack
+    is shaped.
+  </div>
+</Base>

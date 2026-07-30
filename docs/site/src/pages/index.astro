@@ -36,8 +36,8 @@ ci-doctor analyze "$CI_PIPELINE_ID"`;
   </p>
 
   <div class="btn-row">
-    <a class="btn primary" href={url('/usage/')}>Get started</a>
-    <a class="btn" href={url('/action/')}>GitHub Action</a>
+    <a class="btn primary" href={url('/start/')}>Get started</a>
+    <a class="btn" href={url('/cicd/github/')}>GitHub Action</a>
     <a class="btn" href="https://github.com/fennet82/ci-doctor">Source</a>
   </div>
 
@@ -47,7 +47,7 @@ ci-doctor analyze "$CI_PIPELINE_ID"`;
     <figcaption>.github/workflows/ci-doctor.yml</figcaption>
     <Code code={quickstart} lang="yaml" theme="github-dark" />
   </figure>
-  <p><a href={url('/action/')}>Full action reference →</a></p>
+  <p><a href={url('/cicd/github/')}>Full action reference →</a></p>
 
   <h2>The core idea</h2>
   <p>
@@ -85,18 +85,19 @@ ci-doctor analyze "$CI_PIPELINE_ID"`;
     </div>
   </div>
 
-  <h2>Install</h2>
+  <h2>Install and try it</h2>
   <Code code={install} lang="bash" theme="github-dark" />
-
-  <h2>Try it</h2>
   <Code code={tryIt} lang="bash" theme="github-dark" />
+  <p>
+    <a href={url('/start/')}>Get started →</a> walks the whole path: install, a first run on a
+    saved log, and what it needs to reach a live pipeline.
+  </p>
 
   <div class="note">
-    New here? <a href={url('/concepts/')}>Concepts</a> explains the pipeline and what every
-    part of it decides — read it once and the rest stops being a list of unexplained knobs.
-    Then <a href={url('/requirements/')}>Requirements</a> covers what it needs, and
-    <a href={url('/configuration/')}>Configuration</a> and <a href={url('/cicd/')}>Examples</a>
-    get it running in your pipeline.
+    <strong>Where to go next.</strong> <a href={url('/concepts/')}>Concepts</a> explains the
+    pipeline and what every part of it decides — read it once and the rest stops being a list
+    of unexplained knobs. <a href={url('/cicd/')}>CI setup</a> has the drop-in job for GitLab
+    and GitHub, and <a href={url('/reference/')}>Reference</a> is every flag and config key.
   </div>
 </Base>
 

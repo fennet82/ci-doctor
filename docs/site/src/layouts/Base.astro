@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Sidebar from '../components/Sidebar.astro';
 import { asset, url } from '../lib/url';
 
 interface Props {
@@ -12,24 +13,6 @@ const {
 } = Astro.props;
 
 const REPO = 'https://github.com/fennet82/ci-doctor';
-
-const links = [
-  { href: '/', label: 'Overview' },
-  { href: '/concepts/', label: 'Concepts' },
-  { href: '/matchers/', label: 'Matchers' },
-  { href: '/requirements/', label: 'Requirements' },
-  { href: '/configuration/', label: 'Configuration' },
-  { href: '/usage/', label: 'Usage' },
-  { href: '/action/', label: 'Action' },
-  { href: '/cicd/', label: 'Examples' },
-];
-
-// Compare against the *resolved* paths so `base` can't desync the active state.
-const here = Astro.url.pathname.replace(/\/+$/, '') || '/';
-const isActive = (href: string) => {
-  const target = url(href).replace(/\/+$/, '') || '/';
-  return href === '/' ? here === target : here.startsWith(target);
-};
 
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
@@ -50,12 +33,16 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
     <meta property="og:image" content={asset('/ci-doctor-logo.png')} />
     <meta name="twitter:card" content="summary_large_image" />
 
-    {/* Before first paint: otherwise a dark-theme visitor gets a white flash. */}
+    {/* Before first paint: otherwise a dark-theme visitor gets a white flash,
+        and a reader who collapsed the sidebar sees it flash back in. */}
     <script is:inline>
       try {
         const saved = localStorage.getItem('theme');
         if (saved === 'dark' || saved === 'light') {
           document.documentElement.dataset.theme = saved;
+        }
+        if (localStorage.getItem('sidebar') === 'collapsed') {
+          document.documentElement.dataset.sidebar = 'collapsed';
         }
       } catch {}
     </script>
@@ -71,15 +58,18 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
           <span>ci-doctor</span>
         </a>
 
-        <div class="nav-links" id="nav-links">
-          {links.map((l) => (
-            <a href={url(l.href)} class={isActive(l.href) ? 'active' : ''}>{l.label}</a>
-          ))}
-        </div>
+        <span class="nav-spacer"></span>
 
-        <button class="icon-btn nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <path d="M3 6h18M3 12h18M3 18h18" />
+        <a class="icon-btn" href={REPO} aria-label="Source on GitHub">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+          </svg>
+        </a>
+
+        <button class="icon-btn nav-toggle" id="nav-toggle" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2.5" />
+            <path d="M9.5 4v16" />
           </svg>
         </button>
 
@@ -95,9 +85,12 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
       </nav>
     </header>
 
-    <main id="content">
-      <slot />
-    </main>
+    <div class="shell">
+      <Sidebar here={Astro.url.pathname} />
+      <main id="content">
+        <slot />
+      </main>
+    </div>
 
     <footer class="site-footer">
       <div class="inner">
@@ -118,10 +111,39 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
         try { localStorage.setItem('theme', next); } catch {}
       });
 
-      document.getElementById('nav-toggle')?.addEventListener('click', (e) => {
-        const menu = document.getElementById('nav-links');
-        const open = menu?.classList.toggle('open');
-        e.currentTarget.setAttribute('aria-expanded', String(!!open));
+      // One button, two modes: on a wide screen the sidebar is a column that
+      // collapses (and the choice sticks); below 1000px it is a drawer.
+      const sidebar = document.getElementById('sidebar');
+      const navToggle = document.getElementById('nav-toggle');
+      const wide = matchMedia('(min-width: 1001px)');
+      const root = document.documentElement;
+
+      const syncLabel = () => {
+        const shown = wide.matches
+          ? root.dataset.sidebar !== 'collapsed'
+          : !!sidebar?.classList.contains('open');
+        navToggle?.setAttribute('aria-expanded', String(shown));
+      };
+      syncLabel();
+      wide.addEventListener('change', syncLabel);
+
+      navToggle?.addEventListener('click', () => {
+        if (wide.matches) {
+          const collapsed = root.dataset.sidebar === 'collapsed';
+          if (collapsed) delete root.dataset.sidebar;
+          else root.dataset.sidebar = 'collapsed';
+          try { localStorage.setItem('sidebar', collapsed ? 'expanded' : 'collapsed'); } catch {}
+        } else {
+          sidebar?.classList.toggle('open');
+        }
+        syncLabel();
+      });
+
+      addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar?.classList.contains('open')) {
+          sidebar.classList.remove('open');
+          syncLabel();
+        }
       });
     </script>
   </body>
