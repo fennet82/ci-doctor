@@ -1,6 +1,136 @@
 # CHANGELOG
 
 
+## v2.0.1 (2026-07-30)
+
+### Bug Fixes
+
+- **matchers**: Stop packs firing on the runner's own failure trailer
+  ([`57521f9`](https://github.com/fennet82/ci-doctor/commit/57521f9b36c53ef5429f2310240debc1e59daa4a))
+
+`bazel` anchored on `^ERROR: .*(failed|FAILED)`, which matches "ERROR: Job failed: exit code 1" —
+  the line that ends every failed GitLab job. It opened a priority-85 window on 40 of 41 fixture
+  logs, ranking above the real evidence under budget pressure on jobs with no bazel in sight.
+
+Three more packs had coverage on paper only, matching another tool: jest on `go test`'s "FAIL
+  <pkg>", maven_gradle on gradle's half of its own pattern, rust_compile on bun's "error:
+  expect(...)". All four tightened.
+
+Adds jest and maven fixtures (both providers + verdict), a //target line to the bazel fixture so
+  that alternative is exercised, and CASES rows for the eight packs that had none. Two new guards:
+  no pack may match runner framing (generic_error and oom excepted, they read it on purpose), and
+  every pack must have a case.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- **packaging**: Give PyPI a rendered project description
+  ([`4551735`](https://github.com/fennet82/ci-doctor/commit/45517350fe4e2f802384e5c2c259266c2b2a6972))
+
+The `readme`, classifiers and project.urls landed, but the README's logo and eight documentation
+  links were still repo-relative. PyPI does not resolve those, so the page rendered with a broken
+  image and dead links. All nine are now absolute (raw.githubusercontent for the image, blob/tree
+  for the links); `twine check` passes on both artifacts.
+
+Also points the Documentation section at the new Concepts and Matchers pages, and notes that the
+  matcher catalogue is generated.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- **report**: Stop re-trimming the evidence to a fixed 15 lines
+  ([`c99a0f4`](https://github.com/fennet82/ci-doctor/commit/c99a0f4918898c425ff996a72769cd31def3d944))
+
+`deterministic_report` joined `bundle.blamed_lines[-15:]`, discarding the selection that denoise,
+  matcher priority and budget.fit had already made — and silently, with bundle.truncated still
+  False.
+
+On a two-error rust build it kept E0599 and cut the header of E0308, the error that caused it. 3 of
+  31 fixture cases were losing their causal line this way. The bundle is already budgeted; the
+  excerpt is now the whole of it, and the 2000-char report cap announces itself like every other
+  cut.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+### Documentation
+
+- Correct the matcher spec's fixture accounting
+  ([`5f63573`](https://github.com/fennet82/ci-doctor/commit/5f63573fecab1b11282c7189c3e0384b80a38e14))
+
+5 of the 7 packs I called uncovered already have logs on disk, they were just missing a CASES row.
+  Only maven_gradle needs an `end` written blind.
+
+Reading npm_build_failure.log fixed two design errors: npm needs no `end` (every line is prefixed,
+  so windows self-merge — true for any prefixed block), and `^\S` cuts tsc short because its code
+  frame starts at column 0.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- Spec the matcher boundary redesign, pypi metadata and concept docs
+  ([`0a574b6`](https://github.com/fennet82/ci-doctor/commit/0a574b63046aa889c248b65027d6692d128bf01e))
+
+Matchers collapse to one shape: start + end + before. `after` is deleted — a fixed line count cannot
+  span a rust diagnostic whose length is unknown until it ends. `end` is a boundary regex, capped by
+  a new global max_window_lines so a wrong regex costs 200 lines, not the whole log.
+
+No overrides/role suppression: it only fires when the token budget binds, and raising
+  max_input_tokens to 32000 makes that branch effectively dead.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- **site**: Add Concepts and Matchers pages
+  ([`55c9653`](https://github.com/fennet82/ci-doctor/commit/55c965343080f1daac7b1e8bf1312432e73b8b8f))
+
+Concepts covers the ten pipeline stages (each naming the module that owns it and the config key that
+  tunes it), a three-band architecture diagram, a module map, and the vocabulary — phase,
+  attribution, denoise, matcher, window, priority, budget, redaction, evidence bundle. Diagrams are
+  HTML and CSS on the existing tokens: no dependency, no runtime JS, and dark mode for free.
+
+Matchers lists all 35 shipped packs. The catalogue is generated from defaults.yml by `mise run
+  docs:data`, including the `# --- Group ---` headers already in it, so the boundary migration
+  updates the docs for free instead of stranding 35 hand-written rows. Two tests guard it: one for
+  drift, one for a generator parse bug silently dropping a pack.
+
+Generating it surfaced two mislabels in defaults.yml — docker_build and oom sat under "Other JS
+  package managers", generic_error under "Linters / type checkers / IaC".
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+- **site**: Document the matchers and reorganise behind a sidebar
+  ([`3deb304`](https://github.com/fennet82/ci-doctor/commit/3deb3048c49023f843b4ba6581fbddc19ad382fd))
+
+The site had grown to eight flat top-level pages with no room to add more, and the two things a
+  reader most often needs — what the shipped matcher packs actually catch, and what each part of the
+  code decides — were either missing or buried in a single 683-line Concepts page.
+
+Content:
+
+- Every one of the 35 shipped packs now carries a plain-English note saying what it catches and why
+  it is ranked where it is. The prose lives in `NOTES` in gen_docs_data.py, keyed by matcher id, so
+  a pack added without one fails the generator instead of rendering a blank cell. - The section-name
+  -> phase map is generated into phases.json for the same reason the matcher catalogue is: a
+  hand-written copy is stale by the next commit. Two tests pin both files to what defaults.yml
+  ships. - New pages for the attribution rule ladder (all ten rule_ids, what fires each, what it
+  blames), the evidence pipeline, and a package-by-package code map. - Two mermaid diagrams: the
+  architecture as dataflow, and how a matcher hit becomes a budgeted window. They render at natural
+  size — letting mermaid scale the SVG to the column shrinks the labels with it.
+
+Structure:
+
+- Five sections (Overview, Get started, Concepts, CI setup, Reference), each a directory under
+  src/pages/. /cicd/gitlab/ and /cicd/github/ now hold one provider's setup each, with the action
+  reference folded into the latter. - src/lib/nav.ts is the single source of truth for the IA: the
+  sidebar and the section index cards both derive from it, so adding a page is one entry plus one
+  file and nothing can end up unreachable. - A persistent sidebar replaces the navbar. Sections
+  collapse; the one holding the current page is open. The chevron toggles, the label navigates. -
+  Layout is full-bleed — only the prose column is capped — so nothing floats in the middle of a wide
+  screen with dead space either side. - The five old top-level URLs redirect rather than 404.
+
+docs/GUIDELINES.md is new: where a page belongs, the nav.ts rule, which data is generated, when a
+  diagram earns its bundle, and the layout tokens.
+
+Dependencies: mermaid, plus the lockfile and allowScripts entry from `npm audit fix` (0
+  vulnerabilities; `npm ci && npm run build` verified).
+
+
 ## v2.0.0 (2026-07-27)
 
 ### Features
