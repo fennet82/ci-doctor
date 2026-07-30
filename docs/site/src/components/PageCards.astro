@@ -1,0 +1,58 @@
+---
+/** The card grid a section index uses to list its own pages. */
+import type { NavPage } from '../lib/nav';
+import { url } from '../lib/url';
+
+interface Props {
+  pages: NavPage[];
+}
+const { pages } = Astro.props;
+---
+
+<div class="cards">
+  {pages.map((p) => (
+    <a class="page-card" href={url(p.href)}>
+      <span class="page-card-label">{p.label}</span>
+      <span class="page-card-blurb">{p.blurb}</span>
+    </a>
+  ))}
+</div>
+
+<style>
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.7rem;
+    margin: 1.75rem 0;
+  }
+
+  .page-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .page-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .page-card-label {
+    font-weight: 650;
+    color: var(--accent);
+  }
+
+  .page-card-blurb {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+</style>

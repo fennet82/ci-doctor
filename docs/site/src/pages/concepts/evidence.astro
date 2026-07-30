@@ -1,0 +1,97 @@
+---
+import { Code } from 'astro:components';
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
+
+const windowExample = `# denoised log, blamed section
+   Compiling ledger v0.4.1
+error[E0308]: mismatched types      <- matcher anchors here
+   --> src/posting.rs:88:31          |
+    |                                |  window: the lines kept
+88  |     let rate: Decimal = ...     |
+    = note: expected \`Decimal\`      <-
+… [14 lines elided] …                  <- the gap is announced, never silent
+error: could not compile \`ledger\``;
+---
+<Base title="Evidence" description="How ci-doctor turns a 40,000-line log into the few dozen lines worth reading: denoising, matcher windows, the token budget and redaction.">
+  <h1>Evidence</h1>
+  <p class="lead">
+    Attribution picks a section; this is everything that happens to it afterwards. Four
+    passes, in order, each one narrowing what a reader — or a model — ever sees.
+  </p>
+
+  <h2>Denoise</h2>
+  <p>
+    Cutting volume before anything is selected. Per line: strip ANSI escapes, collapse
+    <code>\r</code> progress-bar rewrites to their final state, optionally drop the runner's
+    timestamp prefix, then drop configured noise patterns. Finally, runs of identical lines
+    fold into one with a <code>(×47)</code> count.
+  </p>
+  <p>
+    A line that looks like an error is never removed by a noise pattern — the escape hatch
+    that stops an over-broad rule from deleting the one line that explains the failure.
+  </p>
+
+  <h2>Matcher, window, priority</h2>
+  <p>
+    A matcher is a regex that recognises one tool's failure output. Where it fires, it
+    anchors a <strong>window</strong> — the run of lines actually worth showing. Overlapping
+    windows merge; the space between them is replaced by an explicit count.
+  </p>
+  <Code code={windowExample} lang="text" theme="github-dark" />
+  <p>
+    <strong>Priority</strong> decides who survives when the evidence exceeds the budget.
+    Rank a pack by how <em>diagnostic</em> it is, not how loud: <code>npm ERR!</code> always
+    trails the compiler errors that caused it, so it must lose to <code>tsc</code>. The
+    full catalogue — all 35 shipped packs, what each one catches, and how to add your own —
+    is on <a href={url('/concepts/matchers/')}>Matchers</a>.
+  </p>
+
+  <h2>Budget</h2>
+  <p>
+    The evidence has to fit the model's input limit. Two passes, in order: shed whole
+    low-priority windows, then trim whatever survived. Trimming keeps the tail, because the
+    failure lives at the end of a log — and it announces what it dropped.
+  </p>
+  <p>
+    The order matters. Trimming alone would keep the tail of everything, and a tool that
+    reports its cause <em>before</em> its own epilogue would lose the diagnosis and keep the
+    complaint. Token counting is a four-characters-per-token estimate; no tokenizer is
+    loaded, and nothing is downloaded to do it.
+  </p>
+
+  <h2>Redaction</h2>
+  <p>
+    Scrubbing secrets out of everything that leaves the process. A local regex set (private
+    keys, <code>glpat-</code> tokens, AWS keys, <code>Authorization:</code> headers,
+    credentials embedded in URLs) plus the literal values of any environment variable whose
+    <em>name</em> looks secret — a stand-in for the CI's masked-variable list, so a token
+    with no recognisable shape is still caught.
+  </p>
+  <p>
+    It runs <strong>twice</strong>: on the prompt before it is sent, and on the finished
+    report before it is printed or posted. Once is not enough — a model can quote a secret
+    straight out of the log it was shown. There is no entropy scanning and no network call;
+    replacements read <code>[REDACTED:&lt;kind&gt;]</code> so the report stays legible.
+  </p>
+
+  <h2>The evidence bundle</h2>
+  <p>
+    Everything the report step gets, and all it gets: the blamed phase, its denoised and
+    budgeted lines, one non-causal note per warning-only phase, job metadata, the token
+    estimate, and whether anything was truncated. Truncation is always surfaced — a silent
+    cut would be a lie about the evidence.
+  </p>
+
+  <div class="note">
+    <strong>Every cut is visible.</strong> Elisions are printed as
+    <code>… [N lines elided] …</code> wherever they happen — between windows, and again if
+    the budget had to trim inside one. If you never see a marker, nothing was dropped.
+  </div>
+
+  <p>
+    Watching this run is one flag: <code>ci-doctor analyze -v</code> prints a
+    <code>denoise → extract → fit</code> line with the surviving line count after each pass,
+    and whether the budget truncated. See <a href={url('/reference/cli/')}>the CLI reference</a>.
+  </p>
+</Base>

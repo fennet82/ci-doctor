@@ -1,0 +1,77 @@
+---
+import { Code } from 'astro:components';
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
+
+const replay = `# Save the log of a job that failed, then:
+ci-doctor analyze failing-job.log`;
+
+const live = `# Against a live run (reads $CI_PIPELINE_ID / $GITHUB_REPOSITORY in CI):
+ci-doctor analyze "$CI_PIPELINE_ID"
+
+# From your laptop, with no CI variables set, the repo comes from your
+# git origin — and it logs a warning naming what it picked:
+ci-doctor analyze 123456`;
+
+const output = `╭─ ci-doctor ─────────────────────────────────────────────────╮
+│ build failed in the script phase (script_failure).          │
+│ phase=script  category=test  confidence=high                │
+╰─────────────────────────────────────────────────────────────╯
+Root cause
+  test_add asserted 1 == 2
+Evidence
+  ╭─ script ────────────────────────╮
+  │ E   assert 1 == 2               │
+  ╰─────────────────────────────────╯
+Remediation
+  1. Inspect the failing assertion in tests/test_math.py`;
+---
+<Base title="First run" description="Replay a saved job log offline, then point ci-doctor at a live pipeline.">
+  <h1>First run</h1>
+  <p class="lead">
+    Start offline. Passing a log <em>path</em> instead of a run id runs the whole pipeline
+    against a captured log with zero network and zero LLM — the fastest way to see what the
+    tool actually does.
+  </p>
+
+  <h2>Replay a saved log</h2>
+  <Code code={replay} lang="bash" theme="github-dark" />
+  <p>
+    An existing path means no fetch is attempted, so this needs no token, no config and no
+    model. It is also the fastest way to test a <code>.ci-doctor.yml</code> or reproduce an
+    attribution you disagree with.
+  </p>
+
+  <h2>Against a live run</h2>
+  <Code code={live} lang="bash" theme="github-dark" />
+  <p>
+    This one needs a read-scoped token — see <a href={url('/start/requirements/')}>Requirements</a>.
+  </p>
+
+  <h2>What you get</h2>
+  <ul class="tight">
+    <li><strong>Terminal report</strong> — readable in the job log, collapsible inside GitLab CI, colour-aware.</li>
+    <li><strong><code>report.md</code> + <code>report.json</code></strong> — job artifacts. The JSON includes a self-contained <code>handoff_prompt</code> you can paste into a coding agent to perform the fix.</li>
+    <li><strong>MR/PR note</strong> — one idempotent comment, updated in place, only when <code>output.mr_note: true</code> and confidence is medium or high.</li>
+  </ul>
+  <Code code={output} lang="text" theme="github-dark" />
+
+  <div class="note">
+    <strong>No model configured? That is a supported mode, not a degraded one.</strong> With
+    <code>llm.enabled: false</code> — or simply <code>llm.model</code> unset — you still get
+    the phase, the reason, the terminal command, the evidence and remediation steps. The model
+    only ever adds the prose explanation.
+  </div>
+
+  <h2>When the verdict looks wrong</h2>
+  <p>
+    Run it again with <code>-v</code>. The <code>denoise → extract → fit</code> line shows how
+    many lines each stage kept and whether the budget had to truncate, and the attribution line
+    names the exact rule that fired. Both are covered on
+    <a href={url('/reference/cli/')}>the CLI reference</a>, and
+    <a href={url('/concepts/attribution/')}>Sections &amp; attribution</a> explains what those
+    rule names mean.
+  </p>
+
+  <p>Happy with it? <a href={url('/cicd/')}>Wire it into your pipeline →</a></p>
+</Base>

@@ -1,0 +1,63 @@
+---
+import { Code } from 'astro:components';
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
+
+const install = `# uv (recommended)
+uv tool install ci-doctorr
+
+# pip
+pip install ci-doctorr
+
+# or the self-contained image, for air-gapped runners
+docker run --rm ci-doctor:latest --version`;
+
+const action = `# GitHub Actions — nothing to install at all
+- uses: fennet82/ci-doctor@master`;
+
+const extras = `# litellm backend (Bedrock, Vertex, Azure — the clouds OpenAI's shape can't reach)
+pip install "ci-doctorr[litellm]"`;
+---
+<Base title="Install" description="Install ci-doctor with uv, pip, or the self-contained Docker image.">
+  <h1>Install</h1>
+  <p class="lead">
+    Python 3.11+, or the image. One dependency set, no runtime downloads, nothing fetched the
+    first time you run it.
+  </p>
+
+  <h2>From PyPI</h2>
+  <Code code={install} lang="bash" theme="github-dark" />
+  <p>
+    <code>uv tool install</code> gives you an isolated <code>ci-doctor</code> on your PATH
+    without touching a project environment, which is what you usually want for a CLI.
+  </p>
+
+  <h2>On GitHub Actions</h2>
+  <p>Don't. The action installs the analyzer itself, pinned to the ref you chose:</p>
+  <Code code={action} lang="yaml" theme="github-dark" />
+  <p>
+    It is a <strong>composite</strong> action rather than a Docker one, so the action version
+    and the analyzer version cannot drift. Full reference on
+    <a href={url('/cicd/github/')}>GitHub Actions</a>.
+  </p>
+
+  <h2>Optional extras</h2>
+  <p>
+    The base install covers the <code>openai</code> LLM backend, which is what Ollama, vLLM,
+    llama.cpp and most gateways already speak. Only the cloud providers with their own auth
+    need more:
+  </p>
+  <Code code={extras} lang="bash" theme="github-dark" />
+  <p>
+    <code>litellm</code> may pull <code>tiktoken</code>, which fetches its vocabulary at
+    runtime — so it is unfit for a strict air gap. The backends are compared on
+    <a href={url('/reference/configuration/')}>Configuration</a>.
+  </p>
+
+  <div class="note">
+    <strong>Air-gapped?</strong> Build an image or a wheel bundle where there <em>is</em>
+    internet and carry it in — see <a href={url('/cicd/local/')}>Local &amp; air-gapped</a>.
+  </div>
+
+  <p>Installed? <a href={url('/start/first-run/')}>Run it on a real failure →</a></p>
+</Base>

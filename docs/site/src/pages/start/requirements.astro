@@ -1,7 +1,7 @@
 ---
 import { Code } from 'astro:components';
-import Base from '../layouts/Base.astro';
-import { url } from '../lib/url';
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/url';
 
 const token = `# Env var (name is configurable via gitlab.token_env / github.token_env):
 export CI_DOCTOR_GITLAB_TOKEN="glpat-xxxxxxxxxxxxxxxxxxxx"
@@ -22,7 +22,7 @@ export CI_DOCTOR_GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
   <h2>Runtime</h2>
   <ul class="tight">
     <li><strong>Python 3.11+</strong>, or the self-contained <strong>Docker image</strong> (dependencies baked in — no <code>pip install</code> at job time).</li>
-    <li>On GitHub Actions, the <a href={url('/action/')}>action</a> handles this for you: nothing to install, no Python setup step.</li>
+    <li>On GitHub Actions, the <a href={url('/cicd/github/')}>action</a> handles this for you: nothing to install, no Python setup step.</li>
     <li>Runs in your pipeline's <em>post</em> stage, only on failure. It is read-only and always exits 0.</li>
   </ul>
 
@@ -65,7 +65,7 @@ export CI_DOCTOR_GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
     To enable the explanation step, point it at any <strong>OpenAI-compatible</strong> endpoint:
     Ollama, vLLM, llama.cpp server, LocalAI, or an internal gateway. An API key is optional.
     Other backends — litellm, Anthropic, the local <code>claude</code> CLI — are on
-    <a href={url('/configuration/')}>Configuration</a>.
+    <a href={url('/reference/configuration/')}>Configuration</a>.
   </p>
 
   <h2>Network &amp; air-gap</h2>
