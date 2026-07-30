@@ -1,25 +1,19 @@
-# Toolchain for working on ci-doctor. `mise install` gets you every binary the
-# hooks, the tests and the release pipeline expect, at the versions CI uses.
-#
-# Not a runtime dependency of ci-doctor itself — the shipped package needs only
-# Python and its wheels. This is the contributor's bench.
+# The contributor's bench: every binary the hooks, tests and release pipeline expect,
+# at the versions CI uses. Not a runtime dependency — the shipped package needs only
+# Python and its wheels.
 
 [tools]
-# No python here on purpose: uv installs and pins it from `requires-python` in
-# pyproject.toml, and `uv sync` owns .venv. Listing it in both places is one more
-# thing to drift.
-# ruff is not here either, for the same reason: it is a dev dependency, so uv.lock
-# pins it and `uv run ruff` is the same binary locally and in CI. A second copy on
-# PATH is exactly how local and CI end up disagreeing about what "formatted" means.
+# Python and ruff are deliberately absent: uv installs Python from `requires-python`
+# and uv.lock pins ruff, so `uv run` is the same binary here and in CI. A second copy
+# on PATH is how local and CI end up disagreeing about what "formatted" means.
 uv = "latest"        # the package manager, the Python it runs on, and the pinned ruff
 gitleaks = "latest"  # secret scanning; the pre-push hook and the `leaks` CI job
 gh = "latest"        # GitHub CLI — release.yml uploads assets with it
 glab = "latest"      # GitLab CLI — the other provider ci-doctor reads
 node = "latest"      # the runtime the npm backend below needs
 
-# Indexes this repo into .codegraph/ so agents can look up a symbol and its callers
-# instead of grepping. Declared as a tool, not installed in a task: `mise install`
-# then pins its version like everything else here.
+# Indexes this repo into .codegraph/ so agents look up a symbol instead of grepping.
+# A tool rather than a task, so `mise install` pins its version like everything else.
 "npm:@colbymchenry/codegraph" = "latest"
 
 [tasks.setup]
@@ -37,14 +31,12 @@ description = "Run the test suite (no network, no LLM)"
 run = "uv run pytest -q"
 
 [tasks.cov]
-description = "Run the suite with coverage and enforce the floor CI enforces"
+description = "Run the suite with coverage, against the floor CI enforces"
 run = "uv run pytest -q --cov"
 
-# The same matrix ci.yml runs. Each version gets its own .venv-3.x via
-# UV_PROJECT_ENVIRONMENT so the default .venv is never rebuilt underneath you —
-# without that, `uv run --python 3.11` would swap your working environment and
-# leave you on whichever version ran last. The venvs are cached, so only the
-# first run pays for the interpreter download.
+# UV_PROJECT_ENVIRONMENT gives each version its own cached .venv-3.x; without it
+# `uv run --python 3.11` rebuilds the default .venv and leaves you on whichever
+# version ran last. Versions are pinned to ci.yml by tests/test_python_versions.py.
 [tasks."test:matrix"]
 description = "Run the suite on every supported Python (3.11-3.14), like CI"
 run = '''
@@ -53,7 +45,7 @@ for v in 3.11 3.12 3.13 3.14; do
   echo "--- python $v"
   UV_PROJECT_ENVIRONMENT=".venv-$v" uv run --python "$v" pytest -q || fail=1
 done
-[ $fail -eq 0 ] || echo "test:all: at least one version failed" >&2
+[ $fail -eq 0 ] || echo "test:matrix: at least one version failed" >&2
 exit $fail
 '''
 

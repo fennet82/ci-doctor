@@ -237,7 +237,8 @@ def deterministic_report(
     # priority and budget-fitted. Re-trimming it to a fixed line count discards the
     # selection the whole pipeline just made — it decapitated the *first* of two
     # rust compile errors, which is the one that caused the second.
-    excerpt = "\n".join(bundle.blamed_lines) if bundle.blamed_lines else (attr.terminal_evidence or "")
+    blamed = "\n".join(bundle.blamed_lines)
+    excerpt = blamed if bundle.blamed_lines else (attr.terminal_evidence or "")
     is_infra = attr.phase in (Phase.PROVISION, Phase.PREPARE) or attr.reason in (
         FailureReason.RUNNER_SYSTEM,
         FailureReason.NO_RUNNER,
@@ -250,9 +251,7 @@ def deterministic_report(
     if degraded:
         factors.append("ci-doctor could not reach the LLM; this is the deterministic fallback report.")
 
-    category = _infer_category(
-        attr.reason, "\n".join(bundle.blamed_lines) + "\n" + (attr.terminal_evidence or "")
-    )
+    category = _infer_category(attr.reason, f"{blamed}\n{attr.terminal_evidence or ''}")
     return Report(
         summary=f"{job.name} failed in the {attr.phase} phase ({attr.reason})."[:140],
         failure_phase=attr.phase,

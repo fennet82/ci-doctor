@@ -103,7 +103,7 @@ def _assemble(tokens) -> list[Section]:
     """
     top: list[Section] = []
     stack: list[Section] = []
-    counter = [0]
+    counter = 0
     seen_start = False
     preamble: Section | None = None
     trailer: Section | None = None
@@ -115,13 +115,14 @@ def _assemble(tokens) -> list[Section]:
             target: The section receiving the lines. Mutated.
             text: A content run, possibly multi-line.
         """
+        nonlocal counter
         parts = text.split("\n")
         if parts and parts[-1] == "":
             parts.pop()  # drop the empty tail after a trailing newline
         for raw_line in parts:
-            counter[0] += 1
+            counter += 1
             line = raw_line.rstrip("\r")
-            target.lines.append(LogLine(number=counter[0], text=line))
+            target.lines.append(LogLine(number=counter, text=line))
             if target.header is None and line.strip():
                 target.header = line.strip()
 
