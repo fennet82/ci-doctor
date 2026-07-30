@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
-.venv/
+# .venv/ plus the per-version .venv-3.x that `mise run test:matrix` builds. uv
+# self-ignores the ones it creates; this covers a venv made any other way.
+.venv*/
 .pytest_cache/
 *.egg-info/
 dist/
