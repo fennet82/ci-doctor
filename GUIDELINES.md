@@ -34,7 +34,7 @@ ci_doctor/
     gitlab/         python-gitlab adapter + segmenter + reasons
     github/         PyGithub adapter + segmenter + reasons
 tests/              fixtures + golden-file attribution suite
-docs/site/          Astro documentation site — see docs/GUIDELINES.md before editing
+docs/site/          Astro documentation site — see docs/site/GUIDELINES.md before editing
 examples/           .gitlab-ci.yml + GitHub Actions workflows
 ```
 

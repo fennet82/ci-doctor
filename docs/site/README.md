@@ -20,7 +20,7 @@ Enable it once in **Settings → Pages → Source: GitHub Actions**.
 
 ## Writing docs
 
-**Read [docs/GUIDELINES.md](../GUIDELINES.md) before adding or moving a page.** It
+**Read [GUIDELINES.md](GUIDELINES.md) before adding or moving a page.** It
 covers how the five sections are organised and where a new page belongs, the
 `nav.ts` → page-file order that keeps a page reachable, the `base` gotcha that
 makes every internal link go through `src/lib/url.ts`, which data is generated
