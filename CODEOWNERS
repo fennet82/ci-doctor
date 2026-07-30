@@ -1,0 +1,10 @@
+# Who gets review requests. GitHub reads this file only at the repo root, in
+# .github/, or in docs/ — and only under exactly this name, no extension.
+#
+# Owning a path auto-requests that reviewer on a PR touching it. It does not
+# *block* a merge: that needs "Require review from Code Owners" on the branch
+# protection rule for master. Without it this file is a suggestion.
+#
+# Last matching pattern wins, so put the broad rule first and narrow below it.
+
+* @fennet82
