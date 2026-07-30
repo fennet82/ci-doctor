@@ -80,9 +80,7 @@ run = "gitleaks git --no-banner --redact"
 description = "Everything CI runs, in one command"
 depends = ["test", "lint", "guardrails", "leaks"]
 
-# An explicit list, not `git clean -Xd`: "ignored" is not the same as "garbage".
-# .codegraph is expensive to rebuild, and llm.config.yml, .claude/settings.local.json
-# and anything in .git/info/exclude are your files, not build output.
+# cleanup: delete rebuildable local junk (keeps .venv, node_modules, .codegraph)
 [tasks.cleanup]
 description = "Delete rebuildable local junk (keeps .venv, node_modules, .codegraph)"
 run = '''
@@ -90,9 +88,9 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 before=$(du -sm . | cut -f1)
 
-# Caches. Pruned rather than walked: .venv and node_modules hold thousands of them.
-find . \( -path ./.venv -o -name .venv-\* -o -name node_modules -o -path ./.git \) -prune \
-  -o -type d -name __pycache__ -print0 | xargs -0 rm -rf
+# Not `rm -rf **/__pycache__/`: mise runs tasks with sh, which has no globstar, so
+# `**` collapses to `*` and silently misses every nested one.
+find ci_doctor tests scripts -type d -name __pycache__ -exec rm -rf {} +
 rm -rf .pytest_cache .ruff_cache
 
 # Coverage, build output, and ci-doctor's own run artifacts.
@@ -125,3 +123,4 @@ run = ["npm install", "npm run dev"]
 description = "Build the docs site, same as the CI job"
 dir = "docs/site"
 run = ["npm ci", "npm run build"]
+
