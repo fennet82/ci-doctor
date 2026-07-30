@@ -1,7 +1,9 @@
 # Matcher boundaries, PyPI metadata, and concept docs
 
 Date: 2026-07-28
-Status: §0 done; §1-§3 proposed, awaiting review
+Status: **implemented** — §0-§3 all shipped. Kept as the design record behind the
+matcher boundary rules; the phantom-coverage table in §0 is why several packs look
+the way they do. Superseded by the code for anything operational.
 
 ---
 
