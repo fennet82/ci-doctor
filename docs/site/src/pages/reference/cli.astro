@@ -1,7 +1,7 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
 
 const cli = `ci-doctor analyze [OPTIONS] [TARGET]
 
@@ -35,40 +35,54 @@ ci-doctor [DEBUG] job failing-job: 6 top-level sections
 ci-doctor [DEBUG] job failing-job: attribution phase=script reason=script_failure rule=trailer_exit_code confidence=high
 ci-doctor [DEBUG] blamed phase script: denoise 812->190, extract ->140, fit ->140 lines (truncated=False)
 ci-doctor [DEBUG] LLM disabled/unconfigured -> deterministic report`;
-
 ---
 
-<Base title="CLI" description="The ci-doctor command line: analyze and config, their flags, and what --verbose prints.">
-  <h1>CLI</h1>
-  <p class="lead">Two commands: <code>analyze</code> and <code>config</code>. Both always exit 0.</p>
+<Base
+    title="CLI"
+    description="The ci-doctor command line: analyze and config, their flags, and what --verbose prints."
+>
+    <h1>CLI</h1>
+    <p class="lead">
+        Two commands: <code>analyze</code> and <code>config</code>. Both always
+        exit 0.
+    </p>
 
-  <h2><code>analyze</code></h2>
-  <Code code={cli} lang="text" theme="github-dark" />
-  <p>
-    What the report looks like is on <a href={url('/start/first-run/')}>First run</a>.
-  </p>
+    <h2><code>analyze</code></h2>
+    <Code code={cli} lang="text" theme="github-dark" />
+    <p>
+        What the report looks like is on <a href={url("/start/first-run/")}
+            >First run&nbsp;</a
+        >.
+    </p>
 
-  <h2>Deterministic mode (no LLM)</h2>
-  <Code code={deterministic} lang="bash" theme="github-dark" />
+    <h2>Deterministic mode (no LLM)</h2>
+    <Code code={deterministic} lang="bash" theme="github-dark" />
 
-  <h2>Inspecting your config</h2>
-  <p>
-    Config surprises are almost always a layer you forgot was applied. Ask, rather than guess —
-    the full layering rules are on <a href={url('/reference/configuration/')}>Configuration</a>:
-  </p>
-  <Code code={configCmd} lang="bash" theme="github-dark" />
+    <h2>Inspecting your config</h2>
+    <p>
+        Config surprises are almost always a layer you forgot was applied. Ask,
+        rather than guess — the full layering rules are on <a
+            href={url("/reference/configuration/")}>Configuration&nbsp;</a
+        >:
+    </p>
+    <Code code={configCmd} lang="bash" theme="github-dark" />
 
-  <h2>Debugging with <code>--verbose</code></h2>
-  <p>Turn on debug logs across the whole pipeline (or set <code>CI_DOCTOR_LOG_LEVEL=DEBUG</code>):</p>
-  <Code code={verbose} lang="text" theme="github-dark" />
-  <p>
-    The <code>denoise → extract → fit</code> line is the one to read when the evidence looks
-    wrong: it shows how many lines each stage kept, and whether the token budget had to truncate.
-  </p>
+    <h2>Debugging with <code>--verbose</code></h2>
+    <p>
+        Turn on debug logs across the whole pipeline (or set <code
+            >CI_DOCTOR_LOG_LEVEL=DEBUG</code
+        >):
+    </p>
+    <Code code={verbose} lang="text" theme="github-dark" />
+    <p>
+        The <code>denoise → extract → fit</code> line is the one to read when the
+        evidence looks wrong: it shows how many lines each stage kept, and whether
+        the token budget had to truncate.
+    </p>
 
-  <div class="note">
-    <strong>Offline replay.</strong> Passing a log path instead of a run id runs the full pipeline
-    against a captured log with zero network and zero LLM — ideal for testing your config or
-    reproducing an attribution.
-  </div>
+    <div class="note">
+        <strong>Offline replay.</strong> Passing a log path instead of a run id runs
+        the full pipeline against a captured log with zero network and zero LLM —
+        ideal for testing your config or reproducing an attribution.
+    </div>
 </Base>

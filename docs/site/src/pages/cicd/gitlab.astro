@@ -1,7 +1,7 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
 
 const gitlab = `# runs only on failure; always exits 0.
 ci-doctor:
@@ -36,52 +36,75 @@ const gitlabSelfHosted = `  variables:
     CI_DOCTOR_GITLAB__BASE_URL: "https://gitlab.internal.example.com"
     CI_DOCTOR_GITLAB__CA_BUNDLE: "/etc/ssl/certs/internal-ca.pem"`;
 ---
-<Base title="GitLab CI" description="Drop ci-doctor into .gitlab-ci.yml as a post-stage job that explains failures without changing the outcome.">
-  <h1>GitLab CI</h1>
-  <p class="lead">
-    One job in the <code>.post</code> stage, gated on <code>when: on_failure</code>. It reads
-    the pipeline it belongs to and writes its report as artifacts.
-  </p>
 
-  <h2>The minimal job</h2>
-  <p>Deterministic report, artifacts on every failure, no model required:</p>
-  <figure class="snippet">
-    <figcaption>.gitlab-ci.yml</figcaption>
-    <Code code={gitlab} lang="yaml" theme="github-dark" />
-  </figure>
-  <p>
-    <code>CI_PIPELINE_ID</code> and <code>CI_PROJECT_ID</code> are predefined by GitLab, so the
-    only thing you supply is the token. It needs <code>read_api</code> — and <code>api</code>
-    only if you turn on merge-request notes below.
-  </p>
+<Base
+    title="GitLab CI"
+    description="Drop ci-doctor into .gitlab-ci.yml as a post-stage job that explains failures without changing the outcome."
+>
+    <h1>GitLab CI</h1>
+    <p class="lead">
+        One job in the <code>.post</code> stage, gated on <code
+            >when: on_failure</code
+        >. It reads the pipeline it belongs to and writes its report as
+        artifacts.
+    </p>
 
-  <h2>Add an LLM explanation</h2>
-  <p>Point at any OpenAI-compatible endpoint (swap in place of the deterministic-only variables):</p>
-  <Code code={gitlabLlm} lang="yaml" theme="github-dark" />
-  <p>
-    Optional at every step: with no model the job still emits the full deterministic report.
-    The other backends are on <a href={url('/reference/configuration/')}>Configuration</a>.
-  </p>
+    <h2>The minimal job</h2>
+    <p>Deterministic report, artifacts on every failure, no model required:</p>
+    <figure class="snippet">
+        <figcaption>.gitlab-ci.yml</figcaption>
+        <Code code={gitlab} lang="yaml" theme="github-dark" />
+    </figure>
+    <p>
+        <code>CI_PIPELINE_ID</code> and <code>CI_PROJECT_ID</code> are predefined
+        by GitLab, so the only thing you supply is the token. It needs <code
+            >read_api</code
+        > — and <code>api</code>
+        only if you turn on merge-request notes below.
+    </p>
 
-  <h2>Post a note on the merge request</h2>
-  <p>Idempotent — it updates its own previous comment instead of spamming. Gated on confidence ≥ medium.</p>
-  <Code code={gitlabMr} lang="yaml" theme="github-dark" />
-  <p>
-    Needs <code>CI_MERGE_REQUEST_IID</code>, which GitLab sets on merge-request pipelines, and a
-    token with <code>api</code> scope rather than <code>read_api</code>.
-  </p>
+    <h2>Add an LLM explanation</h2>
+    <p>
+        Point at any OpenAI-compatible endpoint (swap in place of the
+        deterministic-only variables):
+    </p>
+    <Code code={gitlabLlm} lang="yaml" theme="github-dark" />
+    <p>
+        Optional at every step: with no model the job still emits the full
+        deterministic report. The other backends are on <a
+            href={url("/reference/configuration/")}>Configuration&nbsp;</a
+        >.
+    </p>
 
-  <h2>Self-hosted GitLab</h2>
-  <p>Override the API host and hand it your internal CA. Proxy variables are honoured as-is:</p>
-  <Code code={gitlabSelfHosted} lang="yaml" theme="github-dark" />
-  <p>
-    <code>HTTPS_PROXY</code>, <code>NO_PROXY</code> and <code>REQUESTS_CA_BUNDLE</code> behave
-    the way you would expect. For runners with no egress at all, see
-    <a href={url('/cicd/local/')}>Local &amp; air-gapped</a>.
-  </p>
+    <h2>Post a note on the merge request</h2>
+    <p>
+        Idempotent — it updates its own previous comment instead of spamming.
+        Gated on confidence ≥ medium.
+    </p>
+    <Code code={gitlabMr} lang="yaml" theme="github-dark" />
+    <p>
+        Needs <code>CI_MERGE_REQUEST_IID</code>, which GitLab sets on
+        merge-request pipelines, and a token with <code>api</code> scope rather than
+        <code>read_api</code>.
+    </p>
 
-  <div class="note">
-    <strong>It always exits 0</strong> and is read-only, so adding this job can never fail your
-    pipeline or mask the real error. <code>allow_failure: true</code> is belt-and-braces.
-  </div>
+    <h2>Self-hosted GitLab</h2>
+    <p>
+        Override the API host and hand it your internal CA. Proxy variables are
+        honoured as-is:
+    </p>
+    <Code code={gitlabSelfHosted} lang="yaml" theme="github-dark" />
+    <p>
+        <code>HTTPS_PROXY</code>, <code>NO_PROXY</code> and <code
+            >REQUESTS_CA_BUNDLE</code
+        > behave the way you would expect. For runners with no egress at all, see
+        <a href={url("/cicd/local/")}>Local &amp; air-gapped&nbsp;</a>.
+    </p>
+
+    <div class="note">
+        <strong>It always exits 0</strong> and is read-only, so adding this job can
+        never fail your pipeline or mask the real error. <code
+            >allow_failure: true</code
+        > is belt-and-braces.
+    </div>
 </Base>

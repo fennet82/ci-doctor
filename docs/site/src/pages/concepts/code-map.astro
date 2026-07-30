@@ -1,158 +1,290 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
 
 // The code map, by package. `entry` is the function or type worth reading first.
 const packages = [
-  {
-    dir: 'ci_doctor/',
-    blurb: 'The wiring, and nothing else.',
-    files: [
-      { path: 'cli.py', entry: '_process()', role: 'The only place the pieces are joined: Typer commands, config loading, logging, and the `exit 0` guarantee. Segment → assign phases → attribute → build bundle → report.' },
-    ],
-  },
-  {
-    dir: 'config/',
-    blurb: 'What is tunable, and how the layers combine.',
-    files: [
-      { path: 'schema.py', entry: 'Config', role: 'The pydantic model. Source of truth for the published JSON Schema and for every scalar default. `extra="forbid"` — an unknown key in a config file is an error, not a shrug.' },
-      { path: 'loader.py', entry: 'load_config()', role: 'Applies the five layers in order and owns the merge-by-id rule that lets your matcher packs add to the shipped ones instead of replacing them.' },
-      { path: 'defaults.yml', entry: '—', role: 'The data-heavy baseline: phase map, the 35 matcher packs, noise patterns. Data, not code — which is why the docs can generate tables from it.' },
-    ],
-  },
-  {
-    dir: 'core/',
-    blurb: 'The domain. Pure functions, no network, no clock, no provider ever named.',
-    files: [
-      { path: 'models.py', entry: 'Job, Section, LogLine, Phase', role: 'The vocabulary everything downstream speaks. A `Section` is a named region of a log with its own lines, children and a `closed` flag; that flag is what makes "died mid-step" detectable.' },
-      { path: 'ports.py', entry: 'LogSegmenter, RunFetcher', role: 'The protocols a provider must satisfy. The entire reason `core/` can stay blind to which CI system produced a log.' },
-      { path: 'phases.py', entry: 'assign_phases()', role: 'Walks the section tree and stamps a `Phase` on each node from the config map. An unrecognised section inherits the nearest known phase, falling back to `script` — an unknown block is far more often your command than infrastructure.' },
-      { path: 'attribution.py', entry: 'attribute()', role: 'The classifier: a first-match-wins ladder of rules over job metadata and log structure. Returns the phase, the reason, a confidence, the single most telling line, and the `rule_id` that fired.' },
-      { path: 'denoise.py', entry: 'denoise()', role: 'Strip ANSI, collapse `\\r` progress rewrites to their final state, optionally drop the timestamp prefix, drop configured noise, then fold runs of identical lines into one with a count.' },
-      { path: 'extract.py', entry: 'extract()', role: 'Runs the matchers, turns hits into windows, merges what overlaps, sheds the lowest-priority windows under budget pressure, and renders the gaps as explicit elision markers.' },
-      { path: 'budget.py', entry: 'fit()', role: 'The last-resort cap: trims *inside* the surviving evidence, keeping the tail, and announces how much it dropped. Token counting is a 4-chars-per-token estimate — no tokenizer is loaded.' },
-      { path: 'analyze.py', entry: 'build_bundle()', role: 'The orchestrator for the evidence: picks the last section carrying the blamed phase, then denoise → extract → fit into one `EvidenceBundle`.' },
-      { path: 'redact.py', entry: 'redact()', role: 'The secret scrubber. Run on the prompt and again on the finished report.' },
-    ],
-  },
-  {
-    dir: 'providers/',
-    blurb: 'One directory per CI system. Adding a provider means adding a directory, never editing core.',
-    files: [
-      { path: 'gitlab/provider.py', entry: 'GitLabProvider', role: 'REST client: find the failed pipeline, list its jobs, pull the trace for the failed ones.' },
-      { path: 'gitlab/segmenter.py', entry: 'GitLabSegmenter', role: 'Reads GitLab\'s `section_start:…:step_script` markers into the Section tree.' },
-      { path: 'gitlab/reasons.py', entry: '—', role: 'Maps GitLab\'s `failure_reason` strings onto the domain `FailureReason` enum.' },
-      { path: 'github/segmenter.py', entry: 'GitHubSegmenter', role: 'The harder half of the same job: GitHub group names embed action versions ("Run actions/checkout@v4"), so they are canonicalised to stable tokens here — which is what lets the phase map in `core/` stay provider-free.' },
-      { path: 'git_origin.py', entry: '—', role: 'Infers the project from the checkout\'s git remote, so the CLI usually needs no `--project`.' },
-    ],
-  },
-  {
-    dir: 'llm/',
-    blurb: 'The one optional model call. It explains why; it never decides where.',
-    files: [
-      { path: 'report.py', entry: 'produce_report()', role: 'Builds the report. With no model configured this is the whole output — a deterministic report, not a stub — and the failure-category signatures are computed here either way.' },
-      { path: 'backends.py', entry: '—', role: '`openai`, `litellm`, `claude_code`. All prompt-and-parse; the caller validates the JSON against the schema.' },
-      { path: 'schema.py', entry: 'LLMAnswer', role: 'The shape a model answer must have. A reply that does not validate is discarded, not trusted.' },
-    ],
-  },
-  {
-    dir: 'render/',
-    blurb: 'Presentation only — no decisions live here.',
-    files: [
-      { path: 'terminal.py', entry: '—', role: 'The rich terminal view.' },
-      { path: 'markdown.py', entry: '—', role: '`report.md`, and the body of the MR/PR note.' },
-      { path: 'json_out.py', entry: '—', role: '`report.json`, for anything downstream that wants to parse rather than read.' },
-    ],
-  },
+    {
+        dir: "ci_doctor/",
+        blurb: "The wiring, and nothing else.",
+        files: [
+            {
+                path: "cli.py",
+                entry: "_process()",
+                role: "The only place the pieces are joined: Typer commands, config loading, logging, and the `exit 0` guarantee. Segment → assign phases → attribute → build bundle → report.",
+            },
+        ],
+    },
+    {
+        dir: "config/",
+        blurb: "What is tunable, and how the layers combine.",
+        files: [
+            {
+                path: "schema.py",
+                entry: "Config",
+                role: 'The pydantic model. Source of truth for the published JSON Schema and for every scalar default. `extra="forbid"` — an unknown key in a config file is an error, not a shrug.',
+            },
+            {
+                path: "loader.py",
+                entry: "load_config()",
+                role: "Applies the five layers in order and owns the merge-by-id rule that lets your matcher packs add to the shipped ones instead of replacing them.",
+            },
+            {
+                path: "defaults.yml",
+                entry: "—",
+                role: "The data-heavy baseline: phase map, the 35 matcher packs, noise patterns. Data, not code — which is why the docs can generate tables from it.",
+            },
+        ],
+    },
+    {
+        dir: "core/",
+        blurb: "The domain. Pure functions, no network, no clock, no provider ever named.",
+        files: [
+            {
+                path: "models.py",
+                entry: "Job, Section, LogLine, Phase",
+                role: 'The vocabulary everything downstream speaks. A `Section` is a named region of a log with its own lines, children and a `closed` flag; that flag is what makes "died mid-step" detectable.',
+            },
+            {
+                path: "ports.py",
+                entry: "LogSegmenter, RunFetcher",
+                role: "The protocols a provider must satisfy. The entire reason `core/` can stay blind to which CI system produced a log.",
+            },
+            {
+                path: "phases.py",
+                entry: "assign_phases()",
+                role: "Walks the section tree and stamps a `Phase` on each node from the config map. An unrecognised section inherits the nearest known phase, falling back to `script` — an unknown block is far more often your command than infrastructure.",
+            },
+            {
+                path: "attribution.py",
+                entry: "attribute()",
+                role: "The classifier: a first-match-wins ladder of rules over job metadata and log structure. Returns the phase, the reason, a confidence, the single most telling line, and the `rule_id` that fired.",
+            },
+            {
+                path: "denoise.py",
+                entry: "denoise()",
+                role: "Strip ANSI, collapse `\\r` progress rewrites to their final state, optionally drop the timestamp prefix, drop configured noise, then fold runs of identical lines into one with a count.",
+            },
+            {
+                path: "extract.py",
+                entry: "extract()",
+                role: "Runs the matchers, turns hits into windows, merges what overlaps, sheds the lowest-priority windows under budget pressure, and renders the gaps as explicit elision markers.",
+            },
+            {
+                path: "budget.py",
+                entry: "fit()",
+                role: "The last-resort cap: trims *inside* the surviving evidence, keeping the tail, and announces how much it dropped. Token counting is a 4-chars-per-token estimate — no tokenizer is loaded.",
+            },
+            {
+                path: "analyze.py",
+                entry: "build_bundle()",
+                role: "The orchestrator for the evidence: picks the last section carrying the blamed phase, then denoise → extract → fit into one `EvidenceBundle`.",
+            },
+            {
+                path: "redact.py",
+                entry: "redact()",
+                role: "The secret scrubber. Run on the prompt and again on the finished report.",
+            },
+        ],
+    },
+    {
+        dir: "providers/",
+        blurb: "One directory per CI system. Adding a provider means adding a directory, never editing core.",
+        files: [
+            {
+                path: "gitlab/provider.py",
+                entry: "GitLabProvider",
+                role: "REST client: find the failed pipeline, list its jobs, pull the trace for the failed ones.",
+            },
+            {
+                path: "gitlab/segmenter.py",
+                entry: "GitLabSegmenter",
+                role: "Reads GitLab's `section_start:…:step_script` markers into the Section tree.",
+            },
+            {
+                path: "gitlab/reasons.py",
+                entry: "—",
+                role: "Maps GitLab's `failure_reason` strings onto the domain `FailureReason` enum.",
+            },
+            {
+                path: "github/segmenter.py",
+                entry: "GitHubSegmenter",
+                role: 'The harder half of the same job: GitHub group names embed action versions ("Run actions/checkout@v4"), so they are canonicalised to stable tokens here — which is what lets the phase map in `core/` stay provider-free.',
+            },
+            {
+                path: "git_origin.py",
+                entry: "—",
+                role: "Infers the project from the checkout's git remote, so the CLI usually needs no `--project`.",
+            },
+        ],
+    },
+    {
+        dir: "llm/",
+        blurb: "The one optional model call. It explains why; it never decides where.",
+        files: [
+            {
+                path: "report.py",
+                entry: "produce_report()",
+                role: "Builds the report. With no model configured this is the whole output — a deterministic report, not a stub — and the failure-category signatures are computed here either way.",
+            },
+            {
+                path: "backends.py",
+                entry: "—",
+                role: "`openai`, `litellm`, `claude_code`. All prompt-and-parse; the caller validates the JSON against the schema.",
+            },
+            {
+                path: "schema.py",
+                entry: "LLMAnswer",
+                role: "The shape a model answer must have. A reply that does not validate is discarded, not trusted.",
+            },
+        ],
+    },
+    {
+        dir: "render/",
+        blurb: "Presentation only — no decisions live here.",
+        files: [
+            {
+                path: "terminal.py",
+                entry: "—",
+                role: "The rich terminal view.",
+            },
+            {
+                path: "markdown.py",
+                entry: "—",
+                role: "`report.md`, and the body of the MR/PR note.",
+            },
+            {
+                path: "json_out.py",
+                entry: "—",
+                role: "`report.json`, for anything downstream that wants to parse rather than read.",
+            },
+        ],
+    },
 ];
 
 const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags`;
 ---
-<Base title="Code map" description="Package by package: what every ci-doctor file decides, and the function to open first.">
-  <h1>Code map</h1>
-  <p class="lead">
-    Package by package, with the one function or type worth opening first in each file.
-    Paths are relative to <code>ci_doctor/</code>.
-  </p>
 
-  {packages.map((pkg) => (
-    <section class="pkg">
-      <div class="pkg-head">
-        <code class="pkg-dir">{pkg.dir}</code>
-        <span class="pkg-blurb">{pkg.blurb}</span>
-      </div>
-      <table class="pkg-table">
-        <thead>
-          <tr><th>File</th><th>Start here</th><th>What it decides</th></tr>
-        </thead>
-        <tbody>
-          {pkg.files.map((f) => (
-            <tr>
-              <td><code>{f.path}</code></td>
-              <td>{f.entry === '—' ? <span class="dash">—</span> : <code>{f.entry}</code>}</td>
-              <td>{f.role}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  ))}
+<Base
+    title="Code map"
+    description="Package by package: what every ci-doctor file decides, and the function to open first."
+>
+    <h1>Code map</h1>
+    <p class="lead">
+        Package by package, with the one function or type worth opening first in
+        each file. Paths are relative to <code>ci_doctor/</code>.
+    </p>
 
-  <h2>Configuration layering</h2>
-  <p>Every knob in every one of those files is set by the same five-layer merge:</p>
-  <Code code={layering} lang="text" theme="github-dark" />
-  <p>
-    Mappings deep-merge, lists and scalars replace. The one exception is a list whose entries
-    all carry an <code>id</code> — today only <code>extraction.matchers</code> — which merges
-    per id, so your packs add to the shipped ones instead of wiping them. See
-    <a href={url('/reference/configuration/')}>Configuration</a> for the full reference.
-  </p>
+    {
+        packages.map((pkg) => (
+            <section class="pkg">
+                <div class="pkg-head">
+                    <code class="pkg-dir">{pkg.dir}</code>
+                    <span class="pkg-blurb">{pkg.blurb}</span>
+                </div>
+                <table class="pkg-table">
+                    <thead>
+                        <tr>
+                            <>
+                                <th>File</th>
+                                <th>Start here</th>
+                                <th>What it decides</th>
+                            </>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {pkg.files.map((f) => (
+                            <tr>
+                                <td>
+                                    <code>{f.path}</code>
+                                </td>
+                                <td>
+                                    {f.entry === "—" ? (
+                                        <span class="dash">—</span>
+                                    ) : (
+                                        <code>{f.entry}</code>
+                                    )}
+                                </td>
+                                <td>{f.role}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </section>
+        ))
+    }
 
-  <div class="note">
-    <strong>Adding a CI provider is a directory, not a patch.</strong> Implement the protocols
-    in <code>core/ports.py</code>, add a segmenter and a reason map, and extend the shipped
-    phase map with your section names. Nothing in <code>core/</code> changes — and CI greps to
-    make sure of it.
-  </div>
+    <h2>Configuration layering</h2>
+    <p>
+        Every knob in every one of those files is set by the same five-layer
+        merge:
+    </p>
+    <Code code={layering} lang="text" theme="github-dark" />
+    <p>
+        Mappings deep-merge, lists and scalars replace. The one exception is a
+        list whose entries all carry an <code>id</code> — today only <code
+            >extraction.matchers</code
+        > — which merges per id, so your packs add to the shipped ones instead of
+        wiping them. See
+        <a href={url("/reference/configuration/")}>Configuration&nbsp;</a> for the
+        full reference.
+    </p>
+
+    <div class="note">
+        <strong>Adding a CI provider is a directory, not a patch.</strong> Implement
+        the protocols in <code>core/ports.py</code>, add a segmenter and a
+        reason map, and extend the shipped phase map with your section names.
+        Nothing in <code>core/</code> changes — and CI greps to make sure of it.
+    </div>
 </Base>
 
 <style>
-  .pkg { margin: 1.75rem 0; }
+    .pkg {
+        margin: 1.75rem 0;
+    }
 
-  .pkg-head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.7rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.6rem;
-  }
+    .pkg-head {
+        display: flex;
+        align-items: baseline;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.6rem;
+    }
 
-  .pkg-dir {
-    font-family: var(--mono);
-    font-size: 0.9rem;
-    font-weight: 650;
-    color: var(--accent);
-    background: var(--accent-soft);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: var(--radius-sm);
-    padding: 0.15em 0.55em;
-  }
+    .pkg-dir {
+        font-family: var(--mono);
+        font-size: 0.9rem;
+        font-weight: 650;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+        border-radius: var(--radius-sm);
+        padding: 0.15em 0.55em;
+    }
 
-  .pkg-blurb {
-    font-size: 0.88rem;
-    color: var(--muted);
-  }
+    .pkg-blurb {
+        font-size: 0.88rem;
+        color: var(--muted);
+    }
 
-  /* Path and entry-point columns are identifiers: never wrap mid-name. */
-  .pkg-table td:first-child,
-  .pkg-table td:nth-child(2) { white-space: nowrap; }
-  .pkg-table th:nth-child(2) { width: 1%; }
-
-  .dash { color: var(--muted); }
-
-  @media (max-width: 700px) {
+    /* Path and entry-point columns are identifiers: never wrap mid-name. */
     .pkg-table td:first-child,
-    .pkg-table td:nth-child(2) { white-space: normal; }
-  }
+    .pkg-table td:nth-child(2) {
+        white-space: nowrap;
+    }
+    .pkg-table th:nth-child(2) {
+        width: 1%;
+    }
+
+    .dash {
+        color: var(--muted);
+    }
+
+    @media (max-width: 700px) {
+        .pkg-table td:first-child,
+        .pkg-table td:nth-child(2) {
+            white-space: normal;
+        }
+    }
 </style>

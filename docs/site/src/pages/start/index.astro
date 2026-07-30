@@ -1,36 +1,53 @@
 ---
-import Base from '../../layouts/Base.astro';
-import PageCards from '../../components/PageCards.astro';
-import { nav } from '../../lib/nav';
-import { url } from '../../lib/url';
+import Base from "../../layouts/Base.astro";
+import PageCards from "../../components/PageCards.astro";
+import { nav } from "../../lib/nav";
+import { url } from "../../lib/url";
 
-const section = nav.find((s) => s.href === '/start/')!;
+const section = nav.find((s) => s.href === "/start/")!;
 ---
-<Base title="Get started" description="Install ci-doctor, run it against a real failure, and check what it needs.">
-  <h1>Get started</h1>
-  <p class="lead">
-    The shortest path to a verdict is a log file and one command — no CI, no token, no model.
-    Start there, then wire it into a pipeline.
-  </p>
 
-  <PageCards pages={section.pages} />
+<Base
+    title="Get started"
+    description="Install ci-doctor, run it against a real failure, and check what it needs."
+>
+    <h1>Get started</h1>
+    <p class="lead">
+        The shortest path to a verdict is a log file and one command — no CI, no
+        token, no model. Start there, then wire it into a pipeline.
+    </p>
 
-  <div class="note">
-    <strong>On GitHub Actions there is nothing to install.</strong> One step, and it defaults
-    to the run that triggered it — skip straight to
-    <a href={url('/cicd/github/')}>GitHub Actions</a>.
-  </div>
+    <PageCards pages={section.pages} />
 
-  <h2>What "getting started" actually involves</h2>
-  <ol class="tight">
-    <li><a href={url('/start/install/')}>Install it</a> — or don't, on GitHub Actions.</li>
-    <li><a href={url('/start/first-run/')}>Replay a saved log</a> offline to see the report shape.</li>
-    <li><a href={url('/start/requirements/')}>Get a read-scoped token</a> when you want it to fetch a live run itself.</li>
-    <li><a href={url('/cicd/')}>Add the job to your pipeline</a>, where it runs only on failure.</li>
-  </ol>
-  <p>
-    Steps 1–2 need nothing but Python. Everything after that is about letting it reach your
-    CI provider. An LLM is optional at every step — without one you get the full
-    deterministic report, not a stub.
-  </p>
+    <div class="note">
+        <strong>On GitHub Actions there is nothing to install.</strong> One step,
+        and it defaults to the run that triggered it — skip straight to
+        <a href={url("/cicd/github/")}>GitHub Actions&nbsp;</a>.
+    </div>
+
+    <h2>What "getting started" actually involves</h2>
+    <ol class="tight">
+        <li>
+            <a href={url("/start/install/")}>Install it&nbsp;</a> — or don't, on GitHub
+            Actions.
+        </li>
+        <li>
+            <a href={url("/start/first-run/")}>Replay a saved log&nbsp;</a> offline
+            to see the report shape.
+        </li>
+        <li>
+            <a href={url("/start/requirements/")}
+                >Get a read-scoped token&nbsp;</a
+            > when you want it to fetch a live run itself.
+        </li>
+        <li>
+            <a href={url("/cicd/")}>Add the job to your pipeline&nbsp;</a>,
+            where it runs only on failure.
+        </li>
+    </ol>
+    <p>
+        Steps 1–2 need nothing but Python. Everything after that is about
+        letting it reach your CI provider. An LLM is optional at every step —
+        without one you get the full deterministic report, not a stub.
+    </p>
 </Base>

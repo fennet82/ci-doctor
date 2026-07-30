@@ -1,7 +1,7 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
 
 const token = `# Env var (name is configurable via gitlab.token_env / github.token_env):
 export CI_DOCTOR_GITLAB_TOKEN="glpat-xxxxxxxxxxxxxxxxxxxx"
@@ -13,65 +13,120 @@ export CI_DOCTOR_GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
 ---
 
 <Base title="Requirements">
-  <h1>What it needs</h1>
-  <p class="lead">
-    Minimal on purpose. A Python runtime (or the image), a read-scoped token, and — optionally —
-    an LLM endpoint.
-  </p>
+    <h1>What it needs</h1>
+    <p class="lead">
+        Minimal on purpose. A Python runtime (or the image), a read-scoped
+        token, and — optionally — an LLM endpoint.
+    </p>
 
-  <h2>Runtime</h2>
-  <ul class="tight">
-    <li><strong>Python 3.11+</strong>, or the self-contained <strong>Docker image</strong> (dependencies baked in — no <code>pip install</code> at job time).</li>
-    <li>On GitHub Actions, the <a href={url('/cicd/github/')}>action</a> handles this for you: nothing to install, no Python setup step.</li>
-    <li>Runs in your pipeline's <em>post</em> stage, only on failure. It is read-only and always exits 0.</li>
-  </ul>
+    <h2>Runtime</h2>
+    <ul class="tight">
+        <li>
+            <strong>Python 3.11+</strong>, or the self-contained <strong
+                >Docker image</strong
+            > (dependencies baked in — no <code>pip install</code> at job time).
+        </li>
+        <li>
+            On GitHub Actions, the <a href={url("/cicd/github/")}
+                >action&nbsp;</a
+            > handles this for you: nothing to install, no Python setup step.
+        </li>
+        <li>
+            Runs in your pipeline's <em>post</em> stage, only on failure. It is read-only
+            and always exits 0.
+        </li>
+    </ul>
 
-  <h2>Access to your CI provider</h2>
-  <p>A read-scoped API token, from an environment variable <em>or</em> a file:</p>
-  <Code code={token} lang="bash" theme="github-dark" />
-  <p>
-    <code>base_url</code> defaults to the public host (<code>gitlab.com</code> / <code>api.github.com</code>);
-    override it for self-hosted GitLab or GitHub Enterprise. Custom CA bundles, self-signed certs, and the
-    standard <code>HTTPS_PROXY</code> / <code>NO_PROXY</code> / <code>REQUESTS_CA_BUNDLE</code> env vars are honoured.
-  </p>
+    <h2>Access to your CI provider</h2>
+    <p>
+        A read-scoped API token, from an environment variable <em>or</em> a file:
+    </p>
+    <Code code={token} lang="bash" theme="github-dark" />
+    <p>
+        <code>base_url</code> defaults to the public host (<code
+            >gitlab.com</code
+        > / <code>api.github.com</code>); override it for self-hosted GitLab or
+        GitHub Enterprise. Custom CA bundles, self-signed certs, and the
+        standard <code>HTTPS_PROXY</code> / <code>NO_PROXY</code> / <code
+            >REQUESTS_CA_BUNDLE</code
+        > env vars are honoured.
+    </p>
 
-  <h3>Token scopes</h3>
-  <table>
-    <thead><tr><th>Provider</th><th>Needs</th></tr></thead>
-    <tbody>
-      <tr><td>GitLab</td><td><code>read_api</code>. Add <code>api</code> only if you turn on MR notes.</td></tr>
-      <tr><td>GitHub</td><td><code>actions: read</code>. Add <code>pull-requests: write</code> only for PR comments.</td></tr>
-    </tbody>
-  </table>
+    <h3>Token scopes</h3>
+    <table>
+        <thead><tr><th>Provider</th><th>Needs</th></tr></thead>
+        <tbody>
+            <tr
+                ><td>GitLab</td><td
+                    ><code>read_api</code>. Add <code>api</code> only if you turn
+                    on MR notes.</td
+                ></tr
+            >
+            <tr
+                ><td>GitHub</td><td
+                    ><code>actions: read</code>. Add <code
+                        >pull-requests: write</code
+                    > only for PR comments.</td
+                ></tr
+            >
+        </tbody>
+    </table>
 
-  <h3>Predefined CI variables it reads</h3>
-  <table>
-    <thead><tr><th>Provider</th><th>Variables</th></tr></thead>
-    <tbody>
-      <tr><td>GitLab</td><td><code>CI_PIPELINE_ID</code>, <code>CI_PROJECT_ID</code>, <code>CI_MERGE_REQUEST_IID</code> (for MR notes)</td></tr>
-      <tr><td>GitHub</td><td><code>GITHUB_REPOSITORY</code>, <code>GITHUB_REF</code>, <code>GITHUB_SHA</code></td></tr>
-    </tbody>
-  </table>
-  <div class="note">
-    None of these are required off a runner. When the repository variable is unset, ci-doctor
-    resolves it from your <code>git origin</code> and logs a warning naming what it picked — so
-    the same command works unchanged on your laptop.
-  </div>
+    <h3>Predefined CI variables it reads</h3>
+    <table>
+        <thead><tr><th>Provider</th><th>Variables</th></tr></thead>
+        <tbody>
+            <tr
+                ><td>GitLab</td><td
+                    ><code>CI_PIPELINE_ID</code>, <code>CI_PROJECT_ID</code>, <code
+                        >CI_MERGE_REQUEST_IID</code
+                    > (for MR notes)</td
+                ></tr
+            >
+            <tr
+                ><td>GitHub</td><td
+                    ><code>GITHUB_REPOSITORY</code>, <code>GITHUB_REF</code>, <code
+                        >GITHUB_SHA</code
+                    ></td
+                ></tr
+            >
+        </tbody>
+    </table>
+    <div class="note">
+        None of these are required off a runner. When the repository variable is
+        unset, ci-doctor resolves it from your <code>git origin</code> and logs a
+        warning naming what it picked — so the same command works unchanged on your
+        laptop.
+    </div>
 
-  <h2>An LLM endpoint — optional</h2>
-  <p>
-    ci-doctor produces a useful deterministic report with <strong>no model at all</strong>
-    (<code>llm.enabled: false</code>, or simply leaving <code>llm.model</code>/<code>llm.api_base</code> unset).
-    To enable the explanation step, point it at any <strong>OpenAI-compatible</strong> endpoint:
-    Ollama, vLLM, llama.cpp server, LocalAI, or an internal gateway. An API key is optional.
-    Other backends — litellm, Anthropic, the local <code>claude</code> CLI — are on
-    <a href={url('/reference/configuration/')}>Configuration</a>.
-  </p>
+    <h2>An LLM endpoint — optional</h2>
+    <p>
+        ci-doctor produces a useful deterministic report with <strong
+            >no model at all</strong
+        >
+        (<code>llm.enabled: false</code>, or simply leaving <code
+            >llm.model</code
+        >/<code>llm.api_base</code> unset). To enable the explanation step, point
+        it at any <strong>OpenAI-compatible</strong> endpoint: Ollama, vLLM, llama.cpp
+        server, LocalAI, or an internal gateway. An API key is optional. Other backends
+        — litellm, Anthropic, the local <code>claude</code> CLI — are on
+        <a href={url("/reference/configuration/")}>Configuration&nbsp;</a>.
+    </p>
 
-  <h2>Network &amp; air-gap</h2>
-  <ul class="tight">
-    <li>At runtime it only ever contacts the GitLab/GitHub and LLM endpoints <em>you</em> configure.</li>
-    <li>No telemetry, no update checks, no runtime downloads of models, rules, or schemas.</li>
-    <li>Distribute via an internal container registry or an offline wheel bundle — see <a href={url('/cicd/')}>Examples</a>.</li>
-  </ul>
+    <h2>Network &amp; air-gap</h2>
+    <ul class="tight">
+        <li>
+            At runtime it only ever contacts the GitLab/GitHub and LLM endpoints <em
+                >you</em
+            > configure.
+        </li>
+        <li>
+            No telemetry, no update checks, no runtime downloads of models,
+            rules, or schemas.
+        </li>
+        <li>
+            Distribute via an internal container registry or an offline wheel
+            bundle — see <a href={url("/cicd/")}>Examples</a>.
+        </li>
+    </ul>
 </Base>

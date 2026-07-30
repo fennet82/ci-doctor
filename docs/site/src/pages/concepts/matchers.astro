@@ -1,9 +1,9 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import Mermaid from '../../components/Mermaid.astro';
-import { url } from '../../lib/url';
-import catalogue from '../../data/matchers.json';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import Mermaid from "../../components/Mermaid.astro";
+import { url } from "../../lib/url";
+import catalogue from "../../data/matchers.json";
 
 // Generated from ci_doctor/config/defaults.yml by `mise run docs:data`; a test
 // fails if this file drifts from what ships. Never edit the JSON by hand.
@@ -13,9 +13,12 @@ const total = catalogue.reduce((n, g) => n + g.packs.length, 0);
 // for inline code — the only markup they carry. Escape first: several notes
 // contain angle brackets (`error <Capital>`).
 const inlineCode = (s: string) =>
-  s
-    .replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+    s
+        .replace(
+            /[&<>]/g,
+            (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!,
+        )
+        .replace(/`([^`]+)`/g, "<code>$1</code>");
 
 const extraction = `flowchart LR
   L["denoised lines<br>of the blamed section"] --> M{{"every matcher<br>runs over them"}}
@@ -46,224 +49,279 @@ const testIt = `# Prove it fires before you trust it — a matcher that never ma
 # fails silently, because the tail window still returns something.
 ci-doctor analyze path/to/failing-job.log`;
 ---
-<Base title="Matchers" description="The shipped matcher packs — what each one anchors on, and how to add or retune your own.">
-  <h1>Matchers</h1>
-  <p class="lead">
-    A matcher recognises one tool's failure output and pulls the lines around it into the
-    evidence. {total} ship by default, covering the test frameworks, compilers, linters and
-    package managers most pipelines run. They are data, not code — every one is overridable
-    from your own <code>.ci-doctor.yml</code>.
-  </p>
 
-  <h2>How a pack is shaped</h2>
-  <p>There are two forms, and a pack uses one or the other:</p>
-  <table>
-    <thead><tr><th>Form</th><th>Fields</th><th>Use when</th></tr></thead>
-    <tbody>
-      <tr>
-        <td><strong>Anchor</strong></td>
-        <td><code>pattern</code> + <code>before</code>/<code>after</code></td>
-        <td>The failure is one recognisable line, and the useful context is a known number of lines around it.</td>
-      </tr>
-      <tr>
-        <td><strong>Block</strong></td>
-        <td><code>start</code> + <code>end</code></td>
-        <td>The tool prints a delimited region — <code>=== FAILURES ===</code> through to the summary line.</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>
-    Both carry a <code>priority</code>, which decides who survives when the evidence exceeds
-    the token budget: whole low-priority windows are shed before the survivors are trimmed.
-    Rank a pack by how <em>diagnostic</em> it is, not how loud — <code>npm ERR!</code> (75)
-    always trails the compiler errors that caused it, so it loses to <code>tsc</code> (80).
-  </p>
+<Base
+    title="Matchers"
+    description="The shipped matcher packs — what each one anchors on, and how to add or retune your own."
+>
+    <h1>Matchers</h1>
+    <p class="lead">
+        A matcher recognises one tool's failure output and pulls the lines
+        around it into the evidence. {total} ship by default, covering the test frameworks,
+        compilers, linters and package managers most pipelines run. They are data,
+        not code — every one is overridable from your own <code
+            >.ci-doctor.yml</code
+        >.
+    </p>
 
-  <div class="note">
-    <strong>Anchor on the cause, not the summary.</strong> A tool's final
-    <code>2 tests failed</code> line comes <em>after</em> the detail explaining why, so a
-    summary-only anchor windows straight past the evidence. Anchor on something only your
-    tool prints, too: a bare <code>^ERROR: .*failed</code> also matches
-    <code>ERROR: Job failed: exit code 1</code>, the line that ends every failed GitLab job.
-  </div>
+    <h2>How a pack is shaped</h2>
+    <p>There are two forms, and a pack uses one or the other:</p>
+    <table>
+        <thead><tr><th>Form</th><th>Fields</th><th>Use when</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>Anchor</strong></td>
+                <td
+                    ><code>pattern</code> + <code>before</code>/<code
+                        >after</code
+                    ></td
+                >
+                <td
+                    >The failure is one recognisable line, and the useful
+                    context is a known number of lines around it.</td
+                >
+            </tr>
+            <tr>
+                <td><strong>Block</strong></td>
+                <td><code>start</code> + <code>end</code></td>
+                <td
+                    >The tool prints a delimited region — <code
+                        >=== FAILURES ===</code
+                    > through to the summary line.</td
+                >
+            </tr>
+        </tbody>
+    </table>
+    <p>
+        Both carry a <code>priority</code>, which decides who survives when the
+        evidence exceeds the token budget: whole low-priority windows are shed
+        before the survivors are trimmed. Rank a pack by how <em>diagnostic</em> it
+        is, not how loud — <code>npm ERR!</code> (75) always trails the compiler errors
+        that caused it, so it loses to <code>tsc</code> (80).
+    </p>
 
-  <h2>What happens to a match</h2>
-  <p>
-    Matching is only the first step. Every hit becomes a window, windows that touch are
-    merged, and priority decides which ones survive the budget — all of it in
-    <code>core/extract.py</code>, before a model is ever involved.
-  </p>
+    <div class="note">
+        <strong>Anchor on the cause, not the summary.</strong> A tool's final
+        <code>2 tests failed</code> line comes <em>after</em> the detail explaining
+        why, so a summary-only anchor windows straight past the evidence. Anchor on
+        something only your tool prints, too: a bare <code
+            >^ERROR: .*failed</code
+        > also matches
+        <code>ERROR: Job failed: exit code 1</code>, the line that ends every
+        failed GitLab job.
+    </div>
 
-  <Mermaid
-    code={extraction}
-    label="Extraction flow: denoised lines are matched into windows, merged, shed by priority, then rendered with elision markers."
-    caption="core/extract.py — matching, merging, shedding, rendering."
-  />
+    <h2>What happens to a match</h2>
+    <p>
+        Matching is only the first step. Every hit becomes a window, windows
+        that touch are merged, and priority decides which ones survive the
+        budget — all of it in
+        <code>core/extract.py</code>, before a model is ever involved.
+    </p>
 
-  <p>
-    Two details follow from this. Merged windows take the <em>highest</em> priority they
-    absorbed, so a good pack never loses rank by sitting next to a weak one. And shedding
-    stops at one window: a single unbounded <code>start</code>/<code>end</code> block can
-    exceed the budget alone, and cutting <em>inside</em> it is
-    <code>core/budget.py</code>'s job, not the matcher's.
-  </p>
+    <Mermaid
+        code={extraction}
+        label="Extraction flow: denoised lines are matched into windows, merged, shed by priority, then rendered with elision markers."
+        caption="core/extract.py — matching, merging, shedding, rendering."
+    />
 
-  <h2>The shipped catalogue</h2>
-  <p>
-    Generated from <code>config/defaults.yml</code>, so this is the {total} packs that
-    actually ship, in the order they are declared. <strong>anchor</strong> packs list the
-    context lines they keep either side of the hit; <strong>block</strong> packs run from
-    their <code>start</code> to their <code>end</code>.
-  </p>
+    <p>
+        Two details follow from this. Merged windows take the <em>highest</em> priority
+        they absorbed, so a good pack never loses rank by sitting next to a weak one.
+        And shedding stops at one window: a single unbounded <code>start</code
+        >/<code>end</code> block can exceed the budget alone, and cutting <em
+            >inside</em
+        > it is
+        <code>core/budget.py</code>'s job, not the matcher's.
+    </p>
 
-  {catalogue.map((group) => (
-    <>
-      <h3>{group.group}</h3>
-      <div class="packs">
-        {group.packs.map((p) => (
-          <article class="pack">
-            <div class="pack-head">
-              <code class="pack-id">{p.id}</code>
-              <span class:list={['chip', p.kind]}>{p.kind}</span>
-              <span class="pack-meta">
-                {p.kind === 'block' ? 'start → end' : `−${p.before} / +${p.after} lines`}
-                {' · '}priority {p.priority}
-              </span>
-            </div>
-            <p class="pack-note" set:html={inlineCode(p.note)} />
-            <dl class="pack-rx">
-              <dt>{p.kind === 'block' ? 'start' : 'pattern'}</dt>
-              <dd><code class="rx">{p.match}</code></dd>
-              {p.end && (
-                <>
-                  <dt>end</dt>
-                  <dd><code class="rx">{p.end}</code></dd>
-                </>
-              )}
-            </dl>
-          </article>
-        ))}
-      </div>
-    </>
-  ))}
+    <h2>The shipped catalogue</h2>
+    <p>
+        Generated from <code>config/defaults.yml</code>, so this is the {total} packs
+        that actually ship, in the order they are declared. <strong
+            >anchor</strong
+        > packs list the context lines they keep either side of the hit; <strong
+            >block</strong
+        > packs run from their <code>start</code> to their <code>end</code>.
+    </p>
 
-  <h2>Adding your own</h2>
-  <p>
-    Matcher lists merge <strong>by id</strong>, which is the one exception to "lists replace".
-    A new id is added alongside the shipped packs:
-  </p>
-  <Code code={addPack} lang="yaml" theme="github-dark" />
+    {
+        catalogue.map((group) => (
+            <>
+                <h3>{group.group}</h3>
+                <div class="packs">
+                    {group.packs.map((p) => (
+                        <article class="pack">
+                            <div class="pack-head">
+                                <code class="pack-id">{p.id}</code>
+                                <span class:list={["chip", p.kind]}>
+                                    {p.kind}
+                                </span>
+                                <span class="pack-meta">
+                                    {p.kind === "block"
+                                        ? "start → end"
+                                        : `−${p.before} / +${p.after} lines`}
+                                    {" · "}priority {p.priority}
+                                </span>
+                            </div>
+                            <p
+                                class="pack-note"
+                                set:html={inlineCode(p.note)}
+                            />
+                            <dl class="pack-rx">
+                                <dt>
+                                    {p.kind === "block" ? "start" : "pattern"}
+                                </dt>
+                                <dd>
+                                    <code class="rx">{p.match}</code>
+                                </dd>
+                                {p.end && (
+                                    <>
+                                        <dt>end</dt>
+                                        <dd>
+                                            <code class="rx">{p.end}</code>
+                                        </dd>
+                                    </>
+                                )}
+                            </dl>
+                        </article>
+                    ))}
+                </div>
+            </>
+        ))
+    }
 
-  <p>Reusing a shipped id retunes that pack instead, field by field:</p>
-  <Code code={retune} lang="yaml" theme="github-dark" />
-  <p>
-    Only the fields you write are overridden — setting <code>priority</code> on
-    <code>pytest</code> keeps its <code>start</code>/<code>end</code>, because blanking them
-    would leave a matcher that can never fire. ci-doctor logs a warning naming any shipped
-    pack you override, so an accidental id collision is visible rather than silent.
-  </p>
+    <h2>Adding your own</h2>
+    <p>
+        Matcher lists merge <strong>by id</strong>, which is the one exception
+        to "lists replace". A new id is added alongside the shipped packs:
+    </p>
+    <Code code={addPack} lang="yaml" theme="github-dark" />
 
-  <h2>Check it actually fires</h2>
-  <p>
-    The most common mistake is a pack that never matches. It fails <em>silently</em>: the
-    tail window still returns output, so the report looks fine while your matcher does
-    nothing. Replay a real failing log and confirm your lines are in the evidence:
-  </p>
-  <Code code={testIt} lang="bash" theme="github-dark" />
-  <p>
-    Contributing a pack upstream? It needs a fixture log for <em>both</em> providers plus an
-    expected verdict — see <a href="https://github.com/fennet82/ci-doctor/blob/master/GUIDELINES.md">GUIDELINES.md</a> §5.1.
-    The <a href={url('/concepts/')}>concepts</a> page explains where extraction sits in the
-    pipeline.
-  </p>
+    <p>Reusing a shipped id retunes that pack instead, field by field:</p>
+    <Code code={retune} lang="yaml" theme="github-dark" />
+    <p>
+        Only the fields you write are overridden — setting <code>priority</code> on
+        <code>pytest</code> keeps its <code>start</code>/<code>end</code>,
+        because blanking them would leave a matcher that can never fire.
+        ci-doctor logs a warning naming any shipped pack you override, so an
+        accidental id collision is visible rather than silent.
+    </p>
+
+    <h2>Check it actually fires</h2>
+    <p>
+        The most common mistake is a pack that never matches. It fails <em
+            >silently</em
+        >: the tail window still returns output, so the report looks fine while
+        your matcher does nothing. Replay a real failing log and confirm your
+        lines are in the evidence:
+    </p>
+    <Code code={testIt} lang="bash" theme="github-dark" />
+    <p>
+        Contributing a pack upstream? It needs a fixture log for <em>both</em> providers
+        plus an expected verdict — see <a
+            href="https://github.com/fennet82/ci-doctor/blob/master/GUIDELINES.md"
+            >GUIDELINES.md</a
+        > §5.1. The a href={url("/concepts/")}>concepts&nbsp;
+    </p> page explains where extraction sits in the pipeline.
 </Base>
 
 <style>
-  /* Regexes are the content here, so let them wrap rather than scroll the row. */
-  code.rx {
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 0.8rem;
-    line-height: 1.5;
-  }
+    /* Regexes are the content here, so let them wrap rather than scroll the row. */
+    code.rx {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.8rem;
+        line-height: 1.5;
+    }
 
-  /* The catalogue is many small groups; tighten the default h3 rhythm. */
-  h3 { margin-top: 2.25rem; }
+    /* The catalogue is many small groups; tighten the default h3 rhythm. */
+    h3 {
+        margin-top: 2.25rem;
+    }
 
-  .packs {
-    display: grid;
-    gap: 0.6rem;
-    margin: 1rem 0;
-  }
+    .packs {
+        display: grid;
+        gap: 0.6rem;
+        margin: 1rem 0;
+    }
 
-  .pack {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    padding: 0.85rem 1.05rem;
-    box-shadow: var(--shadow-sm);
-  }
+    .pack {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        padding: 0.85rem 1.05rem;
+        box-shadow: var(--shadow-sm);
+    }
 
-  .pack-head {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
+    .pack-head {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
 
-  .pack-id {
-    font-weight: 650;
-    font-size: 0.9rem;
-  }
+    .pack-id {
+        font-weight: 650;
+        font-size: 0.9rem;
+    }
 
-  .chip {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0.15em 0.5em;
-    border-radius: 999px;
-    border: 1px solid var(--border-strong);
-    color: var(--muted);
-  }
-  .chip.block {
-    color: var(--accent);
-    background: var(--accent-soft);
-    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  }
+    .chip {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.15em 0.5em;
+        border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        color: var(--muted);
+    }
+    .chip.block {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    }
 
-  .pack-meta {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: 0.74rem;
-    color: var(--muted);
-    white-space: nowrap;
-  }
+    .pack-meta {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 0.74rem;
+        color: var(--muted);
+        white-space: nowrap;
+    }
 
-  .pack-note {
-    margin: 0.5rem 0 0;
-    font-size: 0.92rem;
-    line-height: 1.6;
-    max-width: none;
-  }
+    .pack-note {
+        margin: 0.5rem 0 0;
+        font-size: 0.92rem;
+        line-height: 1.6;
+        max-width: none;
+    }
 
-  /* pattern/start/end, labelled so a two-regex block pack is unambiguous. */
-  .pack-rx {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.15rem 0.7rem;
-    margin: 0.6rem 0 0;
-  }
-  .pack-rx dt {
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    color: var(--muted);
-    padding-top: 0.15rem;
-  }
-  .pack-rx dd { margin: 0; }
+    /* pattern/start/end, labelled so a two-regex block pack is unambiguous. */
+    .pack-rx {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.15rem 0.7rem;
+        margin: 0.6rem 0 0;
+    }
+    .pack-rx dt {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--muted);
+        padding-top: 0.15rem;
+    }
+    .pack-rx dd {
+        margin: 0;
+    }
 
-  @media (max-width: 560px) {
-    .pack-meta { margin-left: 0; width: 100%; }
-    .pack-rx { grid-template-columns: 1fr; gap: 0.05rem; }
-  }
+    @media (max-width: 560px) {
+        .pack-meta {
+            margin-left: 0;
+            width: 100%;
+        }
+        .pack-rx {
+            grid-template-columns: 1fr;
+            gap: 0.05rem;
+        }
+    }
 </style>

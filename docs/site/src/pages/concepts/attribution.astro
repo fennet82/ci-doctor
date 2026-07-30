@@ -1,146 +1,249 @@
 ---
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
-import phaseMap from '../../data/phases.json';
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
+import phaseMap from "../../data/phases.json";
 
 // Generated from ci_doctor/config/defaults.yml by `mise run docs:data`; a test
 // fails if it drifts from what ships. Never edit the JSON by hand.
-const byProvider = [...new Set(phaseMap.map((p) => p.provider))].map((provider) => ({
-  provider,
-  rows: phaseMap.filter((p) => p.provider === provider),
-}));
+const byProvider = [...new Set(phaseMap.map((p) => p.provider))].map(
+    (provider) => ({
+        provider,
+        rows: phaseMap.filter((p) => p.provider === provider),
+    }),
+);
 
 // The attribution ladder, in the order the rules are tried. `rule_id` is printed
 // in the report, so a reader can always tell which rung produced the verdict.
 const rules = [
-  { id: 'empty_log_no_runner', when: 'The log is empty or absent — the job never really ran.', phase: 'provision', conf: 'high' },
-  { id: 'reason_*', when: 'The provider itself reported a reason: no runner, runner system failure, missing dependency, unmet prerequisites, cancelled, timeout, API failure. Authoritative, so it is consulted before any log parsing.', phase: 'from the reason', conf: 'high / medium' },
-  { id: 'script_failure_is_script', when: 'The provider said `script_failure`. This is the rule that kills the "blamed the cache" bug — the noisy fetch and prepare warnings are never even looked at.', phase: 'script', conf: 'high' },
-  { id: 'unclosed_section', when: 'No reason given, and a section never saw its end marker. Execution died inside it.', phase: 'that section\'s', conf: 'medium' },
-  { id: 'oom_137', when: 'The trailer reports exit code 137 — SIGKILL, so the OOM killer. Infrastructure, not a script bug.', phase: 'script', conf: 'high' },
-  { id: 'trailer_exit_code', when: 'The trailer reports any other non-zero exit code.', phase: 'script', conf: 'high' },
-  { id: 'trailer_system_failure', when: 'The trailer says `system failure` or names the prepare-environment step.', phase: 'prepare', conf: 'high' },
-  { id: 'trailer_timeout', when: 'The trailer says execution took longer than the limit.', phase: 'provision', conf: 'high' },
-  { id: 'last_error_section', when: 'The last section containing a genuinely fatal line. A section whose only bad news is `WARNING:` can never be picked here.', phase: 'that section\'s', conf: 'low' },
-  { id: 'no_signal', when: 'Nothing above fired. Said plainly rather than guessed.', phase: 'unknown', conf: 'low' },
+    {
+        id: "empty_log_no_runner",
+        when: "The log is empty or absent — the job never really ran.",
+        phase: "provision",
+        conf: "high",
+    },
+    {
+        id: "reason_*",
+        when: "The provider itself reported a reason: no runner, runner system failure, missing dependency, unmet prerequisites, cancelled, timeout, API failure. Authoritative, so it is consulted before any log parsing.",
+        phase: "from the reason",
+        conf: "high / medium",
+    },
+    {
+        id: "script_failure_is_script",
+        when: 'The provider said `script_failure`. This is the rule that kills the "blamed the cache" bug — the noisy fetch and prepare warnings are never even looked at.',
+        phase: "script",
+        conf: "high",
+    },
+    {
+        id: "unclosed_section",
+        when: "No reason given, and a section never saw its end marker. Execution died inside it.",
+        phase: "that section's",
+        conf: "medium",
+    },
+    {
+        id: "oom_137",
+        when: "The trailer reports exit code 137 — SIGKILL, so the OOM killer. Infrastructure, not a script bug.",
+        phase: "script",
+        conf: "high",
+    },
+    {
+        id: "trailer_exit_code",
+        when: "The trailer reports any other non-zero exit code.",
+        phase: "script",
+        conf: "high",
+    },
+    {
+        id: "trailer_system_failure",
+        when: "The trailer says `system failure` or names the prepare-environment step.",
+        phase: "prepare",
+        conf: "high",
+    },
+    {
+        id: "trailer_timeout",
+        when: "The trailer says execution took longer than the limit.",
+        phase: "provision",
+        conf: "high",
+    },
+    {
+        id: "last_error_section",
+        when: "The last section containing a genuinely fatal line. A section whose only bad news is `WARNING:` can never be picked here.",
+        phase: "that section's",
+        conf: "low",
+    },
+    {
+        id: "no_signal",
+        when: "Nothing above fired. Said plainly rather than guessed.",
+        phase: "unknown",
+        conf: "low",
+    },
 ];
 ---
-<Base title="Sections & attribution" description="How a log becomes sections, how sections become phases, and the rule ladder that decides which phase failed.">
-  <h1>Sections &amp; attribution</h1>
-  <p class="lead">
-    Three ideas, in the order they happen: a log becomes <strong>sections</strong>, sections
-    are labelled with a <strong>phase</strong>, and one phase gets the blame. All of it
-    deterministic, all of it before a model is involved.
-  </p>
 
-  <h2>Section</h2>
-  <p>
-    A named region of a job log, holding its own lines, any nested sections, and a
-    <code>closed</code> flag. GitLab emits <code>section_start:…:step_script</code> markers;
-    GitHub emits <code>##[group]</code> headers whose names embed action versions
-    (<code>Run actions/checkout@v4</code>), so its segmenter canonicalises them to stable
-    tokens. Either way the result is the same tree, and that is the last point where the two
-    formats differ.
-  </p>
-  <p>
-    Two synthetic sections always exist: <code>__preamble__</code> for output before the
-    first marker, and <code>__trailer__</code> for the runner's closing verdict after the
-    last one. Neither is ever blamed directly — the classifier reads the trailer, it does not
-    attribute to it.
-  </p>
-  <p>
-    <code>closed</code> is the load-bearing field. A section with no end marker means
-    execution died inside it, which is the strongest structural signal available when the
-    provider reported no reason at all.
-  </p>
+<Base
+    title="Sections & attribution"
+    description="How a log becomes sections, how sections become phases, and the rule ladder that decides which phase failed."
+>
+    <h1>Sections &amp; attribution</h1>
+    <p class="lead">
+        Three ideas, in the order they happen: a log becomes <strong
+            >sections</strong
+        >, sections are labelled with a <strong>phase</strong>, and one phase
+        gets the blame. All of it deterministic, all of it before a model is
+        involved.
+    </p>
 
-  <h2>Phase</h2>
-  <p>
-    What a section was <em>for</em>, independent of what the CI system calls it:
-    <code>provision</code> (getting a runner at all), <code>prepare</code> (the image and
-    environment), <code>fetch</code> (source, cache, artifacts), <code>script</code> (your
-    commands), <code>post</code> (cleanup, artifact upload). The one distinction that
-    matters is <code>script</code> — your bug — versus everything else, which is
-    infrastructure and not.
-  </p>
-  <p>
-    The <code>phases</code> config is what maps section names onto them. This is the shipped
-    map; add your own custom sections to it and they deep-merge on top. A section name that
-    is <em>not</em> in the map inherits the nearest enclosing known phase, falling back to
-    <code>script</code>, because an unrecognised block is far more often your command than
-    the runner's.
-  </p>
+    <h2>Section</h2>
+    <p>
+        A named region of a job log, holding its own lines, any nested sections,
+        and a
+        <code>closed</code> flag. GitLab emits <code
+            >section_start:…:step_script</code
+        > markers; GitHub emits <code>##[group]</code> headers whose names embed action
+        versions (<code>Run actions/checkout@v4</code>), so its segmenter
+        canonicalises them to stable tokens. Either way the result is the same
+        tree, and that is the last point where the two formats differ.
+    </p>
+    <p>
+        Two synthetic sections always exist: <code>__preamble__</code> for output
+        before the first marker, and <code>__trailer__</code> for the runner's closing
+        verdict after the last one. Neither is ever blamed directly — the classifier
+        reads the trailer, it does not attribute to it.
+    </p>
+    <p>
+        <code>closed</code> is the load-bearing field. A section with no end marker
+        means execution died inside it, which is the strongest structural signal available
+        when the provider reported no reason at all.
+    </p>
 
-  {byProvider.map((grp) => (
-    <>
-      <h3>{grp.provider} section names</h3>
-      <table class="phase-table">
-        <thead><tr><th>Section</th><th>Phase</th></tr></thead>
+    <h2>Phase</h2>
+    <p>
+        What a section was <em>for</em>, independent of what the CI system calls
+        it:
+        <code>provision</code> (getting a runner at all), <code>prepare</code> (the
+        image and environment), <code>fetch</code> (source, cache, artifacts), <code
+            >script</code
+        > (your commands), <code>post</code> (cleanup, artifact upload). The one distinction
+        that matters is <code>script</code> — your bug — versus everything else, which
+        is infrastructure and not.
+    </p>
+    <p>
+        The <code>phases</code> config is what maps section names onto them. This
+        is the shipped map; add your own custom sections to it and they deep-merge
+        on top. A section name that is <em>not</em> in the map inherits the nearest
+        enclosing known phase, falling back to
+        <code>script</code>, because an unrecognised block is far more often
+        your command than the runner's.
+    </p>
+
+    {
+        byProvider.map((grp) => (
+            <>
+                <h3>{grp.provider} section names</h3>
+                <table class="phase-table">
+                    <thead>
+                        <tr>
+                            <>
+                                <th>Section</th>
+                                <th>Phase</th>
+                            </>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {grp.rows.map((r) => (
+                            <tr>
+                                <td>
+                                    <code>{r.section}</code>
+                                </td>
+                                <td>
+                                    <code>{r.phase}</code>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </>
+        ))
+    }
+
+    <h2>Attribution</h2>
+    <p>
+        Choosing which phase actually failed. A first-match-wins ladder: the
+        provider's own reason is trusted before any log parsing, structure is
+        only consulted when it said nothing, and the weakest rules sit at the
+        bottom where they belong. It is a pure function with no config and no
+        model, so its verdict is reproducible and every rung has a fixture
+        behind it.
+    </p>
+    <p>
+        Every report carries the <code>rule_id</code> that produced it, so "why did
+        it blame that?" is always answerable without re-reading the log:
+    </p>
+
+    <table class="rules">
+        <thead
+            ><tr
+                ><th><code>rule_id</code></th><th>Fires when</th><th>Blames</th
+                ><th>Confidence</th></tr
+            ></thead
+        >
         <tbody>
-          {grp.rows.map((r) => (
-            <tr><td><code>{r.section}</code></td><td><code>{r.phase}</code></td></tr>
-          ))}
+            {
+                rules.map((r) => (
+                    <tr>
+                        <td>
+                            <code>{r.id}</code>
+                        </td>
+                        <td>{r.when}</td>
+                        <td>
+                            <code>{r.phase}</code>
+                        </td>
+                        <td class="conf">{r.conf}</td>
+                    </tr>
+                ))
+            }
         </tbody>
-      </table>
-    </>
-  ))}
+    </table>
 
-  <h2>Attribution</h2>
-  <p>
-    Choosing which phase actually failed. A first-match-wins ladder: the provider's own
-    reason is trusted before any log parsing, structure is only consulted when it said
-    nothing, and the weakest rules sit at the bottom where they belong. It is a pure
-    function with no config and no model, so its verdict is reproducible and every rung has
-    a fixture behind it.
-  </p>
-  <p>
-    Every report carries the <code>rule_id</code> that produced it, so "why did it blame
-    that?" is always answerable without re-reading the log:
-  </p>
+    <p>
+        Underneath it all sits one rule about words. A runner's <code
+            >WARNING:</code
+        > (or
+        <code>##[warning]</code>) is non-fatal <em>by definition</em> — a missing
+        cache, a missing artifact and a failed cache extract all warn and the job
+        carries on. A tool printing the word from inside a step is still fatal, because
+        that is the step's own output. Getting this backwards is exactly the "blamed
+        the cache" bug.
+    </p>
 
-  <table class="rules">
-    <thead><tr><th><code>rule_id</code></th><th>Fires when</th><th>Blames</th><th>Confidence</th></tr></thead>
-    <tbody>
-      {rules.map((r) => (
-        <tr>
-          <td><code>{r.id}</code></td>
-          <td>{r.when}</td>
-          <td><code>{r.phase}</code></td>
-          <td class="conf">{r.conf}</td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
+    <div class="note">
+        <strong>Disagree with a verdict?</strong> That is a bug with a failing test,
+        not a prompt to tune. Run <code>ci-doctor analyze -v</code> on the saved log,
+        read the
+        <code>rule=</code> field, and find that rung in the table above.
+    </div>
 
-  <p>
-    Underneath it all sits one rule about words. A runner's <code>WARNING:</code> (or
-    <code>##[warning]</code>) is non-fatal <em>by definition</em> — a missing cache, a
-    missing artifact and a failed cache extract all warn and the job carries on. A tool
-    printing the word from inside a step is still fatal, because that is the step's own
-    output. Getting this backwards is exactly the "blamed the cache" bug.
-  </p>
-
-  <div class="note">
-    <strong>Disagree with a verdict?</strong> That is a bug with a failing test, not a prompt
-    to tune. Run <code>ci-doctor analyze -v</code> on the saved log, read the
-    <code>rule=</code> field, and find that rung in the table above.
-  </div>
-
-  <p>
-    Once a phase is blamed, only <em>its</em> section is looked at again — everything from
-    there is <a href={url('/concepts/evidence/')}>evidence selection</a>.
-  </p>
+    <p>
+        Once a phase is blamed, only <em>its</em> section is looked at again — everything
+        from there is <a href={url("/concepts/evidence/")}
+            >evidence selection&nbsp;</a
+        >.
+    </p>
 </Base>
 
 <style>
-  .phase-table { max-width: 26rem; }
+    .phase-table {
+        max-width: 26rem;
+    }
 
-  .rules .conf {
-    white-space: nowrap;
-    font-size: 0.85rem;
-    color: var(--muted);
-  }
-  .rules td:first-child { white-space: nowrap; }
+    .rules .conf {
+        white-space: nowrap;
+        font-size: 0.85rem;
+        color: var(--muted);
+    }
+    .rules td:first-child {
+        white-space: nowrap;
+    }
 
-  h3 { margin-top: 1.8rem; }
+    h3 {
+        margin-top: 1.8rem;
+    }
 </style>

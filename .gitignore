@@ -8,6 +8,8 @@ build/
 # ci-doctor's own artifacts
 report.md
 report.json
+# CodeGraph index — machine-local, rebuilt on demand
+.codegraph/
 # local Claude Code settings / temp
 .claude/settings.local.json
 .claude/*.tmp*

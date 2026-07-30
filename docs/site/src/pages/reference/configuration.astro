@@ -1,7 +1,7 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
 
 const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  CI_DOCTOR_* env  <  CLI flags`;
 
@@ -93,73 +93,120 @@ redaction:
   enabled: true
   extra_patterns: []             # additional regexes to scrub`;
 ---
+
 <Base title="Configuration">
-  <h1>Configuration</h1>
-  <p class="lead">One layered, pydantic-validated config. Unknown keys are an error, not a silent typo.</p>
+    <h1>Configuration</h1>
+    <p class="lead">
+        One layered, pydantic-validated config. Unknown keys are an error, not a
+        silent typo.
+    </p>
 
-  <div class="note">
-    This page is the reference — every key and its default. For what the keys
-    <em>mean</em> — phases, attribution, denoising, matchers, budget, redaction — start with
-    <a href={url('/concepts/')}>Concepts</a>. The shipped matcher packs are listed on
-    <a href={url('/concepts/matchers/')}>Matchers</a>.
-  </div>
+    <div class="note">
+        This page is the reference — every key and its default. For what the
+        keys
+        <em>mean</em> — phases, attribution, denoising, matchers, budget, redaction
+        — start with
+        <a href={url("/concepts/")}>Concepts</a>. The shipped matcher packs are
+        listed on
+        <a href={url("/concepts/matchers/")}>Matchers</a>.
+    </div>
 
-  <h2>How layers combine</h2>
-  <Code code={layering} lang="text" theme="github-dark" />
-  <p>
-    Mappings deep-merge; lists and scalars replace. The one exception is a list whose
-    entries all carry an <code>id</code> — today only <code>extraction.matchers</code> —
-    which merges per id, so your packs add to the shipped ones instead of wiping them.
-    Point at specific files with <code>-f path/to/.ci-doctor.yml</code>, repeated as often
-    as you like — each one overrides the last.
-  </p>
+    <h2>How layers combine</h2>
+    <Code code={layering} lang="text" theme="github-dark" />
+    <p>
+        Mappings deep-merge; lists and scalars replace. The one exception is a
+        list whose entries all carry an <code>id</code> — today only <code
+            >extraction.matchers</code
+        > — which merges per id, so your packs add to the shipped ones instead of
+        wiping them. Point at specific files with <code
+            >-f path/to/.ci-doctor.yml</code
+        >, repeated as often as you like — each one overrides the last.
+    </p>
 
-  <h2>Inspecting the result</h2>
-  <p>Config bugs are almost always a layer you forgot was applied. Ask:</p>
-  <Code code={inspect} lang="bash" theme="github-dark" />
-  <p>
-    <code>--diff</code> reads like <code>git diff</code>: green is what your config adds,
-    red is the default it replaced.
-  </p>
+    <h2>Inspecting the result</h2>
+    <p>Config bugs are almost always a layer you forgot was applied. Ask:</p>
+    <Code code={inspect} lang="bash" theme="github-dark" />
+    <p>
+        <code>--diff</code> reads like <code>git diff</code>: green is what your
+        config adds, red is the default it replaced.
+    </p>
 
-  <h2>Editor completion</h2>
-  <p>
-    Every release ships <code>ci-doctor.schema.json</code>, generated from the same pydantic
-    model that validates your file, so it can never drift. Point your editor at it:
-  </p>
-  <Code code={schemaComment} lang="yaml" theme="github-dark" />
+    <h2>Editor completion</h2>
+    <p>
+        Every release ships <code>ci-doctor.schema.json</code>, generated from
+        the same pydantic model that validates your file, so it can never drift.
+        Point your editor at it:
+    </p>
+    <Code code={schemaComment} lang="yaml" theme="github-dark" />
 
-  <h2>Environment variables</h2>
-  <Code code={envExample} lang="bash" theme="github-dark" />
+    <h2>Environment variables</h2>
+    <Code code={envExample} lang="bash" theme="github-dark" />
 
-  <h2>LLM backends</h2>
-  <p>The LLM step is bring-your-own. Pick one with <code>llm.backend</code>:</p>
-  <table>
-    <thead><tr><th>backend</th><th>What it calls</th><th>Needs</th></tr></thead>
-    <tbody>
-      <tr><td><code>openai</code> (default)</td><td>Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, internal gateway)</td><td><code>model</code> + <code>api_base</code></td></tr>
-      <tr><td><code>litellm</code></td><td>Providers the OpenAI shape cannot reach — Bedrock (SigV4), Vertex (GCP auth), Azure. Via <a href="https://docs.litellm.ai/">litellm</a></td><td><code>model</code>; <code>pip install ci-doctorr[litellm]</code></td></tr>
-      <tr><td><code>claude_code</code></td><td>The local <code>claude</code> CLI, headless (<code>claude -p</code>)</td><td>the <code>claude</code> binary on PATH; uses its own auth</td></tr>
-    </tbody>
-  </table>
-  <div class="note">
-    <strong>Reach for <code>openai</code> first.</strong> It is the only backend in the base
-    install (no extra deps, no runtime downloads), and the OpenAI Chat Completions shape is
-    what Ollama, vLLM, llama.cpp, Together, Groq, DeepSeek, Mistral and most others already
-    speak — including Gemini and Claude via their compatibility endpoints. Use
-    <code>litellm</code> only for the clouds that need their own auth. It may pull
-    <code>tiktoken</code>, which fetches vocab at runtime, so it is unfit for a strict air
-    gap. When the LLM is disabled or unavailable, ci-doctor emits the deterministic report
-    instead of failing.
-  </div>
+    <h2>LLM backends</h2>
+    <p>
+        The LLM step is bring-your-own. Pick one with <code>llm.backend</code>:
+    </p>
+    <table>
+        <thead
+            ><tr><th>backend</th><th>What it calls</th><th>Needs</th></tr
+            ></thead
+        >
+        <tbody>
+            <tr
+                ><td><code>openai</code> (default)</td><td
+                    >Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp,
+                    internal gateway)</td
+                ><td><code>model</code> + <code>api_base</code></td></tr
+            >
+            <tr
+                ><td><code>litellm</code></td><td
+                    >Providers the OpenAI shape cannot reach — Bedrock (SigV4),
+                    Vertex (GCP auth), Azure. Via <a
+                        href="https://docs.litellm.ai/">litellm&nbsp;</a
+                    ></td
+                ><td
+                    ><code>model</code>; <code
+                        >pip install ci-doctorr[litellm]</code
+                    ></td
+                ></tr
+            >
+            <tr
+                ><td><code>claude_code</code></td><td
+                    >The local <code>claude</code> CLI, headless (<code
+                        >claude -p</code
+                    >)</td
+                ><td
+                    >the <code>claude</code> binary on PATH; uses its own auth</td
+                ></tr
+            >
+        </tbody>
+    </table>
+    <div class="note">
+        <strong>Reach for <code>openai</code> first.</strong> It is the only backend
+        in the base install (no extra deps, no runtime downloads), and the OpenAI
+        Chat Completions shape is what Ollama, vLLM, llama.cpp, Together, Groq, DeepSeek,
+        Mistral and most others already speak — including Gemini and Claude via their
+        compatibility endpoints. Use
+        <code>litellm</code> only for the clouds that need their own auth. It may
+        pull
+        <code>tiktoken</code>, which fetches vocab at runtime, so it is unfit
+        for a strict air gap. When the LLM is disabled or unavailable, ci-doctor
+        emits the deterministic report instead of failing.
+    </div>
 
-  <h2>Full reference</h2>
-  <p>Drop a <code>.ci-doctor.yml</code> at your repo root. Everything below is optional — every key has a default.</p>
-  <Code code={full} lang="yaml" theme="github-dark" />
+    <h2>Full reference</h2>
+    <p>
+        Drop a <code>.ci-doctor.yml</code> at your repo root. Everything below is
+        optional — every key has a default.
+    </p>
+    <Code code={full} lang="yaml" theme="github-dark" />
 
-  <div class="note">
-    <strong><code>base_url</code> defaults to the public host</strong> (<code>gitlab.com</code> /
-    <code>api.github.com</code>). Override it for a self-hosted GitLab or GitHub Enterprise instance.
-    Custom CA bundles and proxies are honoured either way.
-  </div>
+    <div class="note">
+        <strong><code>base_url</code> defaults to the public host</strong> (<code
+            >gitlab.com</code
+        > /
+        <code>api.github.com</code>). Override it for a self-hosted GitLab or
+        GitHub Enterprise instance. Custom CA bundles and proxies are honoured
+        either way.
+    </div>
 </Base>

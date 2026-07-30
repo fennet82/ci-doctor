@@ -1,7 +1,7 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../../layouts/Base.astro';
-import { url } from '../../lib/url';
+import { Code } from "astro:components";
+import Base from "../../layouts/Base.astro";
+import { url } from "../../lib/url";
 
 const local = `# Replay a log you saved from a failed job — no network, no token, no LLM:
 ci-doctor analyze ~/Downloads/failing-job.log
@@ -23,41 +23,55 @@ pip wheel . -w ./wheels
 # Copy ./wheels inside the air-gapped network, then:
 pip install --no-index --find-links ./wheels ci-doctorr`;
 ---
-<Base title="Local & air-gapped" description="Run ci-doctor from your laptop, or ship it into a network with no egress.">
-  <h1>Local &amp; air-gapped</h1>
-  <p class="lead">
-    Nothing about ci-doctor requires CI, and nothing about it requires the public internet.
-    Both facts come from the same design rule: no runtime downloads, ever.
-  </p>
 
-  <h2>On your laptop</h2>
-  <p>
-    The fastest way to test a <code>.ci-doctor.yml</code> or reproduce an attribution you
-    disagree with:
-  </p>
-  <Code code={local} lang="bash" theme="github-dark" />
-  <p>
-    Passing a path that exists means no fetch is attempted at all — see
-    <a href={url('/start/first-run/')}>First run</a>.
-  </p>
+<Base
+    title="Local & air-gapped"
+    description="Run ci-doctor from your laptop, or ship it into a network with no egress."
+>
+    <h1>Local &amp; air-gapped</h1>
+    <p class="lead">
+        Nothing about ci-doctor requires CI, and nothing about it requires the
+        public internet. Both facts come from the same design rule: no runtime
+        downloads, ever.
+    </p>
 
-  <h2>Ship it as an image</h2>
-  <p>Build a self-contained image and push it to an internal registry:</p>
-  <Code code={docker} lang="bash" theme="github-dark" />
+    <h2>On your laptop</h2>
+    <p>
+        The fastest way to test a <code>.ci-doctor.yml</code> or reproduce an attribution
+        you disagree with:
+    </p>
+    <Code code={local} lang="bash" theme="github-dark" />
+    <p>
+        Passing a path that exists means no fetch is attempted at all — see
+        <a href={url("/start/first-run/")}>First run&nbsp;</a>.
+    </p>
 
-  <h2 id="offline">…or as an offline wheel bundle</h2>
-  <p>Where Docker isn't an option:</p>
-  <Code code={offline} lang="bash" theme="github-dark" />
+    <h2>Ship it as an image</h2>
+    <p>Build a self-contained image and push it to an internal registry:</p>
+    <Code code={docker} lang="bash" theme="github-dark" />
 
-  <h2>What it still needs to reach</h2>
-  <ul class="tight">
-    <li>Your GitLab or GitHub API host — unless you replay a saved log, in which case nothing.</li>
-    <li>Your LLM endpoint, if you configured one. Skip it and the deterministic report is the output.</li>
-  </ul>
-  <p>
-    Nothing else. No telemetry, no update checks, no model or rule downloads, no hardcoded
-    hosts. The one thing to avoid in a strict air gap is the <code>litellm</code> backend: it
-    may pull <code>tiktoken</code>, which fetches its vocabulary at runtime.
-    <a href={url('/start/requirements/')}>Requirements</a> has the full network story.
-  </p>
+    <h2 id="offline">…or as an offline wheel bundle</h2>
+    <p>Where Docker isn't an option:</p>
+    <Code code={offline} lang="bash" theme="github-dark" />
+
+    <h2>What it still needs to reach</h2>
+    <ul class="tight">
+        <li>
+            Your GitLab or GitHub API host — unless you replay a saved log, in
+            which case nothing.
+        </li>
+        <li>
+            Your LLM endpoint, if you configured one. Skip it and the
+            deterministic report is the output.
+        </li>
+    </ul>
+    <p>
+        Nothing else. No telemetry, no update checks, no model or rule
+        downloads, no hardcoded hosts. The one thing to avoid in a strict air
+        gap is the <code>litellm</code> backend: it may pull <code
+            >tiktoken</code
+        >, which fetches its vocabulary at runtime.
+        <a href={url("/start/requirements/")}>Requirements&nbsp;</a> has the full
+        network story.
+    </p>
 </Base>

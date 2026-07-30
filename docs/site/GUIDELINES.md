@@ -2,10 +2,10 @@
 
 How the docs site at <https://fennet82.github.io/ci-doctor> is organised, and the
 rules a change to it has to follow. The code equivalent is
-[GUIDELINES.md](../GUIDELINES.md); the *why* behind the architecture is
-[PLAN.md](PLAN.md).
+[GUIDELINES.md](../../GUIDELINES.md); the *why* behind the architecture is
+[PLAN.md](../PLAN.md).
 
-Build and preview commands are in [docs/site/README.md](site/README.md).
+Build and preview commands are in [README.md](README.md).
 
 ---
 

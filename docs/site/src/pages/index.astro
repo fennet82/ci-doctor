@@ -1,7 +1,7 @@
 ---
-import { Code } from 'astro:components';
-import Base from '../layouts/Base.astro';
-import { asset, url } from '../lib/url';
+import { Code } from "astro:components";
+import Base from "../layouts/Base.astro";
+import { asset, url } from "../lib/url";
 
 const quickstart = `# GitHub Actions — no install, analyze the run that just failed
 - uses: fennet82/ci-doctor@master`;
@@ -23,98 +23,149 @@ ci-doctor analyze "$CI_PIPELINE_ID"`;
 ---
 
 <Base title="Overview">
-  <img class="hero-logo light" src={asset('/ci-doctor-logo.svg')} alt="ci-doctor — root-cause analysis for CI/CD" />
-  <img class="hero-logo dark" src={asset('/ci-doctor-logo-dark.svg')} alt="ci-doctor — root-cause analysis for CI/CD" />
+    <img
+        class="hero-logo light"
+        src={asset("/ci-doctor-logo.svg")}
+        alt="ci-doctor — root-cause analysis for CI/CD"
+    />
+    <img
+        class="hero-logo dark"
+        src={asset("/ci-doctor-logo-dark.svg")}
+        alt="ci-doctor — root-cause analysis for CI/CD"
+    />
 
-  <p class="pill">read-only · air-gap friendly · GitLab + GitHub</p>
-  <h1>Know <em>why</em> your pipeline failed.</h1>
-  <p class="lead">
-    A postmortem step that runs only when a pipeline fails. It pulls the failed jobs' logs,
-    works out where and why they broke, and emits a structured report — to the job log, to
-    <code>report.md</code>/<code>report.json</code>, and optionally as one idempotent note on
-    the merge or pull request.
-  </p>
+    <p class="pill">read-only · air-gap friendly · GitLab + GitHub</p>
+    <h1>Know <em>why</em> your pipeline failed.</h1>
+    <p class="lead">
+        A postmortem step that runs only when a pipeline fails. It pulls the
+        failed jobs' logs, works out where and why they broke, and emits a
+        structured report — to the job log, to
+        <code>report.md</code>/<code>report.json</code>, and optionally as one
+        idempotent note on the merge or pull request.
+    </p>
 
-  <div class="btn-row">
-    <a class="btn primary" href={url('/start/')}>Get started</a>
-    <a class="btn" href={url('/cicd/github/')}>GitHub Action</a>
-    <a class="btn" href="https://github.com/fennet82/ci-doctor">Source</a>
-  </div>
-
-  <h2>Thirty seconds to a verdict</h2>
-  <p>On GitHub, the whole setup is one step — it defaults to the run that triggered it:</p>
-  <figure class="snippet">
-    <figcaption>.github/workflows/ci-doctor.yml</figcaption>
-    <Code code={quickstart} lang="yaml" theme="github-dark" />
-  </figure>
-  <p><a href={url('/cicd/github/')}>Full action reference →</a></p>
-
-  <h2>The core idea</h2>
-  <p>
-    <strong>Deterministic code decides <em>where</em> the job failed; the LLM only explains <em>why</em>.</strong>
-    Phase attribution is a pure function of job metadata and log structure, computed before any
-    model is called — so a loud, non-fatal cache-restore warning can never get blamed over the
-    real <code>exit code 1</code> in your script. If the classifier is wrong, that is a bug with
-    a failing test, not a prompt to tune.
-  </p>
-
-  <div class="grid">
-    <div class="card">
-      <h3>Never masks the failure</h3>
-      <p>Read-only, and always exits 0 — it cannot change your pipeline's status or hide the real error.</p>
+    <div class="btn-row">
+        <a class="btn primary" href={url("/start/")}>Get started</a>
+        <a class="btn" href={url("/cicd/")}>CI Setup</a>
+        <a class="btn" href="https://github.com/fennet82/ci-doctor">Source</a>
     </div>
-    <div class="card">
-      <h3>Works with no LLM</h3>
-      <p>Deterministic report out of the box: phase, reason, terminal command, evidence, remediation.</p>
-    </div>
-    <div class="card">
-      <h3>Bring your own model</h3>
-      <p>Any OpenAI-compatible endpoint via <code>api_base</code> — Ollama, vLLM, llama.cpp, an internal gateway.</p>
-    </div>
-    <div class="card">
-      <h3>Air-gapped</h3>
-      <p>No runtime downloads, no telemetry, no hardcoded hosts. Ship as a Docker image or offline wheels.</p>
-    </div>
-    <div class="card">
-      <h3>Two providers, one core</h3>
-      <p>GitLab CI and GitHub Actions are adapters. The classifier never learns a provider's name.</p>
-    </div>
-    <div class="card">
-      <h3>Runs on your laptop</h3>
-      <p>Replay a saved log offline, or point it at a live run — the repo is read from git origin when unset.</p>
-    </div>
-  </div>
 
-  <h2>Install and try it</h2>
-  <Code code={install} lang="bash" theme="github-dark" />
-  <Code code={tryIt} lang="bash" theme="github-dark" />
-  <p>
-    <a href={url('/start/')}>Get started →</a> walks the whole path: install, a first run on a
-    saved log, and what it needs to reach a live pipeline.
-  </p>
+    <h2>Thirty seconds to a verdict</h2>
+    <p>
+        On GitHub, the whole setup is one step — it defaults to the run that
+        triggered it:
+    </p>
+    <figure class="snippet">
+        <figcaption>.github/workflows/ci-doctor.yml</figcaption>
+        <Code code={quickstart} lang="yaml" theme="github-dark" />
+    </figure>
+    <p><a href={url("/cicd/github/")}>Full action reference →</a></p>
 
-  <div class="note">
-    <strong>Where to go next.</strong> <a href={url('/concepts/')}>Concepts</a> explains the
-    pipeline and what every part of it decides — read it once and the rest stops being a list
-    of unexplained knobs. <a href={url('/cicd/')}>CI setup</a> has the drop-in job for GitLab
-    and GitHub, and <a href={url('/reference/')}>Reference</a> is every flag and config key.
-  </div>
+    <h2>The core idea</h2>
+    <p>
+        <strong
+            >Deterministic code decides <em>where</em> the job failed; the LLM only
+            explains <em>why</em>.</strong
+        >
+        Phase attribution is a pure function of job metadata and log structure, computed
+        before any model is called — so a loud, non-fatal cache-restore warning can
+        never get blamed over the real <code>exit code 1</code> in your script. If
+        the classifier is wrong, that is a bug with a failing test, not a prompt to
+        tune.
+    </p>
+
+    <div class="grid">
+        <div class="card">
+            <h3>Never masks the failure</h3>
+            <p>
+                Read-only, and always exits 0 — it cannot change your pipeline's
+                status or hide the real error.
+            </p>
+        </div>
+        <div class="card">
+            <h3>Works with no LLM</h3>
+            <p>
+                Deterministic report out of the box: phase, reason, terminal
+                command, evidence, remediation.
+            </p>
+        </div>
+        <div class="card">
+            <h3>Bring your own model</h3>
+            <p>
+                Any OpenAI-compatible endpoint via <code>api_base</code> — Ollama,
+                vLLM, llama.cpp, an internal gateway.
+            </p>
+        </div>
+        <div class="card">
+            <h3>Air-gapped</h3>
+            <p>
+                No runtime downloads, no telemetry, no hardcoded hosts. Ship as
+                a Docker image or offline wheels.
+            </p>
+        </div>
+        <div class="card">
+            <h3>Two providers, one core</h3>
+            <p>
+                GitLab CI and GitHub Actions are adapters. The classifier never
+                learns a provider's name.
+            </p>
+        </div>
+        <div class="card">
+            <h3>Runs on your laptop</h3>
+            <p>
+                Replay a saved log offline, or point it at a live run — the repo
+                is read from git origin when unset.
+            </p>
+        </div>
+    </div>
+
+    <h2>Install and try it</h2>
+    <Code code={install} lang="bash" theme="github-dark" />
+    <Code code={tryIt} lang="bash" theme="github-dark" />
+    <p>
+        <a href={url("/start/")}>Get started →&nbsp;</a> walks the whole path: install,
+        a first run on a saved log, and what it needs to reach a live pipeline.
+    </p>
+
+    <div class="note">
+        <strong>Where to go next.</strong>
+        <a href={url("/concepts/")}>Concepts&nbsp;</a> explains the pipeline and what
+        every part of it decides — read it once and the rest stops being a list of
+        unexplained knobs. <a href={url("/cicd/")}>CI setup&nbsp;</a> has the drop-in
+        job for GitLab and GitHub, and <a href={url("/reference/")}
+            >Reference&nbsp;</a
+        > is every flag and config key.
+    </div>
 </Base>
 
 <style>
-  .hero-logo {
-    width: 100%;
-    max-width: 440px;
-    height: auto;
-    margin: 0 0 2rem;
-  }
-  .hero-logo.dark { display: none; }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .hero-logo.light { display: none; }
-    :global(:root:not([data-theme='light'])) .hero-logo.dark { display: block; }
-  }
-  :global(:root[data-theme='dark']) .hero-logo.light { display: none; }
-  :global(:root[data-theme='dark']) .hero-logo.dark { display: block; }
-  :global(:root[data-theme='light']) .hero-logo.light { display: block; }
-  :global(:root[data-theme='light']) .hero-logo.dark { display: none; }
+    .hero-logo {
+        width: 100%;
+        max-width: 440px;
+        height: auto;
+        margin: 0 0 2rem;
+    }
+    .hero-logo.dark {
+        display: none;
+    }
+    @media (prefers-color-scheme: dark) {
+        :global(:root:not([data-theme="light"])) .hero-logo.light {
+            display: none;
+        }
+        :global(:root:not([data-theme="light"])) .hero-logo.dark {
+            display: block;
+        }
+    }
+    :global(:root[data-theme="dark"]) .hero-logo.light {
+        display: none;
+    }
+    :global(:root[data-theme="dark"]) .hero-logo.dark {
+        display: block;
+    }
+    :global(:root[data-theme="light"]) .hero-logo.light {
+        display: block;
+    }
+    :global(:root[data-theme="light"]) .hero-logo.dark {
+        display: none;
+    }
 </style>
