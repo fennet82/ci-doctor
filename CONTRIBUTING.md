@@ -37,7 +37,13 @@ mise run test:matrix  # the suite on 3.11-3.14, like the CI matrix
 mise run cov          # the suite with coverage, against the floor CI enforces
 mise run lint         # ruff check + format (Python and markdown), then ty
 mise run check        # everything CI runs: test, lint, guardrails, leaks
+mise run cleanup      # delete rebuildable junk: caches, build output, report.*
 ```
+
+`cleanup` works from an explicit list rather than `git clean -Xd`, because ignored
+is not the same as garbage: it keeps `.venv`, `docs/site/node_modules`, the
+`.codegraph` index, `llm.config.yml` and anything you have in `.git/info/exclude`.
+It does remove the per-version `.venv-3.x` that `test:matrix` builds.
 
 The suite blocks real sockets and never calls an LLM, so it runs in seconds. What a
 *good* test looks like, the fixture layout, and which file to put it in are in

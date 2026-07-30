@@ -80,6 +80,33 @@ run = "gitleaks git --no-banner --redact"
 description = "Everything CI runs, in one command"
 depends = ["test", "lint", "guardrails", "leaks"]
 
+# An explicit list, not `git clean -Xd`: "ignored" is not the same as "garbage".
+# .codegraph is expensive to rebuild, and llm.config.yml, .claude/settings.local.json
+# and anything in .git/info/exclude are your files, not build output.
+[tasks.cleanup]
+description = "Delete rebuildable local junk (keeps .venv, node_modules, .codegraph)"
+run = '''
+set -u
+cd "$(git rev-parse --show-toplevel)" || exit 1
+before=$(du -sm . | cut -f1)
+
+# Caches. Pruned rather than walked: .venv and node_modules hold thousands of them.
+find . \( -path ./.venv -o -name .venv-\* -o -name node_modules -o -path ./.git \) -prune \
+  -o -type d -name __pycache__ -print0 | xargs -0 rm -rf
+rm -rf .pytest_cache .ruff_cache
+
+# Coverage, build output, and ci-doctor's own run artifacts.
+rm -rf .coverage .coverage.* htmlcov build dist ./*.egg-info
+rm -rf docs/site/dist docs/site/.astro
+rm -f report.md report.json
+
+# The per-version venvs from `test:matrix`. The default .venv is deliberately kept.
+rm -rf .venv-*/
+
+echo "cleanup: freed $((before - $(du -sm . | cut -f1))) MB"
+echo "kept: .venv, docs/site/node_modules, .codegraph, and your own untracked files"
+'''
+
 [tasks.schema]
 description = "Emit the .ci-doctor.yml JSON Schema (what the release attaches)"
 run = "uv run ci-doctor config --schema"
