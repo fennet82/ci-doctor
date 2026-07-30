@@ -77,6 +77,18 @@ bumps the version, updates `CHANGELOG.md`, tags, builds, and publishes to PyPI. 
 Keep the summary imperative and scoped to one change. Don't hand-edit `CHANGELOG.md`
 or the version in `pyproject.toml` — the pipeline owns both.
 
+### 3.1 Skipping CI
+
+A commit message containing **`[skip ci]`** runs no workflow at all — GitHub itself
+drops the `push` and `pull_request` events, so there is nothing to configure. Use it
+for a commit that cannot affect the build. The release job already relies on this:
+its version-bump commit ends in `[skip ci]`, which is what stops the pipeline from
+re-triggering itself forever.
+
+The token is literal. `[ci skip]`, `[no ci]`, `[skip actions]` and `[actions skip]`
+work too; `[skip-ci]` with a hyphen does **not** — it is not one GitHub recognises,
+and the pipeline will run as normal.
+
 ## 4. Before you push
 
 ```sh
