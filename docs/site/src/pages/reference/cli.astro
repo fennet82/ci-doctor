@@ -13,9 +13,18 @@ Options:
   --job-id TEXT          Analyze a single job id.
   -f, --config PATH      Path to a .ci-doctor.yml. Repeatable — later files
                          override earlier ones.
+  --format [terminal|json]
+                         stdout format. \`json\` prints the report instead of the
+                         rendered panels. [default: terminal]
   --no-color             Disable coloured terminal output (also honours NO_COLOR).
   -v, --verbose          Enable debug logging.
   --help                 Show this message and exit.`;
+
+const jsonOut = `# Everything a script or a coding agent needs, on stdout:
+ci-doctor analyze --format json "$CI_PIPELINE_ID" | jq '.[0].handoff_prompt'
+
+# Logs and progress go to stderr, so the pipe only ever carries the report.
+# report.md and report.json are still written as artifacts either way.`;
 
 const configCmd = `ci-doctor config           # the effective config, every layer merged
 ci-doctor config --diff    # only what your file/env/flags change vs the defaults
@@ -54,6 +63,16 @@ ci-doctor [DEBUG] LLM disabled/unconfigured -> deterministic report`;
             >First run</a
         >.
     </p>
+
+    <h2>Machine-readable output</h2>
+    <p>
+        <code>--format json</code> puts the report on stdout instead of the
+        rendered panels — the same array that lands in <code>report.json</code>,
+        matching the schema on <a href={url("/concepts/evidence/")}>Evidence</a>.
+        Everything else the command says goes to stderr, so the pipe carries the
+        report and nothing else.
+    </p>
+    <Code code={jsonOut} lang="bash" theme="github-dark" />
 
     <h2>Deterministic mode (no LLM)</h2>
     <Code code={deterministic} lang="bash" theme="github-dark" />

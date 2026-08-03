@@ -11,6 +11,7 @@ catches everything and always exits 0.
 import logging
 import os
 import sys
+from enum import Enum
 from pathlib import Path
 
 import typer
@@ -28,6 +29,13 @@ from ci_doctor.core.models import FailureReason, Job, Run
 app = typer.Typer(add_completion=False, help="Explain why a CI pipeline failed (read-only postmortem).")
 
 log = logging.getLogger("ci_doctor.cli")
+
+
+class OutputFormat(str, Enum):
+    """What `analyze` writes to stdout. The artifacts are written either way."""
+
+    TERMINAL = "terminal"
+    JSON = "json"
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -77,6 +85,11 @@ def analyze(
     ),
     job_id: str = typer.Option(None, "--job-id", help="Analyze a single job id."),
     config_path: list[Path] = _CONFIG_OPTION,
+    output_format: OutputFormat = typer.Option(
+        OutputFormat.TERMINAL,
+        "--format",
+        help="stdout format. `json` prints the report instead of the rendered panels.",
+    ),
     no_color: bool = typer.Option(False, "--no-color", help="Disable coloured terminal output."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging."),
 ) -> None:
@@ -90,6 +103,8 @@ def analyze(
         target: A pipeline/run id, or a path to a raw job log.
         job_id: Restrict a live run to one job.
         config_path: Explicit `.ci-doctor.yml` files, lowest precedence first.
+        output_format: What goes to stdout — the rendered panels, or the report
+            as JSON for a script or a coding agent to read.
         no_color: Disable coloured terminal output.
         verbose: Enable debug logging.
     """
@@ -111,7 +126,7 @@ def analyze(
         typer.echo("nothing to do: pass a pipeline id, or the path to a log to replay.", err=True)
         return
 
-    _deliver(results, cfg, no_color=no_color)
+    _deliver(results, cfg, no_color=no_color, output_format=output_format)
     _maybe_post_mr(provider, run, results, cfg)
 
 
@@ -371,13 +386,16 @@ def _process(job: Job, cfg):
     return job, attr, report
 
 
-def _deliver(results, cfg, *, no_color: bool) -> None:
-    """Render the reports to the terminal and write the artifacts.
+def _deliver(results, cfg, *, no_color: bool, output_format: OutputFormat = OutputFormat.TERMINAL) -> None:
+    """Render the reports to stdout and write the artifacts.
 
     Args:
         results: ``(job, attribution, report)`` tuples.
         cfg: The effective config, supplying the output paths.
         no_color: Disable coloured terminal output.
+        output_format: JSON puts the report on stdout instead of the panels, for a
+            script or an agent to read. The artifacts are written either way, and
+            every human-facing line already goes to stderr, so stdout stays parseable.
     """
     import json
     import os
@@ -390,14 +408,17 @@ def _deliver(results, cfg, *, no_color: bool) -> None:
         return
 
     reports = [report for *_, report in results]
-    if cfg.output.terminal:
+    payload = [r.model_dump(mode="json") for r in reports]
+    if output_format is OutputFormat.JSON:
+        typer.echo(json.dumps(payload, indent=2))
+    elif cfg.output.terminal:
         wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
         for report in reports:
             render_terminal(report, no_color=no_color, wrap_section=wrap)
 
     md = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
     Path(cfg.output.markdown_path).write_text(md)
-    Path(cfg.output.json_path).write_text(json.dumps([r.model_dump(mode="json") for r in reports], indent=2))
+    Path(cfg.output.json_path).write_text(json.dumps(payload, indent=2))
     typer.echo(f"wrote {cfg.output.markdown_path} and {cfg.output.json_path}", err=True)
 
 
@@ -452,12 +473,17 @@ def main() -> None:
     # NullHighlighter: rich otherwise repr-highlights the message body (numbers
     # cyan, words yellow/magenta), which drowns out the level colour. Passing
     # highlighter=None does NOT disable it — rich falls back to ReprHighlighter.
+    #
+    # stderr=True: stdout is the payload — the rendered report, or the JSON that
+    # `--format json` exists to be piped into something. A log line there corrupts
+    # it. Diagnostics belong on stderr, where `typer.echo(..., err=True)` already
+    # puts every other human-facing message.
     logging.basicConfig(
         level=logging.INFO,
         format="%(message)s",
         handlers=[
             RichHandler(
-                console=Console(theme=_LEVEL_COLORS),
+                console=Console(theme=_LEVEL_COLORS, stderr=True),
                 show_time=False,
                 show_path=False,
                 markup=False,

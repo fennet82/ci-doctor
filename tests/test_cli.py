@@ -63,6 +63,56 @@ def test_from_file_replay_smoke(provider, monkeypatch, capsys, tmp_path):
     assert (tmp_path / "report.json").exists()
 
 
+@pytest.mark.parametrize("provider", support.providers_with("sample"))
+def test_format_json_puts_a_parseable_report_on_stdout(provider, monkeypatch, capsys, tmp_path):
+    """`--format json` is what an agent reads: stdout must parse, with no panels in it."""
+    monkeypatch.chdir(tmp_path)
+    log = str(support.log_path(provider, "sample").resolve())
+    monkeypatch.setattr(sys, "argv", ["ci-doctor", "analyze", "--format", "json", log])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+
+    captured = capsys.readouterr()
+    reports = json.loads(captured.out)  # the whole of stdout, not a fragment of it
+    assert reports and {"summary", "failure_phase", "handoff_prompt"} <= reports[0].keys()
+    assert "Root cause" not in captured.out  # the rendered panels are suppressed
+    # The artifacts still land, and the human-facing chatter stays on stderr so it
+    # can never end up inside what the caller is parsing.
+    assert (tmp_path / "report.json").exists()
+    assert "wrote report.md" in captured.err
+
+
+def test_format_json_stdout_has_nothing_but_json(tmp_path):
+    """`--format json | jq` must work, so nothing may share stdout with the payload.
+
+    A subprocess, not an in-process call: pytest's logging plugin owns the root
+    logger, so `basicConfig` in `main()` no-ops and the rich handler never writes
+    during a normal test. Only a real process shows which stream the logs land on.
+    """
+    import subprocess
+
+    provider = support.providers_with("sample")[0]
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "ci_doctor.cli",
+            "analyze",
+            "--format",
+            "json",
+            str(support.log_path(provider, "sample").resolve()),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0  # guardrail #3, even here
+    json.loads(proc.stdout)  # raises if a log line leaked onto stdout
+    assert "analyzing" in proc.stderr  # ...because the diagnostics went to stderr
+
+
 def test_config_schema_is_valid_json(monkeypatch, capsys, tmp_path):
     """`--schema` emits parseable JSON Schema carrying the published $id."""
     monkeypatch.chdir(tmp_path)  # no stray .ci-doctor.yml from the repo root
