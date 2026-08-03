@@ -155,7 +155,9 @@
         if (!query.trim()) return render([], '');
         const mod = await load();
         if (!mod) {
-          status.textContent = 'Search runs on the built site — `astro dev` has no index.';
+          // Only reachable under `astro dev`, which builds no index. Name the
+          // command that does rather than describing the limitation.
+          status.textContent = 'No index in dev — run `mise run docs:preview` to search locally.';
           return;
         }
         status.textContent = 'Searching…';

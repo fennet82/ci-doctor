@@ -120,3 +120,11 @@ description = "Build the docs site, same as the CI job"
 dir = "docs/site"
 run = ["npm ci", "npm run build"]
 
+# Search needs the index the build generates, and `astro dev` has none. Serving a
+# copy of it does not help either — the runtime stalls against the dev server —
+# so building and previewing is the way to exercise search locally.
+[tasks."docs:preview"]
+description = "Build the docs site and serve the built output (the only mode where search works)"
+dir = "docs/site"
+run = ["npm run build", "npm run preview"]
+
