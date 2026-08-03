@@ -1,232 +1,334 @@
 ---
 /**
- * Full-text search over the built site, as a command palette.
+ * Full-text search, as a command palette — the shape Starlight uses, and with it
+ * the Nx docs: a trigger styled as a search bar, a native `<dialog>` over a dimmed
+ * page, results grouped by page with their matching headings underneath.
  *
- * The index is Pagefind's: it runs over `dist/` after the Astro build (see the
- * `build` script) and indexes whatever is marked `data-pagefind-body` — the
- * `<main>` of each page, so the sidebar and header don't match everything.
+ * The index is Pagefind's, built over `dist/` after the Astro build (see the
+ * `build` script) from whatever is marked `data-pagefind-body` — the `<main>` of
+ * each page, so the sidebar and header don't match everything.
  *
- * Nothing loads until the palette is opened for the first time; the runtime and
- * the index chunks are fetched on demand, so a reader who never searches pays
- * nothing for this.
+ * Results are rendered here rather than by `@pagefind/default-ui`: that bundle
+ * polls `while (!pagefind) { init(); await sleep(50) }` waiting for an init that
+ * never resolved in this setup, leaving "Searching for…" on screen forever, while
+ * the runtime API underneath answers correctly. Fewer moving parts, and this way
+ * the palette is styled from the site's own tokens instead of fighting theirs.
  */
-import { url } from '../lib/url';
-
-// Pagefind writes its runtime into the built site, so this path only exists in a
-// production build — `astro dev` has no index, and the palette says so.
-const PAGEFIND = url('/pagefind/pagefind.js');
-const BASE = url('/');
 ---
 
-<button class="icon-btn search-btn" id="search-open" aria-label="Search the docs" aria-keyshortcuts="Control+K Meta+K">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <path d="M20 20l-3.5-3.5" />
-  </svg>
-  <span class="search-btn-label">Search</span>
-  <kbd class="search-btn-kbd">⌘K</kbd>
-</button>
+<site-search>
+  <button class="search-trigger" data-open-modal disabled aria-label="Search the docs" aria-keyshortcuts="Control+K">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
+    </svg>
+    <span class="search-trigger-label">Search</span>
+    <kbd class="search-trigger-kbd" style="display: none;"><kbd>Ctrl</kbd><kbd>K</kbd></kbd>
+  </button>
 
-<dialog class="palette" id="search-dialog" aria-label="Search the docs">
-  <form method="dialog" class="palette-form">
-    <div class="palette-head">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" />
-        <path d="M20 20l-3.5-3.5" />
-      </svg>
-      <input
-        type="search"
-        id="search-input"
-        placeholder="Search the docs…"
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="Search query"
-        aria-controls="search-results"
-      />
-      <kbd>Esc</kbd>
+  <dialog class="search-dialog" aria-label="Search the docs">
+    <div class="search-frame">
+      <div class="search-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input
+          type="search"
+          data-search-input
+          placeholder="Search the docs…"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Search query"
+          aria-controls="search-results"
+        />
+        <button class="search-cancel" data-close-modal aria-label="Close search">Esc</button>
+      </div>
+      <p class="search-status" data-search-status role="status" aria-live="polite"></p>
+      <ul class="search-results" id="search-results" data-search-results></ul>
     </div>
-  </form>
-  <div class="palette-status" id="search-status" role="status" aria-live="polite"></div>
-  <ul class="palette-results" id="search-results"></ul>
-</dialog>
+  </dialog>
+</site-search>
 
-<script is:inline define:vars={{ PAGEFIND, BASE }}>
+{/* Inline so the shortcut never flashes the wrong key. navigator.platform is
+    deprecated but remains the reliable Apple check — the UA string is spoofed by
+    some browsers once devtools is open. */}
+<script is:inline>
   (() => {
-    const dialog = document.getElementById('search-dialog');
-    const input = document.getElementById('search-input');
-    const results = document.getElementById('search-results');
-    const status = document.getElementById('search-status');
-    const openBtn = document.getElementById('search-open');
-    if (!dialog || !input || !results || !status || !openBtn) return;
-
-    let pagefind = null;
-    let loading = null;
-    let seq = 0; // drops the answer to a query the reader has already typed past
-
-    /** Load the runtime once, on first open. Absent in `astro dev`. */
-    const load = () => {
-      if (pagefind) return Promise.resolve(pagefind);
-      if (!loading) {
-        loading = import(/* @vite-ignore */ PAGEFIND)
-          .then(async (mod) => {
-            // Pagefind records URLs relative to the directory it indexed (dist/),
-            // so under a base path they need it put back on the front.
-            await mod.options({ baseUrl: BASE });
-            pagefind = mod;
-            return mod;
-          })
-          .catch(() => null);
-      }
-      return loading;
-    };
-
-    const open = () => {
-      if (!dialog.open) dialog.showModal();
-      input.focus();
-      input.select();
-      load().then((mod) => {
-        if (!mod && !input.value) {
-          status.textContent = 'Search runs on the built site — not in `astro dev`.';
-        }
-      });
-    };
-
-    const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-
-    const render = (items, query) => {
-      if (!items.length) {
-        results.innerHTML = '';
-        status.textContent = query ? `No matches for “${query}”.` : '';
-        return;
-      }
-      status.textContent = `${items.length} result${items.length === 1 ? '' : 's'}`;
-      // `excerpt` is Pagefind's own HTML — the query terms wrapped in <mark>. It is
-      // built from the indexed text of this same site, so it is ours, not user input.
-      results.innerHTML = items
-        .map(
-          (r) => `<li>
-            <a href="${escape(r.url)}">
-              <span class="r-title">${escape(r.meta?.title || r.url)}</span>
-              <span class="r-excerpt">${r.excerpt}</span>
-            </a>
-          </li>`,
-        )
-        .join('');
-    };
-
-    const search = async (query) => {
-      const mine = ++seq;
-      if (!query.trim()) {
-        render([], '');
-        return;
-      }
-      const mod = await load();
-      if (!mod) {
-        status.textContent = 'Search runs on the built site — not in `astro dev`.';
-        return;
-      }
-      const res = await mod.search(query);
-      const items = await Promise.all(res.results.slice(0, 8).map((r) => r.data()));
-      if (mine === seq) render(items, query); // a later keystroke already won
-    };
-
-    let timer;
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
-      const q = input.value;
-      timer = setTimeout(() => search(q), 120); // typing is faster than searching
-    });
-
-    openBtn.addEventListener('click', open);
-
-    document.addEventListener('keydown', (e) => {
-      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        open();
-      } else if (e.key === '/' && !typing && !dialog.open) {
-        e.preventDefault();
-        open();
-      }
-    });
-
-    // Arrow keys walk the results by moving real focus, so Enter activates the
-    // link natively and a screen reader announces each one as it lands.
-    dialog.addEventListener('keydown', (e) => {
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      const links = [...results.querySelectorAll('a')];
-      if (!links.length) return;
-      e.preventDefault();
-      const at = links.indexOf(document.activeElement);
-      if (e.key === 'ArrowDown') {
-        links[at < 0 ? 0 : Math.min(at + 1, links.length - 1)].focus();
-      } else if (at <= 0) {
-        input.focus();
-      } else {
-        links[at - 1].focus();
-      }
-    });
-
-    // Clicking the backdrop closes it; the dialog itself must not.
-    dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) dialog.close();
-    });
+    const hint = document.querySelector('.search-trigger-kbd');
+    if (!(hint instanceof HTMLElement)) return;
+    const key = hint.querySelector('kbd');
+    if (key && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+      key.textContent = '⌘';
+      hint.closest('button')?.setAttribute('aria-keyshortcuts', 'Meta+K');
+    }
+    hint.style.display = '';
   })();
 </script>
 
-<style is:global>
-  .search-btn {
-    width: auto;
-    gap: 0.4rem;
-    padding: 0 0.5rem;
-    color: var(--muted);
+<script>
+  interface SubResult {
+    title: string;
+    url: string;
+    excerpt: string;
   }
-  .search-btn svg { width: 15px; height: 15px; }
-  .search-btn-label { font-size: 0.85rem; }
-  .search-btn-kbd,
-  .palette kbd {
+  interface Result {
+    url: string;
+    excerpt: string;
+    meta: { title?: string };
+    sub_results: SubResult[];
+  }
+
+  class SiteSearch extends HTMLElement {
+    constructor() {
+      super();
+      const openBtn = this.querySelector<HTMLButtonElement>('[data-open-modal]')!;
+      const closeBtn = this.querySelector<HTMLButtonElement>('[data-close-modal]')!;
+      const dialog = this.querySelector('dialog')!;
+      const frame = this.querySelector('.search-frame')!;
+      const input = this.querySelector<HTMLInputElement>('[data-search-input]')!;
+      const list = this.querySelector<HTMLElement>('[data-search-results]')!;
+      const status = this.querySelector<HTMLElement>('[data-search-status]')!;
+
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '') + '/';
+      let pagefind: any = null;
+      let loading: Promise<any> | null = null;
+      let seq = 0; // drops the answer to a query the reader has already typed past
+
+      /** Load the runtime once. Absent in `astro dev`, where no index is built. */
+      const load = () => {
+        if (pagefind) return Promise.resolve(pagefind);
+        if (!loading) {
+          loading = import(/* @vite-ignore */ `${base}pagefind/pagefind.js`)
+            .then(async (mod) => {
+              // Pagefind records URLs relative to the directory it indexed (dist/),
+              // so they need the base path back or every result 404s. The trailing
+              // slash matters: without it the join produces "/ci-doctorconcepts/".
+              await mod.options({ baseUrl: base, excerptLength: 20 });
+              pagefind = mod;
+              return mod;
+            })
+            .catch(() => null);
+        }
+        return loading;
+      };
+
+      const escape = (s: string) =>
+        s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+      const render = (items: Result[], query: string) => {
+        if (!items.length) {
+          list.innerHTML = '';
+          status.textContent = query ? `No results for “${query}”.` : '';
+          return;
+        }
+        status.textContent = `${items.length} page${items.length === 1 ? '' : 's'}`;
+        // `excerpt` is Pagefind's own HTML — the query terms wrapped in <mark> —
+        // built from this site's indexed text, so it is ours, not reader input.
+        list.innerHTML = items
+          .map((r) => {
+            const subs = (r.sub_results || [])
+              .filter((s) => s.url !== r.url)
+              .slice(0, 3)
+              .map(
+                (s) => `<li class="sub">
+                  <a href="${escape(s.url)}">
+                    <span class="sub-title">${escape(s.title)}</span>
+                    <span class="excerpt">${s.excerpt}</span>
+                  </a>
+                </li>`,
+              )
+              .join('');
+            return `<li class="hit">
+              <a class="page" href="${escape(r.url)}">
+                <span class="page-title">${escape(r.meta?.title || r.url)}</span>
+                <span class="excerpt">${r.excerpt}</span>
+              </a>
+              ${subs ? `<ul class="subs">${subs}</ul>` : ''}
+            </li>`;
+          })
+          .join('');
+      };
+
+      const run = async (query: string) => {
+        const mine = ++seq;
+        if (!query.trim()) return render([], '');
+        const mod = await load();
+        if (!mod) {
+          status.textContent = 'Search runs on the built site — `astro dev` has no index.';
+          return;
+        }
+        status.textContent = 'Searching…';
+        const res = await mod.search(query);
+        const items: Result[] = await Promise.all(res.results.slice(0, 6).map((r: any) => r.data()));
+        if (mine === seq) render(items, query); // a later keystroke already won
+      };
+
+      let timer: ReturnType<typeof setTimeout>;
+      input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const query = input.value;
+        load(); // warm the index while they are still typing
+        timer = setTimeout(() => run(query), 150);
+      });
+
+      /** A click on a result, or anywhere outside the frame, closes the palette. */
+      const onClick = (event: MouseEvent) => {
+        const isLink = 'href' in (event.target || {});
+        if (isLink || (document.body.contains(event.target as Node) && !frame.contains(event.target as Node))) {
+          dialog.close();
+        }
+      };
+
+      const open = (event?: MouseEvent) => {
+        dialog.showModal();
+        document.body.toggleAttribute('data-search-open', true);
+        input.focus();
+        input.select();
+        load();
+        event?.stopPropagation(); // the click that opened it must not close it again
+        window.addEventListener('click', onClick);
+      };
+
+      openBtn.addEventListener('click', open);
+      openBtn.disabled = false; // enabled only once there is a handler behind it
+      closeBtn.addEventListener('click', () => dialog.close());
+      dialog.addEventListener('close', () => {
+        document.body.toggleAttribute('data-search-open', false);
+        window.removeEventListener('click', onClick);
+      });
+
+      window.addEventListener('keydown', (e) => {
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement)?.tagName || '');
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+          dialog.open ? dialog.close() : open();
+          e.preventDefault();
+        } else if (e.key === '/' && !typing && !dialog.open) {
+          open();
+          e.preventDefault();
+        }
+      });
+
+      // Arrow keys walk the results by moving real focus, so Enter follows the link
+      // natively and a screen reader announces each one as it lands.
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        const links = [...list.querySelectorAll('a')];
+        if (!links.length) return;
+        e.preventDefault();
+        const at = links.indexOf(document.activeElement as HTMLAnchorElement);
+        if (e.key === 'ArrowDown') links[at < 0 ? 0 : Math.min(at + 1, links.length - 1)].focus();
+        else if (at <= 0) input.focus();
+        else links[at - 1].focus();
+      });
+    }
+  }
+  customElements.define('site-search', SiteSearch);
+</script>
+
+<style is:global>
+  site-search {
+    display: contents;
+  }
+  [data-search-open] {
+    overflow: hidden; /* the page must not scroll behind the modal */
+  }
+
+  /* --- the trigger ------------------------------------------------------- */
+
+  .search-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .search-trigger:hover {
+    border-color: var(--border-strong);
+    color: var(--fg);
+  }
+  .search-trigger svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .search-trigger-label,
+  .search-trigger-kbd { display: none; }
+
+  /* Wide enough, and it becomes a bar — the way a search field reads. */
+  @media (min-width: 800px) {
+    .search-trigger {
+      width: 100%;
+      max-width: 15rem;
+      justify-content: flex-start;
+      padding-inline: 0.7rem 0.45rem;
+    }
+    .search-trigger-label { display: block; }
+    .search-trigger-kbd {
+      display: flex;
+      gap: 0.15rem;
+      margin-inline-start: auto; /* pinned right, like every palette hint */
+    }
+  }
+  .search-trigger-kbd kbd {
     font-family: var(--mono);
     font-size: 0.68rem;
+    line-height: 1.5;
     padding: 0.05rem 0.3rem;
     border: 1px solid var(--border);
     border-radius: 4px;
+    background: var(--bg);
     color: var(--muted);
-    background: var(--bg-subtle);
-  }
-  /* The icon alone once the header gets tight. */
-  @media (max-width: 620px) {
-    .search-btn-label,
-    .search-btn-kbd { display: none; }
-    .search-btn { width: 34px; padding: 0; }
   }
 
-  .palette {
-    width: min(38rem, calc(100vw - 2rem));
-    max-height: min(30rem, calc(100vh - 8rem));
-    margin: 8vh auto auto;
+  /* --- the dialog -------------------------------------------------------- */
+
+  .search-dialog {
+    margin: 0;
     padding: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border: 0;
     background: var(--card);
     color: var(--fg);
-    box-shadow: var(--shadow-md);
   }
-  .palette::backdrop {
-    background: rgb(16 21 28 / 0.45);
-    backdrop-filter: blur(2px);
+  /* Gated on [open]: an unconditional `display` beats the UA's
+     `dialog:not([open]) { display: none }`, and the palette then sits in the page
+     permanently — unclosable, and with no backdrop, since ::backdrop only paints
+     for a dialog opened with showModal(). */
+  .search-dialog[open] {
+    display: flex;
   }
-  .palette-head {
+  .search-dialog::backdrop {
+    background: rgb(9 12 17 / 0.6);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+  .search-frame {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .search-head {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.75rem 0.9rem;
+    padding: 0.85rem 1rem;
     border-bottom: 1px solid var(--border);
   }
-  .palette-head svg { width: 17px; height: 17px; color: var(--muted); flex-shrink: 0; }
-  .palette-head input {
+  .search-head svg { width: 17px; height: 17px; color: var(--muted); flex-shrink: 0; }
+  .search-head input {
     flex: 1;
     min-width: 0;
     border: 0;
@@ -236,45 +338,93 @@ const BASE = url('/');
     font: inherit;
     font-size: 1rem;
   }
-  .palette-head input::-webkit-search-cancel-button { display: none; }
+  .search-head input::-webkit-search-cancel-button { display: none; }
+  .search-cancel {
+    flex-shrink: 0;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-subtle);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    cursor: pointer;
+  }
+  .search-cancel:hover { color: var(--fg); border-color: var(--border-strong); }
 
-  .palette-status {
-    padding: 0.4rem 0.9rem;
+  .search-status {
+    margin: 0;
+    padding: 0.5rem 1rem 0;
     font-size: 0.78rem;
     color: var(--muted);
   }
-  .palette-status:empty { display: none; }
+  .search-status:empty { display: none; }
 
-  .palette-results {
+  /* --- results ----------------------------------------------------------- */
+
+  .search-results {
     list-style: none;
     margin: 0;
-    padding: 0 0.4rem 0.5rem;
+    padding: 0.5rem;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .palette-results a {
+  .search-results .hit + .hit { margin-top: 0.15rem; }
+  .search-results a {
     display: block;
-    padding: 0.55rem 0.6rem;
+    padding: 0.5rem 0.6rem;
     border-radius: var(--radius-sm);
     color: inherit;
     text-decoration: none;
   }
-  .palette-results a:hover,
-  .palette-results a:focus-visible {
+  .search-results a:hover,
+  .search-results a:focus-visible {
     background: var(--bg-subtle);
     outline: none;
   }
-  .r-title { display: block; font-weight: 600; font-size: 0.92rem; }
-  .r-excerpt {
+  .page-title {
+    display: block;
+    font-weight: 650;
+    font-size: 0.94rem;
+  }
+  .excerpt {
     display: block;
     margin-top: 0.15rem;
     font-size: 0.82rem;
     line-height: 1.45;
     color: var(--muted);
   }
-  .r-excerpt mark {
+  .excerpt mark {
     background: color-mix(in srgb, var(--accent) 22%, transparent);
     color: var(--fg);
     border-radius: 3px;
     padding: 0 0.1em;
+  }
+  /* Matching headings within a page, as a tree under it. */
+  .subs {
+    list-style: none;
+    margin: 0.1rem 0 0;
+    padding-left: 0.85rem;
+    border-left: 1px solid var(--border);
+    margin-left: 0.75rem;
+  }
+  .sub-title {
+    display: block;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  @media (min-width: 800px) {
+    .search-dialog {
+      margin: 4.5rem auto auto;
+      width: 90%;
+      max-width: 38rem;
+      height: max-content;
+      max-height: calc(100% - 9rem);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+    }
   }
 </style>
