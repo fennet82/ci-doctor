@@ -34,12 +34,11 @@ const { code, label, caption } = Astro.props;
         securityLevel: 'strict',
         theme: 'base',
         fontFamily: token('--sans'),
-        // useMaxWidth:false is what makes the labels legible. Left on, mermaid
-        // shrinks the whole SVG to the container, so a wide flowchart scales its
-        // text down with it — and bumping fontSize just makes a bigger SVG that
-        // gets scaled down further. Natural size plus a scrolling container is
-        // the only way the type stays at the size asked for.
-        flowchart: { curve: 'basis', padding: 14, useMaxWidth: false, nodeSpacing: 45, rankSpacing: 55 },
+        // useMaxWidth caps the SVG at its natural width and lets it shrink below
+        // that: a diagram narrower than the column renders at full size, a wider
+        // one scales to fit instead of hanging outside the column with its right
+        // edge cut off. Height is bounded by the CSS below, not here.
+        flowchart: { curve: 'basis', padding: 14, useMaxWidth: true, nodeSpacing: 45, rankSpacing: 55 },
         themeVariables: {
           background: token('--bg'),
           primaryColor: token('--accent-soft'),
@@ -78,7 +77,7 @@ const { code, label, caption } = Astro.props;
   }
 
   .diagram .mermaid {
-    overflow-x: auto;
+    overflow: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card);
@@ -86,10 +85,11 @@ const { code, label, caption } = Astro.props;
     box-shadow: var(--shadow-sm);
     /* Reserve height so the page does not jump when the diagram lands. */
     min-height: 8rem;
+    /* A tall flowchart is 1700px of natural height — two screens of one box on a
+       desktop. Bound the frame and scroll inside it; the type stays full size. */
+    max-height: 80vh;
   }
 
-  /* No max-width: the SVG renders at its natural size so the labels stay
-     readable, and the container above scrolls when it is wider than the column. */
   .diagram .mermaid svg {
     display: block;
     margin: 0 auto;
