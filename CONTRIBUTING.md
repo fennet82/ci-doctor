@@ -68,7 +68,7 @@ shell — read them, they are short.
 | Hook | Does |
 |---|---|
 | `pre-commit` | `ruff check --fix` then `ruff format` on staged `*.py`, `ruff format --preview` on staged `*.md`, and re-stages only what it rewrote. Fix runs first: removing an unused import leaves the blank lines it sat between. |
-| `commit-msg` | Rejects anything that is not a Conventional Commit. Not cosmetic — semantic-release parses these to pick the version bump. |
+| `commit-msg` | Rejects anything that is not a Conventional Commit. Not cosmetic — the release workflow reads the type to decide whether to ship. |
 | `pre-push` | `pytest`, `ty`, the `core/` guardrail grep, and `gitleaks` if installed. Everything CI runs, before the round trip. |
 
 `--no-verify` skips them. CI does not, so it only moves where you find out.
@@ -97,17 +97,17 @@ pipeline parses them, so the format is functional, not cosmetic.
 
 | Type | Effect |
 |---|---|
-| `feat:` | **minor** version bump + release |
-| `fix:` | **patch** version bump + release |
-| `BREAKING CHANGE:` in body (or `feat!:`) | **major** bump |
-| `docs:` `test:` `chore:` `refactor:` `perf:` `ci:` | no release |
+| `feat:` `fix:` `BREAKING CHANGE:` in body (or `feat!:`) | ships the next alpha |
+| `docs:` `test:` `chore:` `refactor:` `perf:` `ci:` | no release; rides along in the next one |
 
-`.github/workflows/release.yml` runs on every push to `master`: python-semantic-release
-bumps the version, updates `CHANGELOG.md`, tags, builds, and publishes to PyPI. **A
-`feat:` or `fix:` on master ships a release.** If nothing releasable is found, it no-ops.
+`.github/workflows/release.yml` runs on every push to `master`: if any commit since the
+last tag is a `feat:`/`fix:`/`BREAKING`, it bumps to the next alpha (`0.0.1a2` →
+`0.0.1a3`), tags, builds and publishes to PyPI. Otherwise it no-ops.
 
-Keep the summary imperative and scoped to one change. Don't hand-edit `CHANGELOG.md`
-or the version in `pyproject.toml` — the pipeline owns both.
+The type does **not** pick how big the bump is — while the project is in alpha, only the
+counter moves. [GUIDELINES.md §8](GUIDELINES.md) has the versioning scheme and where it
+goes next. Keep the summary imperative and scoped to one change, and don't hand-edit the
+version in `pyproject.toml` or `uv.lock` — the pipeline owns both.
 
 ### 3.1 Skipping CI
 

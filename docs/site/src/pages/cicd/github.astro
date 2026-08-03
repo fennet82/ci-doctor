@@ -83,7 +83,7 @@ const ghe = `      - uses: fennet82/ci-doctor@master
                 ></tr
             >
             <tr
-                ><td><code>@v1.2.3</code></td><td
+                ><td><code>@v0.0.1a3</code></td><td
                     >Exactly that release. Never moves.</td
                 ></tr
             >
@@ -95,9 +95,10 @@ const ghe = `      - uses: fennet82/ci-doctor@master
         </tbody>
     </table>
     <p>
-        There is no floating <code>@v1</code>: releases are cut by
-        semantic-release, which publishes the exact tag and nothing else. Pin a
-        release tag or a SHA when you need reproducibility.
+        There is no floating <code>@v1</code>: the release pipeline publishes the
+        exact tag and nothing else, and the project is still in alpha
+        (<code>0.0.1aN</code>). Pin a release tag or a SHA when you need
+        reproducibility.
     </p>
 
     <h2>Inputs</h2>

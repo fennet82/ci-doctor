@@ -330,3 +330,70 @@ Real bugs, kept here so they don't recur:
 - **The domain models are plain dataclasses, not pydantic** — nothing validates what an
   adapter puts in them. A `datetime` where the model says `str | None` sails through and
   crashes much later, in the JSON dump. Normalise at the adapter boundary.
+
+## 8. Releases
+
+Versions are **[PEP 440](https://peps.python.org/pep-0440/)** — Python packaging's own
+spec, and the one PyPI normalises against. Not SemVer: `0.0.1a2`, never `0.0.1-a.2`.
+
+`uv version` is the only thing that writes a version. It updates `pyproject.toml` and
+re-locks `uv.lock` in one step, so the two can never disagree. Never hand-edit either,
+and never create a release tag by hand — the pipeline owns both.
+
+### 8.1 Today — master ships alphas, the base version stays put
+
+Every push to `master` that carries a `feat:`, `fix:` or `BREAKING CHANGE:` commit
+publishes the next alpha. Only the alpha counter moves:
+
+```
+0.0.1a1 → 0.0.1a2 → 0.0.1a3 → …
+```
+
+`.github/workflows/release.yml` does the whole thing: `uv version --bump alpha`, a
+`chore(release): <version> [skip ci]` commit, the `v<version>` tag, `uv build`, a GitHub
+Release with the image tarball and the config JSON Schema attached, then PyPI. A push
+with only `docs:`/`chore:`/`refactor:` commits ships nothing and rides along in the next
+alpha.
+
+Note what is *missing*: nothing decides how big the next version is. A commit message
+cannot move the base version, only the counter. That is deliberate — while the shape of
+the tool is still moving, `0.0.1aN` means exactly one thing ("the Nth alpha"), and
+promoting it is a decision a person makes, not a side effect of typing `feat:`.
+
+Two consequences worth knowing:
+
+- **`pip install ci-doctorr` works anyway.** pip installs a pre-release when a project
+  has no stable release. Once a final version exists, alphas need `--pre`.
+- **The GitHub Releases are not flagged as pre-releases.** `/releases/latest` resolves to
+  the newest *non*-prerelease, and the config schema `$id` points through it
+  (`releases/latest/download/ci-doctor.schema.json`). Flagging them would break every
+  editor resolving that URL.
+
+### 8.2 Next — release candidates on master, the final release by hand
+
+Not built yet. Written down so the alpha flow above doesn't have to be unpicked to get
+here. Two pipelines:
+
+1. **`master`, automatic.** Bumps the base version and publishes a **release
+   candidate** — never a final version.
+2. **release, manual** (`workflow_dispatch`). Drops the pre-release suffix, tags the
+   version itself, publishes it. This is the approval gate.
+
+One cycle, end to end:
+
+| When | Command | Version |
+|---|---|---|
+| First feature after a release | `uv version --bump minor --bump rc` | `0.1.0` → `0.2.0rc1` |
+| Every push after that | `uv version --bump rc` | `0.2.0rc1` → `0.2.0rc2` → `rc3` |
+| Approved — manual run | `uv version --bump stable` | `0.2.0rc3` → `0.2.0` |
+| Next feature | `uv version --bump minor --bump rc` | `0.2.0` → `0.3.0rc1` |
+
+The rule that makes it a cycle: **the base version moves once, when the cycle opens.**
+From then on master only increments the rc counter, however many pushes land, until the
+manual pipeline tags the final version. That tag closes the cycle; the next feature opens
+the next one.
+
+Open question for whoever builds this: a `feat:` landing mid-cycle in a `fix:`-sized
+cycle (base at `0.1.1rc2`, a feature arrives). Either re-pick the base and restart at
+`rc1`, or hold the feature's bump for the next cycle. Decide it then; both are defensible,
+and the alpha flow above never has to face it.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Conventional Commits. Not cosmetic: python-semantic-release parses these to
-# decide the version bump, so a malformed type silently ships nothing.
+# Conventional Commits. Not cosmetic: the release workflow greps these to decide
+# whether to ship the next alpha, so a malformed type silently ships nothing.
 set -uo pipefail
 
 subject=$(head -n1 "$1")
@@ -18,9 +18,8 @@ commit-msg: not a Conventional Commit.
   expected: <type>(<optional scope>)<optional !>: <imperative summary>
   types:    ${types//|/, }
 
-  feat: -> minor bump + release      fix: -> patch bump + release
-  feat! or "BREAKING CHANGE:" in the body -> major bump
-  everything else -> no release
+  feat:, fix:, or "BREAKING CHANGE:" in the body -> ships the next alpha
+  everything else -> no release, rides along in the next one
 
 See CONTRIBUTING.md §3.
 EOF
