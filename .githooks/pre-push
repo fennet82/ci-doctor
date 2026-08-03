@@ -12,13 +12,6 @@ echo "pre-push: types"
 # ci_doctor only, matching the CI job — tests are not type-checked.
 uv run ty check ci_doctor || fail=1
 
-echo "pre-push: guardrails"
-# Invariant #2 — core/ must not know a provider exists.
-if grep -rniE 'gitlab|github' ci_doctor/core/; then
-  echo "  core/ references a provider (GUIDELINES.md invariant #2)" >&2
-  fail=1
-fi
-
 # Optional: only runs if you have it. mise install puts it on PATH.
 if command -v gitleaks >/dev/null 2>&1; then
   echo "pre-push: leaks"

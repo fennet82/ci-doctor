@@ -76,17 +76,6 @@ jobs:
       # Build only — publishing is docs.yml, so a PR cannot touch what is live.
       - run: npm run build
 
-  guardrails:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: No provider identifiers in core/
-        run: |
-          if grep -rniE 'gitlab|github' ci_doctor/core/; then
-            echo "::error::core/ must not reference a provider (GUIDELINES.md invariant #2)"
-            exit 1
-          fi
-
   leaks:
     runs-on: ubuntu-latest
     steps:

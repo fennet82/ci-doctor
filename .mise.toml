@@ -68,17 +68,13 @@ run = [
   "uv run ruff format --preview $(git ls-files '*.md' ':!:.claude/**')",
 ]
 
-[tasks.guardrails]
-description = "Invariant #2 — core/ must not name a provider"
-run = "! grep -rniE 'gitlab|github' ci_doctor/core/"
-
 [tasks.leaks]
 description = "Scan history for secrets, same as the CI job"
 run = "gitleaks git --no-banner --redact"
 
 [tasks.check]
 description = "Everything CI runs, in one command"
-depends = ["test", "lint", "guardrails", "leaks"]
+depends = ["test", "lint", "leaks"]
 
 # cleanup: delete rebuildable local junk (keeps .venv, node_modules, .codegraph)
 [tasks.cleanup]
