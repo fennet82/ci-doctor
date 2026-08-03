@@ -61,8 +61,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # [skip ci] is what stops this push from re-triggering the pipeline forever.
           git commit -am "chore(release): $VERSION [skip ci]"
-          git tag "v$VERSION"
-          git push --follow-tags
+          # Annotated, and pushed by name. `git push --follow-tags` pushes only
+          # *annotated* tags, so a lightweight one goes nowhere while the push still
+          # reports success — the commit lands and the release step then fails on a
+          # tag the remote has never heard of. --atomic makes a half-push impossible.
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push --atomic origin "HEAD:$GITHUB_REF_NAME" "refs/tags/v$VERSION"
 
       - name: Build the distributions
         if: steps.gate.outputs.release == 'true'
