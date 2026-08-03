@@ -1,0 +1,280 @@
+---
+/**
+ * Full-text search over the built site, as a command palette.
+ *
+ * The index is Pagefind's: it runs over `dist/` after the Astro build (see the
+ * `build` script) and indexes whatever is marked `data-pagefind-body` — the
+ * `<main>` of each page, so the sidebar and header don't match everything.
+ *
+ * Nothing loads until the palette is opened for the first time; the runtime and
+ * the index chunks are fetched on demand, so a reader who never searches pays
+ * nothing for this.
+ */
+import { url } from '../lib/url';
+
+// Pagefind writes its runtime into the built site, so this path only exists in a
+// production build — `astro dev` has no index, and the palette says so.
+const PAGEFIND = url('/pagefind/pagefind.js');
+const BASE = url('/');
+---
+
+<button class="icon-btn search-btn" id="search-open" aria-label="Search the docs" aria-keyshortcuts="Control+K Meta+K">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="7" />
+    <path d="M20 20l-3.5-3.5" />
+  </svg>
+  <span class="search-btn-label">Search</span>
+  <kbd class="search-btn-kbd">⌘K</kbd>
+</button>
+
+<dialog class="palette" id="search-dialog" aria-label="Search the docs">
+  <form method="dialog" class="palette-form">
+    <div class="palette-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        id="search-input"
+        placeholder="Search the docs…"
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Search query"
+        aria-controls="search-results"
+      />
+      <kbd>Esc</kbd>
+    </div>
+  </form>
+  <div class="palette-status" id="search-status" role="status" aria-live="polite"></div>
+  <ul class="palette-results" id="search-results"></ul>
+</dialog>
+
+<script is:inline define:vars={{ PAGEFIND, BASE }}>
+  (() => {
+    const dialog = document.getElementById('search-dialog');
+    const input = document.getElementById('search-input');
+    const results = document.getElementById('search-results');
+    const status = document.getElementById('search-status');
+    const openBtn = document.getElementById('search-open');
+    if (!dialog || !input || !results || !status || !openBtn) return;
+
+    let pagefind = null;
+    let loading = null;
+    let seq = 0; // drops the answer to a query the reader has already typed past
+
+    /** Load the runtime once, on first open. Absent in `astro dev`. */
+    const load = () => {
+      if (pagefind) return Promise.resolve(pagefind);
+      if (!loading) {
+        loading = import(/* @vite-ignore */ PAGEFIND)
+          .then(async (mod) => {
+            // Pagefind records URLs relative to the directory it indexed (dist/),
+            // so under a base path they need it put back on the front.
+            await mod.options({ baseUrl: BASE });
+            pagefind = mod;
+            return mod;
+          })
+          .catch(() => null);
+      }
+      return loading;
+    };
+
+    const open = () => {
+      if (!dialog.open) dialog.showModal();
+      input.focus();
+      input.select();
+      load().then((mod) => {
+        if (!mod && !input.value) {
+          status.textContent = 'Search runs on the built site — not in `astro dev`.';
+        }
+      });
+    };
+
+    const escape = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+    const render = (items, query) => {
+      if (!items.length) {
+        results.innerHTML = '';
+        status.textContent = query ? `No matches for “${query}”.` : '';
+        return;
+      }
+      status.textContent = `${items.length} result${items.length === 1 ? '' : 's'}`;
+      // `excerpt` is Pagefind's own HTML — the query terms wrapped in <mark>. It is
+      // built from the indexed text of this same site, so it is ours, not user input.
+      results.innerHTML = items
+        .map(
+          (r) => `<li>
+            <a href="${escape(r.url)}">
+              <span class="r-title">${escape(r.meta?.title || r.url)}</span>
+              <span class="r-excerpt">${r.excerpt}</span>
+            </a>
+          </li>`,
+        )
+        .join('');
+    };
+
+    const search = async (query) => {
+      const mine = ++seq;
+      if (!query.trim()) {
+        render([], '');
+        return;
+      }
+      const mod = await load();
+      if (!mod) {
+        status.textContent = 'Search runs on the built site — not in `astro dev`.';
+        return;
+      }
+      const res = await mod.search(query);
+      const items = await Promise.all(res.results.slice(0, 8).map((r) => r.data()));
+      if (mine === seq) render(items, query); // a later keystroke already won
+    };
+
+    let timer;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value;
+      timer = setTimeout(() => search(q), 120); // typing is faster than searching
+    });
+
+    openBtn.addEventListener('click', open);
+
+    document.addEventListener('keydown', (e) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        open();
+      } else if (e.key === '/' && !typing && !dialog.open) {
+        e.preventDefault();
+        open();
+      }
+    });
+
+    // Arrow keys walk the results by moving real focus, so Enter activates the
+    // link natively and a screen reader announces each one as it lands.
+    dialog.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const links = [...results.querySelectorAll('a')];
+      if (!links.length) return;
+      e.preventDefault();
+      const at = links.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') {
+        links[at < 0 ? 0 : Math.min(at + 1, links.length - 1)].focus();
+      } else if (at <= 0) {
+        input.focus();
+      } else {
+        links[at - 1].focus();
+      }
+    });
+
+    // Clicking the backdrop closes it; the dialog itself must not.
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+  })();
+</script>
+
+<style is:global>
+  .search-btn {
+    width: auto;
+    gap: 0.4rem;
+    padding: 0 0.5rem;
+    color: var(--muted);
+  }
+  .search-btn svg { width: 15px; height: 15px; }
+  .search-btn-label { font-size: 0.85rem; }
+  .search-btn-kbd,
+  .palette kbd {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    background: var(--bg-subtle);
+  }
+  /* The icon alone once the header gets tight. */
+  @media (max-width: 620px) {
+    .search-btn-label,
+    .search-btn-kbd { display: none; }
+    .search-btn { width: 34px; padding: 0; }
+  }
+
+  .palette {
+    width: min(38rem, calc(100vw - 2rem));
+    max-height: min(30rem, calc(100vh - 8rem));
+    margin: 8vh auto auto;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--fg);
+    box-shadow: var(--shadow-md);
+  }
+  .palette::backdrop {
+    background: rgb(16 21 28 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+  .palette-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .palette-head svg { width: 17px; height: 17px; color: var(--muted); flex-shrink: 0; }
+  .palette-head input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: 1rem;
+  }
+  .palette-head input::-webkit-search-cancel-button { display: none; }
+
+  .palette-status {
+    padding: 0.4rem 0.9rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .palette-status:empty { display: none; }
+
+  .palette-results {
+    list-style: none;
+    margin: 0;
+    padding: 0 0.4rem 0.5rem;
+    overflow-y: auto;
+  }
+  .palette-results a {
+    display: block;
+    padding: 0.55rem 0.6rem;
+    border-radius: var(--radius-sm);
+    color: inherit;
+    text-decoration: none;
+  }
+  .palette-results a:hover,
+  .palette-results a:focus-visible {
+    background: var(--bg-subtle);
+    outline: none;
+  }
+  .r-title { display: block; font-weight: 600; font-size: 0.92rem; }
+  .r-excerpt {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  .r-excerpt mark {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--fg);
+    border-radius: 3px;
+    padding: 0 0.1em;
+  }
+</style>

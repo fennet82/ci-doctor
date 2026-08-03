@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && pagefind --site dist",
     "preview": "astro preview"
   },
   "dependencies": {
@@ -14,5 +14,8 @@
   },
   "allowScripts": {
     "esbuild@0.28.1": true
+  },
+  "devDependencies": {
+    "pagefind": "^1.5.2"
   }
 }
