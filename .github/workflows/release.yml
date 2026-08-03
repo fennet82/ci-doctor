@@ -1,8 +1,9 @@
 name: release
 
-# On every push to master: analyze conventional commits, bump the version + tag,
-# generate a GitHub Release from the commits, attach the Docker image as a gzipped
-# tar, and publish to PyPI. If no releasable commit (feat/fix/BREAKING) is found, it no-ops.
+# Every push to master carrying a feat/fix/BREAKING commit publishes the next alpha:
+# 0.0.1a1, 0.0.1a2, 0.0.1a3 … The base version never moves — bumping it is a decision,
+# not a side effect of a commit message. GUIDELINES.md §8 has the whole scheme, and the
+# rc/GA flow this grows into.
 on:
   push:
     branches: [master]
@@ -21,51 +22,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # full history so commit analysis works
+          fetch-depth: 0          # full history: the gate reads every commit since the last tag
 
-      # Bump version (pyproject), update CHANGELOG.md, commit, tag vX.Y.Z, push,
-      # create the GitHub Release from the commits, and build the sdist+wheel into dist/.
-      - name: Python Semantic Release
-        id: release
-        uses: python-semantic-release/python-semantic-release@v9
+      # Docs, chores and refactors ride along in the next alpha rather than cutting one
+      # of their own. Same rule the pipeline always had; semantic-release used to own it.
+      - name: Is there anything to release?
+        id: gate
+        run: |
+          last=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          range=${last:+$last..}HEAD
+          if git log "$range" --format='%s%n%b' \
+             | grep -qE '^(feat|fix)(\(.+\))?!?:|^BREAKING CHANGE:'; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No feat/fix/BREAKING commit since ${last:-the start of history} — nothing to release."
+          fi
+
+      - uses: astral-sh/setup-uv@v5
+        if: steps.gate.outputs.release == 'true'
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          enable-cache: true
 
-      - name: Build Docker image and save as gzipped tar
-        if: ${{ steps.release.outputs.released == 'true' }}
+      # `uv version` writes canonical PEP 440 and re-locks, so pyproject.toml and uv.lock
+      # can never disagree about the version. --no-sync skips a venv we would throw away.
+      - name: Bump to the next alpha
+        id: bump
+        if: steps.gate.outputs.release == 'true'
         run: |
-          IMAGE="ci-doctor:${{ steps.release.outputs.version }}"
-          docker build -t "$IMAGE" .
-          docker save "$IMAGE" | gzip -9 > "ci-doctor-${{ steps.release.outputs.version }}-image.tar.gz"
+          uv version --bump alpha --no-sync
+          echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
 
-      - name: Attach Docker image to the release
-        if: ${{ steps.release.outputs.released == 'true' }}
+      - name: Commit and tag
+        if: steps.gate.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # [skip ci] is what stops this push from re-triggering the pipeline forever.
+          git commit -am "chore(release): $VERSION [skip ci]"
+          git tag "v$VERSION"
+          git push --follow-tags
+
+      - name: Build the distributions
+        if: steps.gate.outputs.release == 'true'
+        run: uv build
+
+      - name: Build the Docker image and save it as a gzipped tar
+        if: steps.gate.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          docker build -t "ci-doctor:$VERSION" .
+          docker save "ci-doctor:$VERSION" | gzip -9 > "ci-doctor-$VERSION-image.tar.gz"
+
+      # The JSON Schema for .ci-doctor.yml, generated from the pydantic model so it can
+      # never drift from the code. Editors resolve it via the $id baked into the schema,
+      # which points at /releases/latest/download/ci-doctor.schema.json.
+      - name: Generate the config JSON Schema
+        if: steps.gate.outputs.release == 'true'
+        run: uv run ci-doctor config --schema > ci-doctor.schema.json
+
+      # Not `--prerelease`, deliberately: /releases/latest resolves to the newest
+      # *non*-prerelease, and the schema $id above depends on it. While every release is
+      # an alpha, flagging them would leave that URL resolving to nothing, forever.
+      - name: Create the GitHub Release
+        if: steps.gate.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.release.outputs.tag }}" "ci-doctor-${{ steps.release.outputs.version }}-image.tar.gz" --clobber
-
-      # The JSON Schema for .ci-doctor.yml, generated from the pydantic model so it
-      # can never drift from the code. Editors resolve it via the $id baked into the
-      # schema, which points at /releases/latest/download/ci-doctor.schema.json.
-      - name: Attach the config JSON Schema to the release
-        if: ${{ steps.release.outputs.released == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
-          python3 -m venv /tmp/schema-venv
-          /tmp/schema-venv/bin/pip install --quiet .
-          /tmp/schema-venv/bin/ci-doctor config --schema > ci-doctor.schema.json
-          gh release upload "${{ steps.release.outputs.tag }}" ci-doctor.schema.json --clobber
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            dist/* "ci-doctor-$VERSION-image.tar.gz" ci-doctor.schema.json
 
       # Trusted Publishing: authenticates via OIDC (id-token: write above). No token/secret.
       # Requires a matching publisher on PyPI (repo fennet82/ci-doctor, workflow release.yml).
       - name: Publish distributions to PyPI
-        if: ${{ steps.release.outputs.released == 'true' }}
+        if: steps.gate.outputs.release == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Upload the built distributions to the GitHub Release
-        if: ${{ steps.release.outputs.released == 'true' }}
-        uses: python-semantic-release/publish-action@v9
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.release.outputs.tag }}
