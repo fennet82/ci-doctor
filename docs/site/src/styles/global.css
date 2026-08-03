@@ -209,6 +209,26 @@ a:hover { text-decoration: underline; }
 .brand:hover { text-decoration: none; }
 .brand img { width: 26px; height: 26px; }
 
+/* Reads as metadata on the wordmark, not as a second nav item — hence the
+   monospace, the muted colour, and no underline on hover. */
+.version {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--bg-subtle);
+}
+.version:hover {
+  text-decoration: none;
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
