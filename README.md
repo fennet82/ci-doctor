@@ -217,7 +217,7 @@ for provenance, is [docs/PLAN.md](https://github.com/fennet82/ci-doctor/blob/mas
 
 ```sh
 mise run setup       # uv sync + the repo's git hooks  (or just: uv sync)
-mise run check       # everything CI runs: tests, lint, guardrails, secret scan
+mise run check       # everything CI runs: tests, lint, secret scan
 ```
 
 The suite blocks real sockets and never calls an LLM, so it runs in seconds.

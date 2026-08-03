@@ -36,7 +36,7 @@ mise run test         # or: uv run pytest
 mise run test:matrix  # the suite on 3.11-3.14, like the CI matrix
 mise run cov          # the suite with coverage, against the floor CI enforces
 mise run lint         # ruff check + format (Python and markdown), then ty
-mise run check        # everything CI runs: test, lint, guardrails, leaks
+mise run check        # everything CI runs: test, lint, leaks
 mise run cleanup      # delete rebuildable junk: caches, build output, report.*
 ```
 
@@ -69,7 +69,7 @@ shell — read them, they are short.
 |---|---|
 | `pre-commit` | `ruff check --fix` then `ruff format` on staged `*.py`, `ruff format --preview` on staged `*.md`, and re-stages only what it rewrote. Fix runs first: removing an unused import leaves the blank lines it sat between. |
 | `commit-msg` | Rejects anything that is not a Conventional Commit. Not cosmetic — the release workflow reads the type to decide whether to ship. |
-| `pre-push` | `pytest`, `ty`, the `core/` guardrail grep, and `gitleaks` if installed. Everything CI runs, before the round trip. |
+| `pre-push` | `pytest`, `ty`, and `gitleaks` if installed. Everything CI runs, before the round trip. |
 
 `--no-verify` skips them. CI does not, so it only moves where you find out.
 
