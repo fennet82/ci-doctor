@@ -79,6 +79,10 @@
     sub_results: SubResult[];
   }
 
+  /** Query parameter carrying the search term from a result to the page it opens. */
+  const HIGHLIGHT_PARAM = 'highlight';
+  const MARK_CLASS = 'search-mark';
+
   class SiteSearch extends HTMLElement {
     constructor() {
       super();
@@ -104,7 +108,9 @@
               // Pagefind records URLs relative to the directory it indexed (dist/),
               // so they need the base path back or every result 404s. The trailing
               // slash matters: without it the join produces "/ci-doctorconcepts/".
-              await mod.options({ baseUrl: base, excerptLength: 20 });
+              // highlightParam puts the query on every result URL, which is what
+              // the highlighter below reads once the reader lands on the page.
+              await mod.options({ baseUrl: base, excerptLength: 20, highlightParam: HIGHLIGHT_PARAM });
               pagefind = mod;
               return mod;
             })
@@ -233,6 +239,46 @@
     }
   }
   customElements.define('site-search', SiteSearch);
+
+  // Arriving from a result: mark the term in the page itself, so the reason this
+  // page matched is visible rather than something to hunt for. Pagefind ships the
+  // highlighter (mark.js underneath); it reads the param its own result URLs wrote.
+  if (new URLSearchParams(location.search).has(HIGHLIGHT_PARAM)) {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '') + '/';
+    import(/* @vite-ignore */ `${base}pagefind/pagefind-highlight.js`)
+      .then(({ default: PagefindHighlight }) => {
+        new PagefindHighlight({
+          highlightParam: HIGHLIGHT_PARAM,
+          markContext: 'main', // never mark the nav, the header or the sidebar
+          markOptions: { className: MARK_CLASS },
+          addStyles: false, // styled below, in the site's own accent
+        });
+
+        // The term is in the URL only to get here. Drop it now so a copied link,
+        // a refresh or a back-navigation is the plain page.
+        const url = new URL(location.href);
+        url.searchParams.delete(HIGHLIGHT_PARAM);
+        history.replaceState(null, '', url);
+
+        // Highlights are an answer to "why this page", not a mode to be in: the
+        // first click or Escape clears them. Scrolling does not — reading the
+        // marked passages is the point.
+        const clear = () => {
+          for (const mark of document.querySelectorAll(`mark.${MARK_CLASS}`)) {
+            mark.replaceWith(...mark.childNodes);
+          }
+          document.querySelector('main')?.normalize(); // re-join the split text nodes
+          removeEventListener('click', clear);
+          removeEventListener('keydown', onKey);
+        };
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') clear();
+        };
+        addEventListener('click', clear);
+        addEventListener('keydown', onKey);
+      })
+      .catch(() => {});
+  }
 </script>
 
 <style is:global>
@@ -421,6 +467,16 @@
     color: var(--fg);
     border-radius: 3px;
     padding: 0 0.1em;
+  }
+
+  /* The same highlight, in the page a result opens. Warmer than the palette's so
+     it reads as "this is what you searched for" against a wall of prose. */
+  mark.search-mark {
+    background: color-mix(in srgb, var(--accent) 28%, transparent);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 0.12em;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
   }
   /* The page's other matching headings, as a tree under it. */
   .sections {
