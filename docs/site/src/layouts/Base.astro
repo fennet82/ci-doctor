@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import Sidebar from '../components/Sidebar.astro';
 import { asset, url } from '../lib/url';
+import { version } from '../lib/version';
 
 interface Props {
   title: string;
@@ -13,6 +14,7 @@ const {
 } = Astro.props;
 
 const REPO = 'https://github.com/fennet82/ci-doctor';
+const VERSION = version();
 
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
@@ -57,6 +59,12 @@ const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : un
           <img src={asset('/ci-doctor-icon.svg')} alt="" width="26" height="26" />
           <span>ci-doctor</span>
         </a>
+        {/* A sibling of the brand, not a child: an <a> inside an <a> is invalid. */}
+        {VERSION && (
+          <a class="version" href={`${REPO}/releases`} title={`Release notes for v${VERSION}`}>
+            v{VERSION}
+          </a>
+        )}
 
         <span class="nav-spacer"></span>
 
