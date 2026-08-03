@@ -127,24 +127,31 @@
         // built from this site's indexed text, so it is ours, not reader input.
         list.innerHTML = items
           .map((r) => {
-            const subs = (r.sub_results || [])
-              .filter((s) => s.url !== r.url)
-              .slice(0, 3)
+            // Pagefind's first sub-result is the page itself (no anchor); the rest
+            // are the headings it matched under.
+            const sections = (r.sub_results || []).filter((s) => s.url !== r.url);
+            // The headline links at the best-matching section rather than the top of
+            // the page: landing on a heading you can see the term in beats landing on
+            // a page you then have to search by eye.
+            const target = sections[0]?.url || r.url;
+            const rest = sections
+              .slice(1, 5)
               .map(
-                (s) => `<li class="sub">
-                  <a href="${escape(s.url)}">
-                    <span class="sub-title">${escape(s.title)}</span>
+                (s) => `<li>
+                  <a class="section" href="${escape(s.url)}">
+                    <span class="section-title">${escape(s.title)}</span>
                     <span class="excerpt">${s.excerpt}</span>
                   </a>
                 </li>`,
               )
               .join('');
             return `<li class="hit">
-              <a class="page" href="${escape(r.url)}">
+              <a class="page" href="${escape(target)}">
                 <span class="page-title">${escape(r.meta?.title || r.url)}</span>
-                <span class="excerpt">${r.excerpt}</span>
+                ${sections[0] ? `<span class="page-section">${escape(sections[0].title)}</span>` : ''}
+                <span class="excerpt">${sections[0]?.excerpt || r.excerpt}</span>
               </a>
-              ${subs ? `<ul class="subs">${subs}</ul>` : ''}
+              ${rest ? `<ul class="sections">${rest}</ul>` : ''}
             </li>`;
           })
           .join('');
@@ -371,7 +378,11 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .search-results .hit + .hit { margin-top: 0.15rem; }
+  .search-results .hit + .hit {
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--border);
+  }
   .search-results a {
     display: block;
     padding: 0.5rem 0.6rem;
@@ -385,9 +396,18 @@
     outline: none;
   }
   .page-title {
-    display: block;
     font-weight: 650;
     font-size: 0.94rem;
+  }
+  /* The heading the headline link actually lands on, so the jump is never a surprise. */
+  .page-section::before {
+    content: '›';
+    margin: 0 0.35rem;
+    color: var(--border-strong);
+  }
+  .page-section {
+    font-size: 0.9rem;
+    color: var(--accent);
   }
   .excerpt {
     display: block;
@@ -402,20 +422,20 @@
     border-radius: 3px;
     padding: 0 0.1em;
   }
-  /* Matching headings within a page, as a tree under it. */
-  .subs {
+  /* The page's other matching headings, as a tree under it. */
+  .sections {
     list-style: none;
-    margin: 0.1rem 0 0;
-    padding-left: 0.85rem;
+    margin: 0.1rem 0 0 1.1rem;
+    padding-left: 0.75rem;
     border-left: 1px solid var(--border);
-    margin-left: 0.75rem;
   }
-  .sub-title {
+  .section-title {
     display: block;
     font-size: 0.86rem;
     font-weight: 500;
     color: var(--accent);
   }
+  .sections .excerpt { font-size: 0.79rem; }
 
   @media (min-width: 800px) {
     .search-dialog {
