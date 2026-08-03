@@ -2,7 +2,7 @@
 name = "ci-doctorr"
 # PEP 440, and the release pipeline owns it — see GUIDELINES.md §8. The `a0` seed is
 # the state before the first alpha: `uv version --bump alpha` makes it 0.0.1a1.
-version = "0.0.1a1"
+version = "0.0.1a2"
 description = "Postmortem CI failure analyzer: deterministic phase attribution plus one LLM explanation. Read-only, air-gap friendly."
 requires-python = ">=3.11"
 license = "MIT"
