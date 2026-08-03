@@ -86,7 +86,36 @@ There is no coverage tab like GitLab's, so the run page carries it instead:
 All native — no third-party action, no account. Coverage *history* is the one thing
 it cannot do; that needs a hosted service like Codecov.
 
-## 3. Commits
+## 3. Branches
+
+Two hops, and each one is gated differently:
+
+```
+<type>/<slug>  ──PR──▶  development  ──PR──▶  master
+     ci.yml                ci.yml            ci.yml + release-gate.yml
+                                             then: release.yml + docs.yml
+```
+
+- **`<type>/<slug>`** — branch off `development`, named with the same types the
+  commits use: `feat/compare-command`, `fix/release-tag-push`, `docs/site-nav`. CI
+  checks the name, so `feature/…` or `my-branch` fails before the tests do.
+- **`development`** — where work integrates. Every PR into it runs the full suite:
+  tests on four Pythons, lint, the docs build, a secret scan, and the branch and
+  commit conventions the git hooks check locally but `--no-verify` can skip.
+- **`master`** — only ever reached from `development`. That PR runs everything
+  above *plus* `release-gate.yml`: the sdist and wheel, `twine check`, the Docker
+  image and the config schema — everything `release.yml` is about to do, minus
+  publishing. E2E and SAST belong in that gate when they arrive; it is the slow
+  lane, run once per integration rather than on every push.
+
+**Merge `development` into `master` with a merge commit, not a squash.** The
+release reads the commit types since the last tag to decide whether to ship, so a
+squash replaces every `feat:`/`fix:` in the batch with one subject — and a batch
+squashed under `chore:` publishes nothing. Feature branches are the opposite case:
+squashing into `development` is fine, because the squash subject *is* the
+conventional commit.
+
+## 4. Commits
 
 **[Conventional Commits](https://www.conventionalcommits.org/)** — the release
 pipeline parses them, so the format is functional, not cosmetic.
@@ -109,7 +138,7 @@ counter moves. [GUIDELINES.md §8](GUIDELINES.md) has the versioning scheme and 
 goes next. Keep the summary imperative and scoped to one change, and don't hand-edit the
 version in `pyproject.toml` or `uv.lock` — the pipeline owns both.
 
-### 3.1 Skipping CI
+### 4.1 Skipping CI
 
 A commit message containing **`[skip ci]`** runs no workflow at all — GitHub itself
 drops the `push` and `pull_request` events, so there is nothing to configure. Use it
@@ -121,7 +150,7 @@ The token is literal. `[ci skip]`, `[no ci]`, `[skip actions]` and `[actions ski
 work too; `[skip-ci]` with a hyphen does **not** — it is not one GitHub recognises,
 and the pipeline will run as normal.
 
-## 4. Before you push
+## 5. Before you push
 
 ```sh
 uv run pytest                      # all green, no exceptions
@@ -132,4 +161,4 @@ grep -ri github ci_doctor/core/    # must be empty
 
 - New behaviour has a test. New matcher has a fixture.
 - Never commit `report.md` / `report.json` (local run artifacts).
-- Branch off `master`; don't push directly to it unless you intend to trigger a release.
+- Branch off `development`, never `master` — see §3.

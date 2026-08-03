@@ -1,0 +1,55 @@
+name: release gate
+
+# The development -> master PR. Everything the release will do, minus publishing.
+#
+# Why here and not in ci.yml: by the time release.yml runs, it has already bumped
+# the version, committed and pushed the tag. A Dockerfile or packaging error at
+# that point leaves a tag with no release behind it — which is exactly how the
+# first alpha failed. This is the last place those are cheap to find.
+#
+# E2E and SAST belong here too when they exist: this is the slow lane, run once
+# per integration, not on every push to a feature branch.
+on:
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  distributions:
+    name: sdist + wheel build and check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv build
+      # Catches the metadata problems PyPI rejects on upload — a bad README render,
+      # a malformed classifier — which otherwise surface only after the tag exists.
+      - run: uvx twine check dist/*
+
+  image:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ci-doctor:gate .
+
+  schema:
+    name: config schema generates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      # The release attaches this to the GitHub Release, and editors resolve it
+      # through the $id baked into it. Prove it still parses before that matters.
+      - run: uv run ci-doctor config --schema | python3 -c 'import json,sys; json.load(sys.stdin)'

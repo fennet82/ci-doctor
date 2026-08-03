@@ -1,11 +1,15 @@
 name: ci
 
 # Jobs are independent on purpose: one red check should name the kind of problem.
+#
+# Runs on both hops of the flow — <type>/<slug> -> development -> master — and on
+# pushes to either, so a merge that skipped a PR is still checked. The heavier
+# release-readiness checks live in release-gate.yml, on the master PR only.
 on:
   pull_request:
-    branches: [master]
+    branches: [development, master]
   push:
-    branches: [master]
+    branches: [development, master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,6 +19,46 @@ permissions:
   contents: read
 
 jobs:
+  # The git hooks check both of these locally, and `--no-verify` skips them. The
+  # release gate reads commit types to decide whether to ship, so they are worth
+  # asserting somewhere that cannot be bypassed.
+  conventions:
+    # Feature work only. The development -> master PR is an integration, not a
+    # feature branch, and carries no type prefix.
+    if: github.event_name == 'pull_request' && github.base_ref == 'development'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the PR's own commits, not just its tip
+      - name: Branch name is <type>/<slug>
+        env:
+          BRANCH: ${{ github.head_ref }}   # via env, never interpolated into the script
+        run: |
+          types='feat|fix|docs|test|chore|refactor|perf|ci|build|style|revert'
+          if [[ ! "$BRANCH" =~ ^($types)/[a-z0-9][a-z0-9._/-]*$ ]]; then
+            echo "::error::branch '$BRANCH' is not <type>/<slug>. Types: ${types//|/, }"
+            exit 1
+          fi
+          echo "branch '$BRANCH' ok"
+      - name: Commits are Conventional Commits
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          types='feat|fix|docs|test|chore|refactor|perf|ci|build|style|revert'
+          bad=0
+          while IFS= read -r subject; do
+            # Merge and revert commits are generated, not authored.
+            [[ "$subject" =~ ^(Merge|Revert) ]] && continue
+            if [[ ! "$subject" =~ ^($types)(\(.+\))?!?:\ .+ ]]; then
+              echo "::error::not a Conventional Commit: $subject"
+              bad=1
+            fi
+          done < <(git log --format=%s "$BASE..$HEAD")
+          [[ $bad -eq 0 ]] && echo "every commit subject ok"
+          exit $bad
+
   test:
     runs-on: ubuntu-latest
     strategy:
