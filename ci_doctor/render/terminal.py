@@ -60,7 +60,9 @@ def render_terminal(report: Report, *, no_color: bool = False, wrap_section: boo
     if report.likely_flaky:
         header.append("  likely-flaky", style="bold magenta")
     console.print(
-        Panel(header, title="ci-doctor", title_align="left", border_style=border, expand=False), end="\n\n"
+        Panel(header, title="ci-doctor", title_align="left", border_style=border, expand=True),
+        end="\n\n",
+        soft_wrap=False,
     )
 
     console.print(Text("Root cause", style=_LABEL))
