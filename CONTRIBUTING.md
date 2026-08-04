@@ -88,25 +88,36 @@ it cannot do; that needs a hosted service like Codecov.
 
 ## 3. Branches
 
-Two hops, and each one is gated differently:
+Two hops for normal work, plus one shortcut for emergencies:
 
 ```
 <type>/<slug>  ──PR──▶  development  ──PR──▶  master
-     ci.yml                ci.yml            ci.yml + release-gate.yml
-                                             then: release.yml + docs.yml
+   ci + security         ci + security        ci + security + release-gate
+                                              then: release.yml, then docs.yml
+
+hotfix/<slug>  ─────────────PR──────────────▶  master
+                                              ci + security + release-gate
+                                              then: back-merge PR into development
 ```
 
 - **`<type>/<slug>`** — branch off `development`, named with the same types the
   commits use: `feat/compare-command`, `fix/release-tag-push`, `docs/site-nav`. CI
   checks the name, so `feature/…` or `my-branch` fails before the tests do.
 - **`development`** — where work integrates. Every PR into it runs the full suite:
-  tests on four Pythons, lint, the docs build, a secret scan, and the branch and
-  commit conventions the git hooks check locally but `--no-verify` can skip.
-- **`master`** — only ever reached from `development`. That PR runs everything
-  above *plus* `release-gate.yml`: the sdist and wheel, `twine check`, the Docker
-  image and the config schema — everything `release.yml` is about to do, minus
-  publishing. E2E and SAST belong in that gate when they arrive; it is the slow
-  lane, run once per integration rather than on every push.
+  tests on four Pythons, lint, the docs build, a secret scan, security scanning, and
+  the branch and commit conventions the git hooks check locally but `--no-verify`
+  can skip.
+- **`master`** — reached from `development`, or from a `hotfix/` branch when
+  something is broken in production and cannot wait for the next integration. Either
+  PR runs everything above *plus* `release-gate.yml`: the sdist and wheel,
+  `twine check`, the Docker image, the config schema and the SBOM — everything
+  `release.yml` is about to do, minus publishing.
+- **`hotfix/<slug>`** — branch off `master`, not `development`. `hotfix` is a valid
+  branch prefix but **not** a valid commit type, so the commits inside it are still
+  `fix:`. When the PR merges, `backmerge.yml` opens a `master → development` PR;
+  merge it, or the next integration will revert the fix.
+
+What each job does, and why it lives where it does, is [docs/ci-cd.md](docs/ci-cd.md).
 
 **Merge `development` into `master` with a merge commit, not a squash.** The
 release reads the commit types since the last tag to decide whether to ship, so a
