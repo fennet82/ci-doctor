@@ -2,9 +2,9 @@ name: ci
 
 # Jobs are independent on purpose: one red check should name the kind of problem.
 #
-# Runs on both hops of the flow — <type>/<slug> -> development -> master — and on
-# pushes to either, so a merge that skipped a PR is still checked. The heavier
-# release-readiness checks live in release-gate.yml, on the master PR only.
+# Runs on every hop — <type>/<slug> -> development -> master, and hotfix/<slug> ->
+# master — plus pushes to either branch, so a merge that skipped a PR is still
+# checked. Security scanning is security.yml; release readiness is release-gate.yml.
 on:
   pull_request:
     branches: [development, master]
@@ -23,19 +23,22 @@ jobs:
   # release gate reads commit types to decide whether to ship, so they are worth
   # asserting somewhere that cannot be bypassed.
   conventions:
-    # Feature work only. The development -> master PR is an integration, not a
-    # feature branch, and carries no type prefix.
-    if: github.event_name == 'pull_request' && github.base_ref == 'development'
+    # Feature work and hotfixes. The development -> master PR is an integration,
+    # not a feature branch, and carries no type prefix.
+    if: >-
+      github.event_name == 'pull_request' &&
+      (github.base_ref == 'development' || startsWith(github.head_ref, 'hotfix/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # the PR's own commits, not just its tip
+          persist-credentials: false
       - name: Branch name is <type>/<slug>
         env:
           BRANCH: ${{ github.head_ref }}   # via env, never interpolated into the script
         run: |
-          types='feat|fix|docs|test|chore|refactor|perf|ci|build|style|revert'
+          types='feat|fix|docs|test|chore|refactor|perf|ci|build|style|revert|hotfix'
           if [[ ! "$BRANCH" =~ ^($types)/[a-z0-9][a-z0-9._/-]*$ ]]; then
             echo "::error::branch '$BRANCH' is not <type>/<slug>. Types: ${types//|/, }"
             exit 1
@@ -46,6 +49,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          # No hotfix here: it names a branch, not a commit type.
           types='feat|fix|docs|test|chore|refactor|perf|ci|build|style|revert'
           bad=0
           while IFS= read -r subject; do
@@ -68,6 +72,8 @@ jobs:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -88,6 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -111,6 +119,8 @@ jobs:
         working-directory: docs/site
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -126,6 +136,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # scan the PR's whole history, not just the tip
+          persist-credentials: false
       # gitleaks-action is free for personal and public repos; moving this repo under
       # an organisation would require GITLEAKS_LICENSE.
       - uses: gitleaks/gitleaks-action@v2
