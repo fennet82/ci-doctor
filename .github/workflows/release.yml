@@ -13,14 +13,20 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write   # push the version-bump commit + tag, create/upload the Release
-  id-token: write   # PyPI Trusted Publishing (OIDC) — no stored token needed
+  contents: write       # push the version-bump commit + tag, create/upload the Release
+  id-token: write       # PyPI Trusted Publishing (OIDC) — no stored token needed
+  attestations: write   # build provenance for the distributions and the image
+
+# At workflow level so the Docker Hub steps can test it in `if:` — a step cannot read
+# env it defines itself. Absent secret means skip the push, not fail the release.
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # zizmor: ignore[artipacked] — this job pushes the tag
         with:
           fetch-depth: 0          # full history: the gate reads every commit since the last tag
 
@@ -38,10 +44,12 @@ jobs:
             echo "No feat/fix/BREAKING commit since ${last:-the start of history} — nothing to release."
           fi
 
+      # Caching off: this job publishes, and a restored cache is writable by any
+      # branch's workflow. Saves seconds, widens the supply chain.
       - uses: astral-sh/setup-uv@v5
         if: steps.gate.outputs.release == 'true'
         with:
-          enable-cache: true
+          enable-cache: false
 
       # `uv version` writes canonical PEP 440 and re-locks, so pyproject.toml and uv.lock
       # can never disagree about the version. --no-sync skips a venv we would throw away.
@@ -72,6 +80,7 @@ jobs:
         if: steps.gate.outputs.release == 'true'
         run: uv build
 
+      # The tarball is the air-gap path and stays regardless of whether the push runs.
       - name: Build the Docker image and save it as a gzipped tar
         if: steps.gate.outputs.release == 'true'
         env:
@@ -80,12 +89,51 @@ jobs:
           docker build -t "ci-doctor:$VERSION" .
           docker save "ci-doctor:$VERSION" | gzip -9 > "ci-doctor-$VERSION-image.tar.gz"
 
+      - uses: docker/login-action@v3
+        if: steps.gate.outputs.release == 'true' && env.DOCKERHUB_USERNAME != ''
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push the image to Docker Hub
+        id: push
+        if: steps.gate.outputs.release == 'true' && env.DOCKERHUB_USERNAME != ''
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          repo=docker.io/fennet/ci-doctor
+          docker tag "ci-doctor:$VERSION" "$repo:$VERSION"
+          docker tag "ci-doctor:$VERSION" "$repo:latest"
+          docker push "$repo:$VERSION"
+          docker push "$repo:latest"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$repo:$VERSION" | cut -d@ -f2)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
       # The JSON Schema for .ci-doctor.yml, generated from the pydantic model so it can
       # never drift from the code. Editors resolve it via the $id baked into the schema,
       # which points at /releases/latest/download/ci-doctor.schema.json.
       - name: Generate the config JSON Schema
         if: steps.gate.outputs.release == 'true'
         run: uv run ci-doctor config --schema > ci-doctor.schema.json
+
+      # Runtime deps only: an SBOM should describe what a user installs, not our tooling.
+      - name: Generate the SBOM
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt -o requirements.txt
+          uvx --from cyclonedx-bom cyclonedx-py requirements requirements.txt -o ci-doctor.sbom.json
+
+      - uses: actions/attest-build-provenance@v2
+        if: steps.gate.outputs.release == 'true'
+        with:
+          subject-path: dist/*
+
+      - uses: actions/attest-build-provenance@v2
+        if: steps.push.outcome == 'success'
+        with:
+          subject-name: docker.io/fennet/ci-doctor
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       # Not `--prerelease`, deliberately: /releases/latest resolves to the newest
       # *non*-prerelease, and the schema $id above depends on it. While every release is
@@ -99,7 +147,7 @@ jobs:
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --generate-notes \
-            dist/* "ci-doctor-$VERSION-image.tar.gz" ci-doctor.schema.json
+            dist/* "ci-doctor-$VERSION-image.tar.gz" ci-doctor.schema.json ci-doctor.sbom.json
 
       # Trusted Publishing: authenticates via OIDC (id-token: write above). No token/secret.
       # Requires a matching publisher on PyPI (repo fennet82/ci-doctor, workflow release.yml).
