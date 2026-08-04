@@ -7,8 +7,8 @@ name: release gate
 # that point leaves a tag with no release behind it — which is exactly how the
 # first alpha failed. This is the last place those are cheap to find.
 #
-# E2E and SAST belong here too when they exist: this is the slow lane, run once
-# per integration, not on every push to a feature branch.
+# The slow lane, run once per integration rather than on every push. E2E belongs
+# here when it exists; SAST runs on every PR in security.yml.
 on:
   pull_request:
     branches: [master]
@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -39,6 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - run: docker build -t ci-doctor:gate .
 
   schema:
@@ -46,6 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -53,3 +59,17 @@ jobs:
       # The release attaches this to the GitHub Release, and editors resolve it
       # through the $id baked into it. Prove it still parses before that matters.
       - run: uv run ci-doctor config --schema | python3 -c 'import json,sys; json.load(sys.stdin)'
+
+  sbom:
+    name: SBOM generates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv export --frozen --no-dev --no-emit-project --format requirements-txt -o requirements.txt
+      - run: uvx --from cyclonedx-bom cyclonedx-py requirements requirements.txt -o sbom.json
+      - run: python3 -c 'import json; json.load(open("sbom.json"))'

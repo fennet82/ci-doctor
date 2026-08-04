@@ -1,0 +1,7 @@
+# Tags, not hashes. Hash-pinning is stricter, but only pays off with a bot to bump
+# the hashes; without one it just freezes actions at whatever shipped that day.
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        "*": ref-pin

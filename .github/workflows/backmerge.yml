@@ -1,0 +1,37 @@
+name: backmerge
+
+# A hotfix reaches master without passing through development, so development ends
+# up missing it and the next integration silently reverts the fix. Only hotfixes:
+# a normal development -> master merge also leaves master ahead, so a plain
+# "is master ahead" check would fire on every release.
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  backmerge:
+    if: >-
+      github.event.pull_request.merged &&
+      startsWith(github.event.pull_request.head.ref, 'hotfix/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # --head master, not a snapshot branch, so the PR tracks the tip as master moves.
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if [[ -n "$(gh pr list --base development --head master --state open --json number --jq '.[]')" ]]; then
+            echo "back-merge PR already open"
+            exit 0
+          fi
+          gh pr create --base development --head master \
+            --title "chore: back-merge master into development" \
+            --body "\`$BRANCH\` shipped straight to master. Merge this so development does not revert it."
