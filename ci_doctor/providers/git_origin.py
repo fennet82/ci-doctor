@@ -31,8 +31,11 @@ def origin_repo(env_var: str) -> str | None:
         repeat once per job log.
     """
     try:
-        proc = subprocess.run(
-            ["git", "remote", "get-url", "origin"], capture_output=True, text=True, timeout=5
+        proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            ["git", "remote", "get-url", "origin"],  # noqa: S607 — git off PATH is the point
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except (OSError, subprocess.SubprocessError) as exc:  # no git, no repo, hung command
         log.debug("could not read git origin: %s", exc)
