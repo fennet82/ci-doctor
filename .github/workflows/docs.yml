@@ -1,20 +1,24 @@
 name: docs
 
-# Publishes docs/site to GitHub Pages. Deploys only from the default branch —
-# a PR must never be able to overwrite the live site, so pull_request builds
-# (in ci.yml) check the build and stop there.
+# Publishes docs/site to GitHub Pages. A PR must never overwrite the live site, so
+# pull_request builds (in ci.yml) check the build and stop there.
+#
+# Runs after release.yml rather than on push: the site reads its version from
+# pyproject.toml, which release.yml bumps and commits mid-run. Building on the push
+# meant rendering the commit *before* the bump, so the site always trailed by one
+# release. release.yml runs on every push to master and its release check is a step,
+# not a workflow-level skip, so a docs-only push still completes it and still lands here.
 on:
-  push:
+  # zizmor: ignore[dangerous-triggers] — release only runs on push to master, which a
+  # fork cannot do, and the checkout below pins master rather than any PR head.
+  workflow_run:
+    workflows: [release]
+    types: [completed]
     branches: [master]
-    paths:
-      - 'docs/site/**'
-      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Never let two deploys race; queue instead of cancelling a half-finished one.
 concurrency:
@@ -23,12 +27,22 @@ concurrency:
 
 jobs:
   build:
+    # Don't advertise a version whose release failed. workflow_dispatch is the retry.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read   # job-level blocks replace the workflow-level one, so restate it
+      pages: write     # configure-pages reads the site config
     defaults:
       run:
         working-directory: docs/site
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master   # the tip, i.e. the bump commit — not the SHA that triggered the run
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -44,6 +58,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
