@@ -350,10 +350,11 @@ publishes the next alpha. Only the alpha counter moves:
 ```
 
 `.github/workflows/release.yml` does the whole thing: `uv version --bump alpha`, a
-`chore(release): <version> [skip ci]` commit, the `v<version>` tag, `uv build`, a GitHub
-Release with the image tarball and the config JSON Schema attached, then PyPI. A push
-with only `docs:`/`chore:`/`refactor:` commits ships nothing and rides along in the next
-alpha.
+`chore(release): <version> [skip ci]` commit, the `v<version>` tag, `uv build`, the image
+pushed to Docker Hub, a GitHub Release with the image tarball, the config JSON Schema and
+the SBOM attached, then PyPI. A push with only `docs:`/`chore:`/`refactor:` commits ships
+nothing and rides along in the next alpha. The full pipeline map is
+[docs/ci-cd.md](docs/ci-cd.md).
 
 Note what is *missing*: nothing decides how big the next version is. A commit message
 cannot move the base version, only the counter. That is deliberate — while the shape of
