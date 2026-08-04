@@ -63,6 +63,13 @@ packages = ["ci_doctor"]
 # 110, not the default 88: the code was written to it (p99 line is 109 chars).
 line-length = 110
 
+# flake8-bandit, vendored in ruff — SAST for the shipped package without a second tool.
+[tool.ruff.lint]
+extend-select = ["S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603"]  # assert is the test; subprocess there is fixture setup
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

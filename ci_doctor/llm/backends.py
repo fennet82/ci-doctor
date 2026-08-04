@@ -158,7 +158,7 @@ class ClaudeCodeClient(LLMClient):
         cmd = [binary, "-p", "--output-format", "json"]
         if self.cfg.model:
             cmd += ["--model", self.cfg.model]
-        proc = subprocess.run(  # prompt on stdin avoids ARG_MAX on large prompts
+        proc = subprocess.run(  # noqa: S603 — argv list, no shell; binary resolved above
             cmd,
             input=prompt,
             capture_output=True,
