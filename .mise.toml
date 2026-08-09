@@ -23,6 +23,7 @@ run = [
   "git config core.hooksPath .githooks",
   # So `git blame` skips the one repo-wide reformat.
   "git config blame.ignoreRevsFile .git-blame-ignore-revs",
+  "codegraph init",
   "echo 'ready — hooks active, run `mise run check` before pushing'",
 ]
 
@@ -127,4 +128,3 @@ run = ["npm ci", "npm run build"]
 description = "Build the docs site and serve the built output (the only mode where search works)"
 dir = "docs/site"
 run = ["npm run build", "npm run preview"]
-
