@@ -1,0 +1,9 @@
+# Deny-by-default: the build context is only what the Dockerfile COPYs. Without
+# this, `docker build` uploads .git, .venv and docs/site/node_modules on every run
+# and any unrelated file edit busts the layer cache.
+*
+!ci_doctor
+!pyproject.toml
+!README.md
+!LICENSE
+**/__pycache__
