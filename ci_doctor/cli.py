@@ -110,7 +110,7 @@ def analyze(
     """
     _configure_logging(verbose)
     cfg = load_config(repo_config=config_path)
-    log.debug("provider=%s target=%s job_id=%s", cfg.provider, target, job_id)
+    log.debug("ci=%s scm=%s target=%s job_id=%s", cfg.ci, cfg.scm_vendor, target, job_id)
 
     run = provider = None
     if target is not None and Path(target).is_file():
@@ -190,7 +190,7 @@ def _validate(paths: list[Path]) -> None:
     except Exception as exc:  # noqa: BLE001 - a bad config is a message, not a traceback
         typer.echo(f"invalid config: {exc}", err=True)
         return
-    typer.echo(f"config ok: provider={cfg.provider}, {len(cfg.extraction.matchers)} matchers.")
+    typer.echo(f"config ok: ci={cfg.ci}, scm={cfg.scm_vendor}, {len(cfg.extraction.matchers)} matchers.")
 
 
 def _looks_like_a_path(target: str) -> bool:
@@ -253,8 +253,33 @@ def _diff_lines(before: str, after: str) -> list[str]:
     return [line.rstrip("\n") for line in diff][2:]
 
 
-def _make_provider(cfg):
-    """Build the provider adapter named by `config.provider`.
+def _adapter(vendor: str, cfg):
+    """Build the adapter for one vendor, whichever ports it implements.
+
+    A vendor may be a CI system, a git host, or — for GitLab and GitHub — both
+    over a single client. The caller checks which ports it got.
+
+    Args:
+        vendor: The vendor name from `ci` or `scm`.
+        cfg: The effective config.
+
+    Returns:
+        The adapter, or None when no adapter exists for that name.
+    """
+    # Import adapters lazily so `core` and the offline path never pull a vendor in.
+    if vendor == "gitlab":
+        from ci_doctor.providers.gitlab.provider import GitLabProvider
+
+        return GitLabProvider(cfg)
+    if vendor == "github":
+        from ci_doctor.providers.github.provider import GitHubProvider
+
+        return GitHubProvider(cfg)
+    return None
+
+
+def _make_ci_provider(cfg):
+    """Build the adapter that reads the run, named by `config.ci`.
 
     Args:
         cfg: The effective config.
@@ -263,31 +288,60 @@ def _make_provider(cfg):
         A :class:`~ci_doctor.core.ports.CIProvider`.
 
     Raises:
-        ValueError: On an unsupported provider name.
+        ValueError: When no adapter reads that CI system.
     """
-    # Import adapters lazily so `core` and the offline path never pull a provider in.
-    if cfg.provider == "gitlab":
-        from ci_doctor.providers.gitlab.provider import GitLabProvider
+    from ci_doctor.core.ports import CIProvider
 
-        return GitLabProvider(cfg)
-    if cfg.provider == "github":
-        from ci_doctor.providers.github.provider import GitHubProvider
+    adapter = _adapter(cfg.ci, cfg)
+    if not isinstance(adapter, CIProvider):
+        raise ValueError(f"unsupported CI system: {cfg.ci}")
+    return adapter
 
-        return GitHubProvider(cfg)
-    raise ValueError(f"unsupported provider: {cfg.provider}")
+
+def _make_scm_provider(cfg, ci_provider=None):
+    """Build the adapter that posts the note, named by `config.scm`.
+
+    Args:
+        cfg: The effective config.
+        ci_provider: The already-connected CI adapter. Reused when the same
+            vendor serves both roles — GitLab's pipelines and merge requests are
+            one API behind one client, and connecting twice would mean a second
+            token read and a second version probe for nothing.
+
+    Returns:
+        An :class:`~ci_doctor.core.ports.SCMProvider`, or None when the note has
+        nowhere to go — which is not an error, the report still lands in the
+        terminal and the artifacts.
+    """
+    from ci_doctor.core.ports import SCMProvider
+
+    vendor = cfg.scm_vendor
+    if vendor == "none":
+        return None
+    if vendor == cfg.ci and isinstance(ci_provider, SCMProvider):
+        return ci_provider
+    adapter = _adapter(vendor, cfg)
+    if not isinstance(adapter, SCMProvider):
+        log.debug("no git-host adapter for %r; the note has nowhere to go", vendor)
+        return None
+    return adapter
 
 
 def _make_segmenter(cfg):
-    """Build the log segmenter for the configured provider.
+    """Build the log segmenter for the configured CI system.
+
+    Keyed on `ci`, never on the git host: log framing is whatever the *runner*
+    printed. That is also why one segmenter can serve several CI systems — Forgejo
+    and Gitea Actions run act_runner, which emits GitHub's `##[group]` markers.
 
     Args:
         cfg: The effective config.
 
     Returns:
         A :class:`~ci_doctor.core.ports.LogSegmenter`, defaulting to GitLab's —
-        offline replay has no provider metadata to go on.
+        offline replay has no run metadata to go on.
     """
-    if cfg.provider == "github":
+    if cfg.ci == "github":
         from ci_doctor.providers.github.segmenter import GitHubSegmenter
 
         return GitHubSegmenter()
@@ -310,7 +364,7 @@ def _analyze_live(run_id: str, cfg, job_id: str | None):
     """
     from ci_doctor.core.select import select_failed_jobs
 
-    provider = _make_provider(cfg)
+    provider = _make_ci_provider(cfg)
     run = provider.fetch_run(run_id)
     jobs = select_failed_jobs(run.jobs, cfg.analysis.include_allowed_failures)
     if job_id is not None:
@@ -422,7 +476,7 @@ def _deliver(results, cfg, *, no_color: bool, output_format: OutputFormat = Outp
     typer.echo(f"wrote {cfg.output.markdown_path} and {cfg.output.json_path}", err=True)
 
 
-def _maybe_post_mr(provider, run, results, cfg) -> None:
+def _maybe_post_mr(ci_provider, run, results, cfg) -> None:
     """Post the report as an MR/PR note, when configured and confident enough.
 
     Gated on medium-or-better confidence: a low-confidence guess posted on
@@ -430,16 +484,22 @@ def _maybe_post_mr(provider, run, results, cfg) -> None:
     guardrail #3 means a broken note must not change the pipeline's outcome.
 
     Args:
-        provider: The provider adapter, or None for offline replay.
+        ci_provider: The CI adapter, or None for offline replay. Passed only so
+            the git host can reuse its client when one vendor serves both roles.
         run: The analyzed run, or None.
         results: ``(job, attribution, report)`` tuples.
         cfg: The effective config.
     """
-    if not cfg.output.mr_note or provider is None or run is None or run.mr is None:
+    if not cfg.output.mr_note or run is None or run.mr is None:
         return
     reports = [report for *_, report in results]
     if not any(r.confidence in ("medium", "high") for r in reports):  # user's gate
         typer.echo("MR note skipped: confidence below medium.", err=True)
+        return
+
+    scm = _make_scm_provider(cfg, ci_provider)
+    if scm is None:
+        typer.echo(f"MR note skipped: no git-host adapter for {cfg.scm_vendor!r}.", err=True)
         return
 
     from ci_doctor.render.markdown import MarkdownRenderer
@@ -447,7 +507,7 @@ def _maybe_post_mr(provider, run, results, cfg) -> None:
     body = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
     marker = f"<!-- ci-doctor:pipeline:{run.id} -->"
     try:
-        provider.post_note(run.mr, body, marker)
+        scm.post_note(run.mr, body, marker)
         typer.echo("posted/updated MR note.", err=True)
     except Exception as exc:  # noqa: BLE001 - delivery must never break the run
         typer.echo(f"MR note failed (ignored): {exc}", err=True)

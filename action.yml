@@ -90,7 +90,7 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        CI_DOCTOR_PROVIDER: github
+        CI_DOCTOR_CI: github
         CI_DOCTOR_GITHUB__BASE_URL: ${{ inputs.api-url }}
         CI_DOCTOR_GITHUB_TOKEN: ${{ inputs.token }}
         CI_DOCTOR_OUTPUT__MR_NOTE: ${{ inputs.post-pr-note }}

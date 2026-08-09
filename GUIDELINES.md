@@ -231,15 +231,27 @@ Order is the whole game:
 Any new signature that could collide gets a case in
 `test_runtime_never_outranks_a_more_actionable_category`.
 
-### 5.4 Add a CI provider
+### 5.4 Add a provider
 
-1. `providers/<name>/{provider,segmenter,reasons}.py` implementing `CIProvider` /
-   `LogSegmenter`.
+**Two ports, chosen independently.** `CIProvider` reads the failed run; `SCMProvider`
+posts the note. Config picks them separately (`ci:` and `scm:`) because the real world
+mixes them — Jenkins builds GitLab repos, Woodpecker builds Forgejo ones. A vendor that
+is both (GitLab, GitHub) implements both ports on **one class over one client**: their
+pipelines and merge requests are the same API, and connecting twice would mean a second
+token read and a second version probe for nothing.
+
+1. `providers/<name>/{provider,segmenter,reasons}.py` implementing `CIProvider`,
+   `SCMProvider`, or both, plus `LogSegmenter` for a CI.
 2. Canonicalise section names to the tokens the `phases:` map already uses
    (`checkout`, `run`, `post`, …) so phase assignment needs no core change.
-3. Register in `cli._make_provider` / `cli._make_segmenter`.
-4. Add `tests/fixtures/logs/<name>/` and register the segmenter in `support.SEGMENTERS`.
-5. Confirm `grep -ri <name> ci_doctor/core/` is empty. If it isn't, the abstraction broke.
+3. Register in `cli._adapter`. `_make_ci_provider` / `_make_scm_provider` sort out
+   which ports it implements; a CI with no git host simply posts no note.
+4. Segmenter selection keys on `ci`, never on `scm` — log framing is whatever the
+   *runner* printed, which is why one segmenter can serve several CI systems
+   (Forgejo and Gitea Actions both run act_runner and emit GitHub's `##[group]`).
+5. Add `tests/fixtures/logs/<name>/` and register the segmenter in `support.SEGMENTERS`.
+   Fixtures are keyed on log format, so a git-host-only adapter owes none.
+6. Confirm `grep -ri <name> ci_doctor/core/` is empty. If it isn't, the abstraction broke.
 
 **Prefer the vendor's own SDK** over hand-rolled REST calls — `python-gitlab` and
 `PyGithub` are already dependencies, and pagination, retries and auth are not worth

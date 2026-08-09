@@ -8,7 +8,7 @@ const layering = `schema defaults  <  defaults.yml  <  repo .ci-doctor.yml  <  C
 const envExample = `# Nested keys use a double underscore:
 export CI_DOCTOR_LLM__MODEL="qwen2.5-coder:32b"
 export CI_DOCTOR_LLM__API_BASE="http://vllm.internal:8000/v1"
-export CI_DOCTOR_PROVIDER="github"
+export CI_DOCTOR_CI="github"
 
 # Secret-looking single-underscore vars (e.g. CI_DOCTOR_GITLAB_TOKEN) are
 # referenced by NAME (token_env) and ignored by the config loader.`;
@@ -25,7 +25,8 @@ llm:
   model: qwen2.5-coder:32b`;
 
 const full = `# .ci-doctor.yml — every knob, with defaults shown.
-provider: gitlab                 # gitlab | github
+ci: gitlab                       # which CI to read the run from
+scm: gitlab                      # which git host gets the note (defaults to "ci")
 
 gitlab:
   base_url: https://gitlab.com   # default; override for a self-hosted instance
@@ -36,7 +37,7 @@ gitlab:
   verify_ssl: true
   timeout_seconds: 30
 
-github:                          # used when provider: github
+github:                          # used when github is the ci or the scm
   base_url: https://api.github.com     # default; override with a GHE base, e.g. https://ghe/api/v3
   token_env: CI_DOCTOR_GITHUB_TOKEN
   token_file: null

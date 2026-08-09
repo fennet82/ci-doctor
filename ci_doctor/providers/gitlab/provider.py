@@ -15,15 +15,20 @@ import gitlab
 
 from ci_doctor.config.schema import Config
 from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, RunnerInfo, Run
-from ci_doctor.core.ports import CIProvider
+from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.gitlab.reasons import to_failure_reason
 
 log = logging.getLogger("ci_doctor.gitlab")
 
 
-class GitLabProvider(CIProvider):
-    """Read-only GitLab adapter over python-gitlab."""
+class GitLabProvider(CIProvider, SCMProvider):
+    """Read-only GitLab adapter over python-gitlab.
+
+    Serves both roles: pipelines and merge requests are the same API behind the
+    same client, so one instance answers as CI system and as git host. A Jenkins
+    build of a GitLab repo uses only the SCM half.
+    """
 
     def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
         """Connect to GitLab, unless a client is injected.
@@ -165,6 +170,8 @@ class GitLabProvider(CIProvider):
         text = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
         log.debug("job %s trace: %d chars", job.id, len(text))
         return text or None
+
+    # --- SCMProvider ------------------------------------------------------
 
     def post_note(self, mr: MergeRequestRef, body: str, marker: str) -> None:
         """Post or update the report on an MR.

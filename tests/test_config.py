@@ -13,7 +13,7 @@ def test_defaults_load_and_validate():
     """The shipped config loads and validates with no user input at all."""
     cfg = load_config(environ={})
     assert isinstance(cfg, Config)
-    assert cfg.provider == "gitlab"
+    assert cfg.ci == "gitlab"
     assert cfg.phases["step_script"] == "script"  # from defaults.yml
     assert cfg.gitlab.timeout_seconds == 30  # scalar default from schema
     assert cfg.gitlab.base_url == "https://gitlab.com"  # official default, overridable
@@ -24,6 +24,40 @@ def test_shipped_matchers_parse():
     cfg = load_config(environ={})
     ids = {m.id for m in cfg.extraction.matchers}
     assert {"pytest", "generic_error"} <= ids
+
+
+def test_scm_defaults_to_the_ci_system(tmp_path):
+    """Left unset, the git host is the CI system — right for GitLab and GitHub."""
+    p = tmp_path / ".ci-doctor.yml"
+    p.write_text("ci: github\n")
+    cfg = load_config(repo_config=p, environ={})
+    assert cfg.scm is None and cfg.scm_vendor == "github"
+
+
+def test_scm_is_independent_of_ci(tmp_path):
+    """The mixed case the split exists for: Jenkins building a GitLab repo."""
+    p = tmp_path / ".ci-doctor.yml"
+    p.write_text("ci: jenkins\nscm: gitlab\n")
+    cfg = load_config(repo_config=p, environ={})
+    assert (cfg.ci, cfg.scm_vendor) == ("jenkins", "gitlab")
+
+
+def test_deprecated_provider_key_still_selects_the_ci(tmp_path, caplog):
+    """An existing `.ci-doctor.yml` keeps working, loudly."""
+    p = tmp_path / ".ci-doctor.yml"
+    p.write_text("provider: github\n")
+    with caplog.at_level(logging.WARNING):
+        cfg = load_config(repo_config=p, environ={})
+    assert cfg.ci == "github"
+    assert "deprecated" in caplog.text
+
+
+def test_provider_contradicting_ci_is_an_error(tmp_path):
+    """Both keys set to different systems: refuse rather than pick one."""
+    p = tmp_path / ".ci-doctor.yml"
+    p.write_text("ci: gitlab\nprovider: github\n")
+    with pytest.raises(ValidationError):
+        load_config(repo_config=p, environ={})
 
 
 def test_unknown_key_is_error(tmp_path):
