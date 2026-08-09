@@ -14,10 +14,14 @@ if TYPE_CHECKING:
 
 
 class CIProvider(ABC):
-    """Read-only access to one CI system. Implemented per provider under `providers/`.
+    """Read-only access to one CI system — who ran the pipeline.
 
-    Guardrail #1: every method here is a *read*, except :meth:`post_note`, which
-    writes only to a discussion thread. Nothing may retry, cancel or restart a job.
+    Separate from :class:`SCMProvider` because the two are chosen independently:
+    Jenkins builds GitLab repos, Woodpecker builds Forgejo ones. A vendor that is
+    both (GitLab, GitHub) implements both ports over one client.
+
+    Guardrail #1: every method here is a *read*. Nothing may retry, cancel or
+    restart a job.
     """
 
     @abstractmethod
@@ -25,7 +29,7 @@ class CIProvider(ABC):
         """Fetch a run and its jobs.
 
         Args:
-            run_ref: The provider's run/pipeline id.
+            run_ref: The CI system's run/pipeline id.
 
         Returns:
             The run, with every job attached but logs not yet fetched.
@@ -36,16 +40,25 @@ class CIProvider(ABC):
         """Fetch one job's raw trace.
 
         Args:
-            job: The job to fetch, already carrying its provider id.
+            job: The job to fetch, already carrying its CI-side id.
 
         Returns:
             The raw log, or None when the job genuinely produced none. None is
             valid data, not an error — it identifies the "never got a runner" case.
         """
 
+
+class SCMProvider(ABC):
+    """Access to one git host — where the code lives and the note goes.
+
+    Guardrail #1 holds here too: the only write in the whole tool is
+    :meth:`post_note`, and it writes to a discussion thread. Nothing may push,
+    merge, or change a repository.
+    """
+
     @abstractmethod
     def post_note(self, mr: "MergeRequestRef", body: str, marker: str) -> None:
-        """Post or update the report as an MR/PR note. Optional; may no-op.
+        """Post or update the report as an MR/PR note.
 
         Implementations must be idempotent: find the existing note by `marker`
         and edit it rather than adding a second comment on every run.

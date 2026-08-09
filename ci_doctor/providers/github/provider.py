@@ -17,7 +17,7 @@ from github import Auth, Github, GithubException
 
 from ci_doctor.config.schema import Config, GitHubConfig
 from ci_doctor.core.models import Job, MergeRequestRef, RunnerInfo, Run
-from ci_doctor.core.ports import CIProvider
+from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.github.reasons import to_failure_reason
 
@@ -47,8 +47,12 @@ def _read_token(cfg: GitHubConfig, environ: Mapping[str, str]) -> str | None:
     return environ.get(cfg.token_env)
 
 
-class GitHubProvider(CIProvider):
-    """Read-only GitHub Actions adapter over PyGithub."""
+class GitHubProvider(CIProvider, SCMProvider):
+    """Read-only GitHub Actions adapter over PyGithub.
+
+    Serves both roles: workflow runs and pull requests are the same API behind
+    the same client, so one instance answers as CI system and as git host.
+    """
 
     def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
         """Connect to GitHub, unless a client is injected.
@@ -162,6 +166,8 @@ class GitHubProvider(CIProvider):
             return None
         log.debug("job %s log: %d chars", job.id, len(text))
         return text or None
+
+    # --- SCMProvider ------------------------------------------------------
 
     def post_note(self, mr: MergeRequestRef, body: str, marker: str) -> None:
         """Post or update the report on a pull request.

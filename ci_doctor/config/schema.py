@@ -9,9 +9,12 @@ Every field carries a ``description``: it is the text editors show when completi
 field added without one ships an undocumented knob.
 """
 
+import logging
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+log = logging.getLogger("ci_doctor.config")
 
 #: Canonical URL of the published schema. A `.ci-doctor.yml` points its
 #: `# yaml-language-server: $schema=` comment here to get editor completion.
@@ -25,7 +28,7 @@ class _Strict(BaseModel):
 
 
 class GitLabConfig(_Strict):
-    """How to reach GitLab. Used when ``provider: gitlab``."""
+    """How to reach GitLab. Used when GitLab is the ``ci`` or the ``scm``."""
 
     base_url: str = Field(
         "https://gitlab.com",
@@ -46,7 +49,7 @@ class GitLabConfig(_Strict):
 
 
 class GitHubConfig(_Strict):
-    """How to reach GitHub Actions. Used when ``provider: github``."""
+    """How to reach GitHub. Used when GitHub is the ``ci`` or the ``scm``."""
 
     base_url: str = Field(
         "https://api.github.com",
@@ -191,7 +194,20 @@ class Config(_Strict):
         json_schema_extra={"$id": SCHEMA_ID},
     )
 
-    provider: str = Field("gitlab", description="Which CI provider to read from: gitlab or github.")
+    ci: str = Field("gitlab", description="Which CI system to read the failed run from: gitlab or github.")
+    scm: str | None = Field(
+        None,
+        description=(
+            "Which git host to post the MR/PR note to. Defaults to `ci`, which is right whenever the "
+            "CI system is also the git host. Set it for mixed setups — `ci: jenkins` with `scm: gitlab`. "
+            'Use "none" to never post.'
+        ),
+    )
+    provider: str | None = Field(
+        None,
+        description="Deprecated alias for `ci`, kept for one release. Set `ci` instead.",
+        deprecated=True,
+    )
     gitlab: GitLabConfig = Field(default_factory=GitLabConfig, description="GitLab connection settings.")
     github: GitHubConfig = Field(default_factory=GitHubConfig, description="GitHub connection settings.")
     llm: LLMConfig = Field(default_factory=LLMConfig, description="LLM explanation step.")
@@ -206,3 +222,35 @@ class Config(_Strict):
     denoise: DenoiseConfig = Field(default_factory=DenoiseConfig, description="Log cleanup.")
     output: OutputConfig = Field(default_factory=OutputConfig, description="Report destinations.")
     redaction: RedactionConfig = Field(default_factory=RedactionConfig, description="Secret scrubbing.")
+
+    @model_validator(mode="after")
+    def _fold_deprecated_provider(self) -> "Config":
+        """Accept the old `provider` key as `ci`, and refuse a contradiction.
+
+        Returns:
+            Self, with `ci` carrying the old key's value when only it was set.
+
+        Raises:
+            ValueError: If both keys are set to different systems. Guessing which
+                one the user meant would silently read the wrong CI.
+        """
+        # Read through __dict__: `deprecated=True` turns plain attribute access into
+        # a DeprecationWarning, and this validator runs on every single config load.
+        provider = self.__dict__.get("provider")
+        if provider is None:
+            return self
+        if "ci" in self.model_fields_set and self.ci != provider:
+            raise ValueError(f"config sets both ci={self.ci!r} and the deprecated provider={provider!r}")
+        log.warning("`provider:` is deprecated and will be removed; rename it to `ci:`")
+        self.ci = provider
+        return self
+
+    @property
+    def scm_vendor(self) -> str:
+        """The git host to post the note to.
+
+        Returns:
+            The configured `scm`, or `ci` when unset — a CI system that is also a
+            git host is its own note target, which covers GitLab and GitHub.
+        """
+        return self.scm or self.ci

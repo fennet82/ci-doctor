@@ -116,7 +116,7 @@ Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_
 an error. Minimal config:
 
 ```yaml
-provider: gitlab
+ci: gitlab
 
 gitlab:
   base_url: https://gitlab.com        # default; override for self-hosted
