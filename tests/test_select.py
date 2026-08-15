@@ -1,4 +1,4 @@
-"""Job selection policy: failed jobs only, allow_failure excluded by default."""
+"""Job selection policy: what gets analyzed, and the same answer on every CI."""
 
 from ci_doctor.core.models import Job
 from ci_doctor.core.select import select_failed_jobs
@@ -24,3 +24,14 @@ def test_include_allowed_failures():
     """The opt-in flag brings allow_failure jobs back in."""
     jobs = [_job("build", "failed"), _job("flaky", "failed", allow_failure=True)]
     assert [j.name for j in select_failed_jobs(jobs, include_allowed_failures=True)] == ["build", "flaky"]
+
+
+def test_cancelled_jobs_are_analyzed_too():
+    """A cancelled job is worth a postmortem: *why* was it still running?
+
+    Attribution has a rule for it (`reason_cancelled` blames whatever section
+    was open), and `analysis.skip_llm_for` ships with "cancelled", so it costs
+    no model call.
+    """
+    jobs = [_job("ok", "success"), _job("slow", "cancelled"), _job("build", "failed")]
+    assert [j.name for j in select_failed_jobs(jobs)] == ["slow", "build"]

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from ci_doctor.config.loader import load_config
 from ci_doctor.core.models import FailureReason
+from ci_doctor.core.select import select_failed_jobs
 from ci_doctor.providers.gitlab.provider import GitLabProvider
 
 
@@ -76,11 +77,19 @@ def test_fetch_run_maps_jobs():
     assert run.jobs[1].allow_failure is True
 
 
-def test_canceled_status_maps_to_cancelled_reason():
-    """GitLab's "canceled" status becomes CANCELLED even with no failure_reason."""
+def test_canceled_normalises_to_the_domain_spelling_and_is_analyzed():
+    """GitLab's "canceled" becomes the domain's "cancelled", reason included.
+
+    Both halves matter: `core.select` decides what to analyze from `status`, and
+    it cannot know one CI spells it with a single l. Leaving the vendor spelling
+    through is how a cancelled job got analyzed on GitHub and silently dropped
+    on GitLab.
+    """
     jobs = [_pipeline_job(id=1, name="x", status="canceled", failure_reason="")]
     run = _provider(jobs, {}).fetch_run("1")
+    assert run.jobs[0].status == "cancelled"
     assert run.jobs[0].failure_reason == FailureReason.CANCELLED
+    assert [j.name for j in select_failed_jobs(run.jobs)] == ["x"]
 
 
 def test_fetch_job_log_and_empty_is_none():

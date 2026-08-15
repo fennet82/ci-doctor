@@ -190,13 +190,14 @@ class GitLabProvider(CIProvider, SCMProvider):
             The neutral job. Every field is read defensively — older instances
             omit attributes, and a missing one must degrade, not crash.
         """
-        status = getattr(pj, "status", "") or ""
+        raw_status = getattr(pj, "status", "") or ""
         raw_reason = getattr(pj, "failure_reason", "") or ""
-        reason = FailureReason.CANCELLED if status == "canceled" else to_failure_reason(raw_reason)
+        cancelled = raw_status == "canceled"  # GitLab spells it with one l
+        reason = FailureReason.CANCELLED if cancelled else to_failure_reason(raw_reason)
         return Job(
             id=str(pj.id),
             name=getattr(pj, "name", "") or "",
-            status=status,
+            status="cancelled" if cancelled else raw_status,
             stage=getattr(pj, "stage", None),
             failure_reason=reason,
             raw_failure_reason=raw_reason,

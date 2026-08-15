@@ -165,7 +165,10 @@ class Job:
     Attributes:
         id: Provider's job id.
         name: Job name as configured in the pipeline.
-        status: Normalised status string, e.g. "failed", "cancelled".
+        status: Normalised status. Adapters must map their vendor's spelling onto
+            these tokens — "failed", "cancelled", "success", "running" — because
+            :mod:`ci_doctor.core.select` decides what to analyze from this field
+            and cannot know that one CI writes "canceled" with one l.
         stage: Pipeline stage, when the provider has stages.
         failure_reason: The provider's verdict, normalised.
         raw_failure_reason: The provider's original string, kept so an unmapped
