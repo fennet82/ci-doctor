@@ -1,7 +1,7 @@
 ---
 import { Code } from "astro:components";
 import Base from "../../layouts/Base.astro";
-import Mermaid from "../../components/Mermaid.astro";
+import Extraction from "../../components/diagrams/Extraction.astro";
 import { url } from "../../lib/url";
 import catalogue from "../../data/matchers.json";
 
@@ -19,16 +19,6 @@ const inlineCode = (s: string) =>
             (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!,
         )
         .replace(/`([^`]+)`/g, "<code>$1</code>");
-
-const extraction = `flowchart LR
-  L["denoised lines<br>of the blamed section"] --> M{{"every matcher<br>runs over them"}}
-  M -- "pattern + before/after" --> W["window"]
-  M -- "start … end" --> W
-  L -- "extraction.tail_lines" --> T["tail window<br>priority 0"]
-  W --> G["merge overlaps<br>window keeps the highest priority"]
-  T --> G
-  G --> D["shed whole windows<br>lowest priority first, until it fits"]
-  D --> R["render, announcing<br>… N lines elided …"]`;
 
 const addPack = `# .ci-doctor.yml — a new id is *added* to the shipped packs
 extraction:
@@ -119,11 +109,7 @@ ci-doctor analyze path/to/failing-job.log`;
         <code>core/extract.py</code>, before a model is ever involved.
     </p>
 
-    <Mermaid
-        code={extraction}
-        label="Extraction flow: denoised lines are matched into windows, merged, shed by priority, then rendered with elision markers."
-        caption="core/extract.py — matching, merging, shedding, rendering."
-    />
+    <Extraction />
 
     <p>
         Two details follow from this. Merged windows take the <em>highest</em> priority
