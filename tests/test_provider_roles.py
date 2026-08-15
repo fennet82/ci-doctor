@@ -14,8 +14,10 @@ from ci_doctor import cli
 from ci_doctor.config.loader import load_config
 from ci_doctor.config.schema import Config
 from ci_doctor.core.ports import CIProvider, SCMProvider
+from ci_doctor.pipeline import JobResult
 from ci_doctor.providers.github.provider import GitHubProvider
 from ci_doctor.providers.gitlab.provider import GitLabProvider
+from ci_doctor.providers.registry import make_ci_provider, make_scm_provider, make_segmenter
 
 
 def _gitlab_provider():
@@ -36,19 +38,19 @@ def test_same_vendor_serves_both_roles_over_one_client():
     for the same endpoint.
     """
     ci_provider = _gitlab_provider()
-    assert cli._make_scm_provider(load_config(environ={}), ci_provider) is ci_provider
+    assert make_scm_provider(load_config(environ={}), ci_provider) is ci_provider
 
 
 def test_mixed_setup_builds_a_separate_git_host():
     """`ci: jenkins` + `scm: github` reads nothing from GitHub but posts there."""
-    scm = cli._make_scm_provider(Config(ci="jenkins", scm="github"), ci_provider=None)
+    scm = make_scm_provider(Config(ci="jenkins", scm="github"), ci_provider=None)
     assert isinstance(scm, GitHubProvider)
 
 
 def test_ci_without_an_adapter_is_an_error():
     """An unreadable CI system fails loudly — there is no run to analyze."""
     with pytest.raises(ValueError, match="unsupported CI system: jenkins"):
-        cli._make_ci_provider(Config(ci="jenkins"))
+        make_ci_provider(Config(ci="jenkins"))
 
 
 @pytest.mark.parametrize("cfg", [Config(ci="gitlab", scm="none"), Config(ci="jenkins")])
@@ -58,7 +60,7 @@ def test_no_git_host_is_not_an_error(cfg):
     `scm: none` is the explicit opt-out; `ci: jenkins` with no `scm` is the user
     who simply hasn't said where their code lives.
     """
-    assert cli._make_scm_provider(cfg, ci_provider=None) is None
+    assert make_scm_provider(cfg, ci_provider=None) is None
 
 
 def test_note_is_skipped_when_there_is_no_git_host(capsys):
@@ -68,7 +70,7 @@ def test_note_is_skipped_when_there_is_no_git_host(capsys):
     cfg = Config(ci="jenkins")
     cfg.output.mr_note = True
 
-    cli._maybe_post_mr(None, run, [(None, None, report)], cfg)
+    cli._maybe_post_mr(None, run, [JobResult(None, None, report)], cfg)
 
     assert "no git-host adapter for 'jenkins'" in capsys.readouterr().err
 
@@ -77,4 +79,4 @@ def test_segmenter_follows_the_ci_not_the_git_host():
     """Log framing is whatever the runner printed, so `scm` must not change it."""
     from ci_doctor.providers.github.segmenter import GitHubSegmenter
 
-    assert isinstance(cli._make_segmenter(Config(ci="github", scm="gitlab")), GitHubSegmenter)
+    assert isinstance(make_segmenter(Config(ci="github", scm="gitlab")), GitHubSegmenter)

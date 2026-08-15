@@ -24,13 +24,16 @@ acquire → segment → attribute → denoise → extract → budget → (LLM) �
 
 ```
 ci_doctor/
-  cli.py            typer entrypoint (always exits 0)
+  cli.py            typer entrypoint (always exits 0): options, rendering, delivery
+  pipeline.py       the analysis itself, with no CLI in it — segment, classify,
+                    evidence, report — over a live run or a log file
   config/           pydantic schema + defaults.yml + layered loader
   core/             provider-neutral: models, ports, attribution (pure), denoise,
                     extract, budget, redact, analyze
   llm/              Report schema, prompt templates, backends
   render/           terminal (rich), markdown
   providers/
+    registry.py     vendor name -> adapter / segmenter, imported on demand
     gitlab/         python-gitlab adapter + segmenter + reasons
     github/         PyGithub adapter + segmenter + reasons
 tests/              fixtures + golden-file attribution suite
@@ -47,6 +50,7 @@ examples/           .gitlab-ci.yml + GitHub Actions workflows
 | Blame/classification logic | `core/attribution.py` | Pure function. No I/O, network, or clock. |
 | Evidence selection | `core/{denoise,extract,budget}.py` | Config-driven where possible. |
 | An LLM backend | `llm/backends.py` | Lazy-import the SDK inside the client. |
+| A new command | `cli.py` (surface) + `pipeline.py` (work) | Anything a non-terminal caller would also want belongs in `pipeline.py`. |
 | Output format | `render/` | Implements the `Renderer` port. |
 | A matcher / language pack | `config/defaults.yml` | **Data, not code.** See §5.1. |
 | A tunable value | `config/schema.py` (scalar) or `defaults.yml` (data) | Prefer a config knob over a hardcoded pattern. |
@@ -133,10 +137,11 @@ def test_something(provider):
     sections = support.segment(provider, log)
 ```
 
-Adding a provider is then **two steps and zero test edits**: drop
-`fixtures/logs/<provider>/` and register its segmenter in `support.SEGMENTERS`.
-Every provider-generic test picks it up. `test_every_provider_dir_has_a_segmenter`
-fails loudly if the directory and the registry drift.
+Adding a provider is then **one step and zero test edits**: drop
+`fixtures/logs/<provider>/`. `support.SEGMENTERS` is the shipped
+`providers/registry.py` table re-exported, so the segmenter is already there and
+every provider-generic test picks the directory up.
+`test_every_provider_dir_has_a_segmenter` fails loudly if the two drift.
 
 ### 4.3 Which test file
 
@@ -252,13 +257,15 @@ token read and a second version probe for nothing.
    `SCMProvider`, or both, plus `LogSegmenter` for a CI.
 2. Canonicalise section names to the tokens the `phases:` map already uses
    (`checkout`, `run`, `post`, …) so phase assignment needs no core change.
-3. Register in `cli._adapter`. `_make_ci_provider` / `_make_scm_provider` sort out
-   which ports it implements; a CI with no git host simply posts no note.
-4. Segmenter selection keys on `ci`, never on `scm` — log framing is whatever the
-   *runner* printed, which is why one segmenter can serve several CI systems
-   (Forgejo and Gitea Actions both run act_runner and emit GitHub's `##[group]`).
-5. Add `tests/fixtures/logs/<name>/` and register the segmenter in `support.SEGMENTERS`.
-   Fixtures are keyed on log format, so a git-host-only adapter owes none.
+3. One line in `providers/registry.py`'s `ADAPTERS`, and one in `SEGMENTERS` if it
+   is a CI. `make_ci_provider` / `make_scm_provider` sort out which ports the class
+   implements; a CI with no git host simply posts no note.
+4. `SEGMENTERS` keys on `ci`, never on `scm` — log framing is whatever the *runner*
+   printed, which is why one segmenter can serve several CI systems (Forgejo and
+   Gitea Actions both run act_runner and emit GitHub's `##[group]`).
+5. Add `tests/fixtures/logs/<name>/`. No test edit: the fixture directory is
+   matched against the same `SEGMENTERS` table. Fixtures are keyed on log format,
+   so a git-host-only adapter owes none.
 6. `test_core_carries_no_vendor_name_in_its_code` must stay green — add the new
    vendor to its regex. If it fires, the abstraction broke.
 

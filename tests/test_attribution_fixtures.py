@@ -151,7 +151,7 @@ def test_every_provider_dir_has_a_segmenter():
     zero tests instead of failing.
     """
     missing = set(support.providers()) - set(support.SEGMENTERS)
-    assert not missing, f"logs/ dirs with no segmenter in support.SEGMENTERS: {sorted(missing)}"
+    assert not missing, f"logs/ dirs with no segmenter in providers/registry.py: {sorted(missing)}"
 
 
 def test_every_expected_verdict_has_at_least_one_log():
