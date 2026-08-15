@@ -7,7 +7,7 @@ the already-segmented job plus its Attribution.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ci_doctor.config.schema import Config
 from ci_doctor.core.attribution import Attribution
@@ -31,7 +31,6 @@ class EvidenceBundle:
         token_estimate: Approximate prompt cost of the whole bundle.
         truncated: Whether the budget dropped lines. Always surfaced in the
             report — a silent truncation would be a lie about the evidence.
-        extra: Free-form slot for future stages.
     """
 
     blamed_phase: Phase
@@ -40,7 +39,6 @@ class EvidenceBundle:
     metadata: dict
     token_estimate: int
     truncated: bool = False
-    extra: dict = field(default_factory=dict)
 
 
 def _walk(sections):
@@ -72,14 +70,7 @@ def _blamed_section(sections: list[Section], phase: Phase) -> Section | None:
     return match[-1] if match else None
 
 
-def build_bundle(
-    job: Job,
-    attr: Attribution,
-    sections: list[Section],
-    cfg: Config,
-    *,
-    strip_timestamps: bool = False,
-) -> EvidenceBundle:
+def build_bundle(job: Job, attr: Attribution, sections: list[Section], cfg: Config) -> EvidenceBundle:
     """Denoise, window and budget the blamed section into a bundle.
 
     Deterministic and offline: no model is called here. Only the blamed phase's
@@ -91,7 +82,6 @@ def build_bundle(
         attr: The classifier's verdict.
         sections: The job's sections, phases already assigned.
         cfg: Config supplying the denoise, extraction and budget knobs.
-        strip_timestamps: Drop the runner's ISO timestamp prefix from each line.
 
     Returns:
         The bundle the report step consumes.
@@ -104,7 +94,7 @@ def build_bundle(
         # fall back to whatever text exists so the report still has context.
         raw = [line.text for sec in _walk(sections) for line in sec.lines]
 
-    clean = denoise(raw, cfg.denoise, strip_timestamps=strip_timestamps)
+    clean = denoise(raw, cfg.denoise)
     blamed_budget = int(cfg.llm.max_input_tokens * 0.7)
     # Budget the *selection* by matcher priority first; `fit` is the last resort
     # that cuts inside whatever survives.

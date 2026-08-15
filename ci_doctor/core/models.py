@@ -55,15 +55,14 @@ class LogLine:
     """One line of a job log.
 
     Attributes:
-        number: 1-based line number in the original log, kept so evidence can
-            point back at the raw trace.
+        number: 1-based position among the log's *content* lines. The section
+            markers a segmenter consumes are not counted, so this tracks the
+            trace a reader sees rather than byte-for-byte file lines.
         text: The line, ANSI already stripped by the segmenter.
-        ts: Epoch seconds from the section marker, when the provider emits one.
     """
 
     number: int
     text: str
-    ts: int | None = None
 
 
 @dataclass

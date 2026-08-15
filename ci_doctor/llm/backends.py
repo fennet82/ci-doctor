@@ -84,12 +84,11 @@ class LiteLLMClient(LLMClient):
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
-    def complete_structured(self, prompt: str, schema: dict) -> dict:
+    def complete_structured(self, prompt: str) -> dict:
         """Run one completion through litellm.
 
         Args:
-            prompt: The rendered, already-redacted prompt.
-            schema: JSON Schema of the expected reply, already embedded in the prompt.
+            prompt: The rendered, already-redacted prompt, schema included.
 
         Returns:
             The parsed reply.
@@ -134,13 +133,12 @@ class ClaudeCodeClient(LLMClient):
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
-    def complete_structured(self, prompt: str, schema: dict) -> dict:
+    def complete_structured(self, prompt: str) -> dict:
         """Run one headless `claude -p` and unwrap its JSON envelope.
 
         Args:
-            prompt: The rendered, already-redacted prompt. Passed on stdin, which
-                avoids ARG_MAX on large evidence bundles.
-            schema: JSON Schema of the expected reply, already embedded in the prompt.
+            prompt: The rendered, already-redacted prompt, schema included.
+                Passed on stdin, which avoids ARG_MAX on large evidence bundles.
 
         Returns:
             The parsed reply, taken from the envelope's `result` field.
