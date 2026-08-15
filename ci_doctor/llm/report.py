@@ -141,6 +141,12 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
     """
     from ci_doctor.llm.backends import backend_ready, make_client
 
+    if str(attr.reason) in cfg.analysis.skip_llm_for:
+        # The reason already settles it (no runner, missing artifact, cancelled):
+        # a model has nothing left to explain, so don't pay for the call.
+        log.debug("reason %s is in analysis.skip_llm_for -> deterministic report", attr.reason)
+        return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
+
     if not (cfg.llm.enabled and (client is not None or backend_ready(cfg.llm))):
         log.debug("LLM disabled/not ready (backend=%s) -> deterministic report", cfg.llm.backend)
         return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
@@ -164,6 +170,17 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
         report = deterministic_report(job, attr, bundle, degraded=True)
     else:
         log.debug("LLM returned a valid report")
+        if report.failure_phase != attr.phase:
+            # Invariant #1, enforced here and not only in the prompt: attribution
+            # owns the phase. A model that argues with it gets overruled, silently
+            # for the reader but loudly in the log.
+            log.warning(
+                "LLM answered phase=%s; overruled by attribution phase=%s (rule %s)",
+                report.failure_phase,
+                attr.phase,
+                attr.rule_id,
+            )
+            report = report.model_copy(update={"failure_phase": attr.phase})
     return redact_report(report, cfg.redaction, environ)
 
 
@@ -183,7 +200,7 @@ def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
     hint = ""
     for _ in range(2):  # one call + one repair retry
         try:
-            data = client.complete_structured(prompt + hint, schema)
+            data = client.complete_structured(prompt + hint)
             return Report.model_validate(data)
         except (ValidationError, ValueError, json.JSONDecodeError) as exc:
             log.debug("LLM reply invalid, repair retry: %s", exc)

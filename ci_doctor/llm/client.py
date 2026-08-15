@@ -79,13 +79,11 @@ class OpenAILLMClient(LLMClient):
             kwargs["http_client"] = httpx.Client(verify=self.cfg.ca_bundle)
         return OpenAI(**kwargs)
 
-    def complete_structured(self, prompt: str, schema: dict) -> dict:
+    def complete_structured(self, prompt: str) -> dict:
         """Run one completion and parse the reply as JSON.
 
         Args:
-            prompt: The rendered, already-redacted prompt.
-            schema: JSON Schema of the expected reply. Not sent to the endpoint —
-                it is already embedded in the prompt text — but part of the port.
+            prompt: The rendered, already-redacted prompt, schema included.
 
         Returns:
             The parsed reply. Validation is the caller's job.

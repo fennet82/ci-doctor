@@ -87,15 +87,19 @@ class LogSegmenter(ABC):
 
 
 class LLMClient(ABC):
-    """A backend that answers with JSON matching a supplied schema."""
+    """A backend that answers with JSON matching the schema embedded in the prompt.
+
+    Every backend is prompt-and-parse: the reply schema is rendered into the
+    prompt text by `llm/report.py`, not passed as an argument, because none of
+    the endpoints we target enforce one server-side.
+    """
 
     @abstractmethod
-    def complete_structured(self, prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion and parse the response as JSON.
 
         Args:
-            prompt: The fully rendered prompt.
-            schema: JSON Schema the response must satisfy.
+            prompt: The fully rendered prompt, schema included.
 
         Returns:
             The parsed response. Callers validate it — a backend may return

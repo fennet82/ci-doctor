@@ -112,10 +112,6 @@ class AnalysisConfig(_Strict):
         default_factory=lambda: ["no_runner", "missing_dependency", "cancelled"],
         description="Failure reasons already fully determined, so they get a templated report and no LLM call.",
     )
-    known_flaky_tests: list[str] = Field(
-        default_factory=list,
-        description="Substrings that, when seen in the evidence, short-circuit the report to likely_flaky.",
-    )
 
 
 class MatcherConfig(_Strict):
