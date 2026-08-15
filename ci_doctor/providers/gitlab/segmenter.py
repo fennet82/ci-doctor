@@ -15,11 +15,8 @@ trailer carries the terminal ``ERROR: Job failed:`` line.
 
 import re
 
-from ci_doctor.core.models import LogLine, Section
+from ci_doctor.core.models import PREAMBLE, TRAILER, LogLine, Section
 from ci_doctor.core.ports import LogSegmenter
-
-PREAMBLE = "__preamble__"
-TRAILER = "__trailer__"
 
 _MARKER = re.compile(
     r"(?:\x1b\[0K)?"

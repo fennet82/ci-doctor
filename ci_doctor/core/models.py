@@ -5,9 +5,21 @@ leak past an adapter boundary. Invariant #2: a case-insensitive grep for any
 provider name over core/ must return nothing (keep this file free of them too).
 """
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
+
+#: Output before the first section marker, and after the last one. Every
+#: segmenter emits these two names so no line is ever lost, and the classifier
+#: reads the trailer for the runner's closing verdict. They are part of the
+#: :class:`Section` contract, which is why they live here and not in a provider.
+PREAMBLE = "__preamble__"
+TRAILER = "__trailer__"
+
+#: The two names above as a set, for the "real sections only" test that
+#: attribution, phase assignment and evidence selection each need.
+SYNTHETIC_SECTIONS = frozenset({PREAMBLE, TRAILER})
 
 #: How much to trust a verdict. A Literal rather than a StrEnum because it is
 #: serialised straight into the report schema, where the enum would change the
@@ -127,6 +139,23 @@ class Section:
     closed: bool = False  # saw an explicit end marker
     lines: list[LogLine] = field(default_factory=list)
     children: list["Section"] = field(default_factory=list)  # nesting is legal
+
+
+def walk_sections(sections: Iterable[Section]) -> Iterator[Section]:
+    """Yield every section depth-first, parents before their children.
+
+    Nesting is legal and providers do use it, so every consumer of the tree —
+    the classifier, phase assignment, evidence selection — needs this same walk.
+
+    Args:
+        sections: Top-level sections.
+
+    Yields:
+        Each section in the tree, in log order.
+    """
+    for sec in sections:
+        yield sec
+        yield from walk_sections(sec.children)
 
 
 @dataclass
