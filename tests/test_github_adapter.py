@@ -9,6 +9,7 @@ from ci_doctor.config.loader import load_config
 from ci_doctor.core.attribution import attribute
 from ci_doctor.core.models import FailureReason, Job, Phase
 from ci_doctor.core.phases import assign_phases
+from ci_doctor.core.select import select_failed_jobs
 from ci_doctor.providers.github.provider import GitHubProvider
 from ci_doctor.providers.github.reasons import to_failure_reason
 from ci_doctor.providers.github.segmenter import GitHubSegmenter
@@ -111,6 +112,7 @@ def test_provider_maps_jobs_and_normalizes_status():
         ),
         _job(id=12, name="flaky", status="completed", conclusion="timed_out"),
         _job(id=13, name="ok", status="completed", conclusion="success"),
+        _job(id=14, name="slow", status="completed", conclusion="cancelled"),
     ]
     provider = GitHubProvider(
         load_config(environ={}),
@@ -126,6 +128,11 @@ def test_provider_maps_jobs_and_normalizes_status():
     assert build.started_at == "2024-01-01T00:00:00+00:00"  # datetime -> ISO string
     assert run.jobs[1].failure_reason == FailureReason.TIMEOUT
     assert run.jobs[2].status == "completed"  # success conclusion stays non-failed
+    # A cancellation keeps its own status rather than being flattened into
+    # "failed" — the domain has a word for it, and GitLab reports the same one.
+    assert run.jobs[3].status == "cancelled"
+    assert run.jobs[3].failure_reason == FailureReason.CANCELLED
+    assert [j.name for j in select_failed_jobs(run.jobs)] == ["build", "flaky", "slow"]
     assert run.ref == "main" and run.sha == "deadbeef"  # straight off the run, no env vars
     assert run.mr is not None and run.mr.iid == "42"  # PR resolved from GITHUB_REF
 

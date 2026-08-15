@@ -23,9 +23,15 @@ from ci_doctor.providers.tokens import read_token
 
 log = logging.getLogger("ci_doctor.github")
 
-#: Conclusions that mean "this job failed". Mapped onto the domain's single
-#: "failed" status so core job-selection needs no GitHub knowledge.
-_FAILED_CONCLUSIONS = {"failure", "timed_out", "startup_failure", "cancelled"}
+#: Job conclusions -> the domain's normalised status, so core job-selection needs
+#: no GitHub knowledge. A timeout and a startup failure are failures; a
+#: cancellation stays its own status, because that is what it is on every CI.
+_CONCLUSION_STATUS = {
+    "failure": "failed",
+    "timed_out": "failed",
+    "startup_failure": "failed",
+    "cancelled": "cancelled",
+}
 
 
 class GitHubProvider(CIProvider, SCMProvider):
@@ -199,8 +205,7 @@ class GitHubProvider(CIProvider, SCMProvider):
         """
         conclusion = j.conclusion
         startup = j.status == "startup_failure" or conclusion == "startup_failure"
-        # Normalize to the domain's "failed" so core job-selection needs no GitHub knowledge.
-        status = "failed" if conclusion in _FAILED_CONCLUSIONS else (j.status or "")
+        status = _CONCLUSION_STATUS.get(conclusion, j.status or "")
         runner = (
             RunnerInfo(id=_str_or_none(j.runner_id), description=j.runner_name) if j.runner_name else None
         )
