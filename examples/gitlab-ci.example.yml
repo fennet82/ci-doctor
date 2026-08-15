@@ -7,6 +7,7 @@ ci-doctor:
     - when: on_failure
   allow_failure: true
   variables:
+    CI_DOCTOR_CI: "gitlab"                          # the default is github; say so for a live run
     CI_DOCTOR_GITLAB_TOKEN: "$CI_DOCTOR_TOKEN"      # a read-scoped API token (or use token_file)
     # Optional LLM (omit for the deterministic report):
     # CI_DOCTOR_LLM__MODEL: "qwen2.5-coder:32b"

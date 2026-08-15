@@ -13,11 +13,21 @@ import pytest
 from ci_doctor import cli
 from ci_doctor.config.loader import load_config
 from ci_doctor.config.schema import Config
+from ci_doctor.core.models import SYNTHETIC_SECTIONS
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.pipeline import JobResult
 from ci_doctor.providers.github.provider import GitHubProvider
+from ci_doctor.providers.github.segmenter import GitHubSegmenter
 from ci_doctor.providers.gitlab.provider import GitLabProvider
-from ci_doctor.providers.registry import make_ci_provider, make_scm_provider, make_segmenter
+from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
+from ci_doctor.providers.registry import (
+    make_ci_provider,
+    make_scm_provider,
+    make_segmenter,
+    segmenter_for,
+    segmenter_for_log,
+)
+from tests import support
 
 
 def _gitlab_provider():
@@ -77,6 +87,28 @@ def test_note_is_skipped_when_there_is_no_git_host(capsys):
 
 def test_segmenter_follows_the_ci_not_the_git_host():
     """Log framing is whatever the runner printed, so `scm` must not change it."""
-    from ci_doctor.providers.github.segmenter import GitHubSegmenter
-
     assert isinstance(make_segmenter(Config(ci="github", scm="gitlab")), GitHubSegmenter)
+
+
+@pytest.mark.parametrize("provider", support.providers())
+def test_replay_reads_the_log_not_the_config(provider):
+    """Offline replay picks the segmenter from the log's own framing.
+
+    A replayed file carries no run metadata, so `ci` is whatever the config
+    defaults to — a value the user never chose. Reading a GitLab trace with
+    GitHub's segmenter is not a near miss: no marker matches, every line lands in
+    the synthetic preamble, and attribution answers "no signal". The fallback
+    here is deliberately a CI that does not exist, so only the log can decide.
+    """
+    raw = support.read_log(provider, "sample")
+    chosen = segmenter_for_log(raw, fallback="nonexistent-ci")
+    assert type(chosen) is type(segmenter_for(provider))
+
+    real = [s.name for s in chosen.segment(raw) if s.name not in SYNTHETIC_SECTIONS]
+    assert real, "the log parsed into nothing but preamble/trailer — wrong segmenter"
+
+
+def test_an_unrecognisable_log_falls_back_to_the_configured_ci():
+    """Nothing in the log identifies a runner, so `ci` is the tie-breaker."""
+    assert isinstance(segmenter_for_log("just some output\n", fallback="github"), GitHubSegmenter)
+    assert isinstance(segmenter_for_log("just some output\n", fallback="gitlab"), GitLabSegmenter)

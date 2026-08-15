@@ -25,8 +25,8 @@ llm:
   model: qwen2.5-coder:32b`;
 
 const full = `# .ci-doctor.yml — every knob, with defaults shown.
-ci: gitlab                       # which CI to read the run from
-scm: gitlab                      # which git host gets the note (defaults to "ci")
+ci: github                       # which CI to read the run from (github | gitlab)
+scm: null                        # which git host gets the note (defaults to "ci")
 
 gitlab:
   base_url: https://gitlab.com   # default; override for a self-hosted instance
