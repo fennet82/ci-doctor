@@ -1,7 +1,9 @@
-"""LLM backend registry. Every backend implements the LLMClient port; the config
-`llm.backend` selects one. All use prompt-and-parse (the prompt already embeds the
-schema and a JSON-only instruction), so correctness is enforced by the caller's
-pydantic validation + repair retry — not by the backend.
+"""LLM backend registry.
+
+Every backend implements the LLMClient port; the config `llm.backend` selects
+one. All use prompt-and-parse (the prompt already embeds the schema and a
+JSON-only instruction), so correctness is enforced by the caller's pydantic
+validation + repair retry — not by the backend.
 
 `openai` is the base install and covers anything speaking the OpenAI Chat Completions
 shape, which is most of the field. `litellm` exists for the providers that do *not*
@@ -173,8 +175,11 @@ class OpenAILLMClient(LLMClient):
 
 
 class LiteLLMClient(LLMClient):
-    """A provider litellm can reach that the OpenAI shape cannot — Bedrock, Vertex,
-    Azure. For anything OpenAI-compatible prefer `openai`: no extra dependency."""
+    """A provider litellm can reach that the OpenAI shape cannot.
+
+    Bedrock, Vertex, Azure. For anything OpenAI-compatible prefer `openai`: no
+    extra dependency.
+    """
 
     def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
         """Store config; litellm is imported only when a call is made.
@@ -206,14 +211,14 @@ class LiteLLMClient(LLMClient):
 
         litellm.telemetry = False  # no phone-home
         api_key = self.environ.get(self.cfg.api_key_env) if self.cfg.api_key_env else None
-        kwargs = dict(
-            model=self.cfg.model,
-            messages=[{"role": "system", "content": _SYSTEM}, {"role": "user", "content": prompt}],
-            api_base=self.cfg.api_base or None,
-            api_key=api_key,
-            temperature=self.cfg.temperature,
-            timeout=self.cfg.timeout_seconds,
-        )
+        kwargs = {
+            "model": self.cfg.model,
+            "messages": [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": prompt}],
+            "api_base": self.cfg.api_base or None,
+            "api_key": api_key,
+            "temperature": self.cfg.temperature,
+            "timeout": self.cfg.timeout_seconds,
+        }
         try:
             resp = litellm.completion(response_format={"type": "json_object"}, **kwargs)
         except Exception:  # noqa: BLE001 - provider may reject response_format; retry without
@@ -222,8 +227,11 @@ class LiteLLMClient(LLMClient):
 
 
 class ClaudeCodeClient(LLMClient):
-    """Shell out to the local `claude` CLI in headless print mode. Uses whatever
-    auth Claude Code is configured with; no API key/endpoint needed here."""
+    """Shell out to the local `claude` CLI in headless print mode.
+
+    Uses whatever auth Claude Code is configured with; no API key or endpoint is
+    needed here.
+    """
 
     def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
         """Store config; the CLI is located at call time, not here.
@@ -265,6 +273,7 @@ class ClaudeCodeClient(LLMClient):
             text=True,
             timeout=self.cfg.timeout_seconds,
             env=self.environ,
+            check=False,  # the return code is read below, with the CLI's own stderr
         )
         if proc.returncode != 0:
             raise RuntimeError(f"claude CLI failed ({proc.returncode}): {proc.stderr[:500]}")

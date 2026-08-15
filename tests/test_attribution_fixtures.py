@@ -1,5 +1,7 @@
-"""Golden-file attribution suite: segment + phase-map + classify each fixture log,
-compare {phase, reason, rule_id} to expected. No network, no LLM.
+"""Golden-file attribution suite.
+
+Segment + phase-map + classify each fixture log, then compare
+{phase, reason, rule_id} to expected. No network, no LLM.
 
 One `expected/<case>.json` covers every provider that ships a log for that case —
 attribution is provider-neutral, so adding `logs/github/oom_137.log` asserts it

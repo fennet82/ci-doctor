@@ -10,9 +10,9 @@ are more permissive by necessity (see :func:`_env_overlay`).
 
 import logging
 import os
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from importlib import resources
-from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 

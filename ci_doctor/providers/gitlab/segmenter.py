@@ -1,13 +1,13 @@
-"""Parse GitLab collapsible-section markers into the Section tree.
+r"""Parse GitLab collapsible-section markers into the Section tree.
 
 Real markers look like::
 
-    \\e[0Ksection_start:1735689600:step_script\\r\\e[0KRunning script
+    \e[0Ksection_start:1735689600:step_script\r\e[0KRunning script
     ...
-    \\e[0Ksection_end:1735689660:step_script\\r\\e[0K
+    \e[0Ksection_end:1735689660:step_script\r\e[0K
 
 with optional ``[collapsed=true]`` after the name and legal nesting. The ANSI
-wrapper and the trailing ``\\r\\e[0K`` are optional in this parser so plain-text
+wrapper and the trailing ``\r\e[0K`` are optional in this parser so plain-text
 fixtures parse the same way. Content outside any section becomes the synthetic
 ``__preamble__`` (before the first section) or ``__trailer__`` (after) — the
 trailer carries the terminal ``ERROR: Job failed:`` line.

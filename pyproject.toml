@@ -14,6 +14,10 @@ dependencies = [
     "python-gitlab>=8.4.0",
     "openai>=2.48.0",
     "pygithub>=2.9.1",
+    # Direct import: PyGithub hands back a redirect URL for a job log and we
+    # fetch it ourselves. It arrives with PyGithub either way; declared because
+    # we import it, not because it adds a wheel.
+    "requests>=2.32",
 ]
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -63,12 +67,21 @@ packages = ["ci_doctor"]
 # 110, not the default 88: the code was written to it (p99 line is 109 chars).
 line-length = 110
 
-# flake8-bandit, vendored in ruff — SAST for the shipped package without a second tool.
 [tool.ruff.lint]
-extend-select = ["S"]
+# S:  flake8-bandit, vendored in ruff — SAST for the shipped package, no second tool.
+# D:  the Google docstring convention the repo already writes by hand. Docstrings are
+#     this codebase's main onboarding surface (GUIDELINES §6), so they are checked.
+# I:  one import order, so a diff never argues about it.
+# UP: the floor is 3.11; don't ship idioms written for older ones.
+# B, C4: bugbear's real traps, and comprehension literals.
+extend-select = ["S", "D", "I", "UP", "B", "C4"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S603"]  # assert is the test; subprocess there is fixture setup
+"ci_doctor/cli.py" = ["B008"]  # typer declares options as call-valued defaults, by design
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

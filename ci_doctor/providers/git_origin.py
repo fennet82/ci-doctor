@@ -11,13 +11,13 @@ rather than in `core/` only because it is I/O; it names no provider.
 
 import logging
 import subprocess
-from functools import lru_cache
+from functools import cache
 from urllib.parse import urlsplit
 
 log = logging.getLogger("ci_doctor.git")
 
 
-@lru_cache(maxsize=None)
+@cache
 def origin_repo(env_var: str) -> str | None:
     """Derive "owner/name" (or "group/sub/project") from the `origin` remote.
 
@@ -36,6 +36,7 @@ def origin_repo(env_var: str) -> str | None:
             capture_output=True,
             text=True,
             timeout=5,
+            check=False,  # a missing remote is an answer, not an error
         )
     except (OSError, subprocess.SubprocessError) as exc:  # no git, no repo, hung command
         log.debug("could not read git origin: %s", exc)

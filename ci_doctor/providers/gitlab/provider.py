@@ -8,12 +8,13 @@ on older instances degrade to sensible defaults instead of crashing.
 """
 
 import logging
+import os
 from collections.abc import Mapping
 
 import gitlab
 
 from ci_doctor.config.schema import Config
-from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, RunnerInfo, Run
+from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, Run, RunnerInfo
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.gitlab.reasons import to_failure_reason
@@ -41,8 +42,6 @@ class GitLabProvider(CIProvider, SCMProvider):
         Raises:
             ValueError: If `gitlab.base_url` is empty.
         """
-        import os
-
         self.cfg = config.gitlab
         self.environ = os.environ if environ is None else environ
         self._project_obj = None

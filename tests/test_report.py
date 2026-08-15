@@ -1,5 +1,7 @@
-"""LLM report tests: deterministic path, LLM path with recorded responses, repair
-retry, degraded fallback, and the end-to-end secret round-trip. No network.
+"""LLM report tests.
+
+Deterministic path, LLM path with recorded responses, repair retry, degraded
+fallback, and the end-to-end secret round-trip. No network.
 """
 
 import pytest
@@ -184,7 +186,7 @@ def test_deterministic_category_from_fixture(provider, fixture, expected):
 
 
 def test_litellm_backend_needs_no_api_base():
-    """litellm is ready on `model` alone — it routes by model name, not endpoint."""
+    """Litellm is ready on `model` alone — it routes by model name, not endpoint."""
     job, attr, bundle, cfg = _pipeline(
         _SIMPLE_LOG, overrides={"llm": {"backend": "litellm", "model": "bedrock/anthropic.claude-v2"}}
     )

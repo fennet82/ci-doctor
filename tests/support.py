@@ -1,5 +1,6 @@
-"""Provider-generic access to the log fixtures. Import this instead of building
-fixture paths or picking a segmenter by hand.
+"""Provider-generic access to the log fixtures.
+
+Import this instead of building fixture paths or picking a segmenter by hand.
 
 Layout::
 

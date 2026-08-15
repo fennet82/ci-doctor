@@ -7,7 +7,7 @@ from ci_doctor.core.extract import extract
 
 def _m(**kw):
     """Build a MatcherConfig with every field defaulted, overridden by kwargs."""
-    base = dict(id="x", start=None, end=None, pattern=None, before=0, after=0, priority=50)
+    base = {"id": "x", "start": None, "end": None, "pattern": None, "before": 0, "after": 0, "priority": 50}
     base.update(kw)
     return MatcherConfig(**base)
 

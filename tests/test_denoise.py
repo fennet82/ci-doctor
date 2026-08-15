@@ -6,7 +6,11 @@ from ci_doctor.core.denoise import denoise, strip_ansi
 
 def _cfg(**kw):
     """Build a DenoiseConfig with test defaults, overridden by kwargs."""
-    base = dict(collapse_carriage_returns=True, dedupe_repeats=True, noise_patterns=[r"^\s*$", r"^Progress:"])
+    base = {
+        "collapse_carriage_returns": True,
+        "dedupe_repeats": True,
+        "noise_patterns": [r"^\s*$", r"^Progress:"],
+    }
     base.update(kw)
     return DenoiseConfig(**base)
 
