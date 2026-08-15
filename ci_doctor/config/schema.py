@@ -190,7 +190,13 @@ class Config(_Strict):
         json_schema_extra={"$id": SCHEMA_ID},
     )
 
-    ci: str = Field("gitlab", description="Which CI system to read the failed run from: gitlab or github.")
+    ci: str = Field(
+        "github",
+        description=(
+            "Which CI system to read the failed run from: github or gitlab. Only used for a live "
+            "run — replaying a log file detects the format from the log itself."
+        ),
+    )
     scm: str | None = Field(
         None,
         description=(

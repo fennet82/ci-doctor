@@ -94,7 +94,8 @@ docker build -t ci-doctor .
 ## Quickstart
 
 ```sh
-# Replay a captured log offline — no network, no LLM:
+# Replay a captured log offline — no network, no LLM, and no config: the log's
+# own framing says which CI produced it.
 uv run ci-doctor analyze failing-job.log
 
 # Against a live pipeline (reads $CI_PIPELINE_ID etc. inside CI):
@@ -116,11 +117,11 @@ Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_
 an error. Minimal config:
 
 ```yaml
-ci: gitlab
+ci: github                            # default; `gitlab` for GitLab CI
 
-gitlab:
-  base_url: https://gitlab.com        # default; override for self-hosted
-  token_env: CI_DOCTOR_GITLAB_TOKEN   # or gitlab.token_file for a secret mount
+github:
+  base_url: https://api.github.com    # default; override for GitHub Enterprise
+  token_env: CI_DOCTOR_GITHUB_TOKEN   # or github.token_file for a secret mount
 
 llm:
   enabled: true                       # false => deterministic-only report
@@ -171,6 +172,7 @@ ci-doctor:
     - when: on_failure
   allow_failure: true
   variables:
+    CI_DOCTOR_CI: "gitlab"          # the default is github
     CI_DOCTOR_GITLAB_TOKEN: "$CI_DOCTOR_TOKEN"
   script:
     - ci-doctor analyze "$CI_PIPELINE_ID"

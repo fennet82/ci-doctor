@@ -13,6 +13,7 @@ Actions both run act_runner, which emits GitHub's `##[group]` markers).
 """
 
 import logging
+import re
 from importlib import import_module
 from typing import Any
 
@@ -35,9 +36,17 @@ SEGMENTERS: dict[str, str] = {
     "github": "ci_doctor.providers.github.segmenter:GitHubSegmenter",
 }
 
-#: Segmenter used when the configured CI system has none of its own — offline
-#: replay of a bare log file has no run metadata to go on.
-_FALLBACK_SEGMENTER = SEGMENTERS["gitlab"]
+#: Segmenter used when the configured CI system has none of its own.
+_FALLBACK_SEGMENTER = SEGMENTERS["github"]
+
+#: What a runner prints that no other runner does, for the one case where the
+#: config cannot answer: replaying a log file, where `ci` is a default nobody
+#: chose. Deliberately unanchored — GitHub prefixes every line with an ISO
+#: timestamp and GitLab wraps its markers in ANSI, so neither sits at column 0.
+_LOG_SIGNATURES: dict[str, re.Pattern[str]] = {
+    "github": re.compile(r"##\[(?:group|endgroup|error|warning)\]"),
+    "gitlab": re.compile(r"section_(?:start|end):\d+:"),
+}
 
 
 def _load(spec: str) -> Any:  # noqa: ANN401 - an import resolved by name cannot be typed
@@ -138,3 +147,28 @@ def make_segmenter(cfg: Config) -> LogSegmenter:
         A :class:`~ci_doctor.core.ports.LogSegmenter`.
     """
     return segmenter_for(cfg.ci)
+
+
+def segmenter_for_log(raw_log: str, fallback: str) -> LogSegmenter:
+    """Pick the segmenter by what the log actually looks like.
+
+    Offline replay has no run metadata, so `ci` is whatever the config happens to
+    say — usually the default, which the user never chose. Reading a GitLab trace
+    with GitHub's segmenter is not a near miss: no marker matches, every line
+    lands in the synthetic preamble, and attribution answers "no signal". So the
+    log is asked instead, and the config is only the tie-breaker.
+
+    Args:
+        raw_log: The captured job log.
+        fallback: CI system to use when nothing in the log identifies a runner —
+            normally `config.ci`.
+
+    Returns:
+        A :class:`~ci_doctor.core.ports.LogSegmenter`.
+    """
+    for ci, signature in _LOG_SIGNATURES.items():
+        if signature.search(raw_log):
+            log.debug("log looks like %s output", ci)
+            return segmenter_for(ci)
+    log.debug("no runner signature in the log; falling back to ci=%r", fallback)
+    return segmenter_for(fallback)

@@ -16,9 +16,9 @@ from typing import NamedTuple
 from ci_doctor.config.schema import Config
 from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.models import FailureReason, Job, Run
-from ci_doctor.core.ports import CIProvider
+from ci_doctor.core.ports import CIProvider, LogSegmenter
 from ci_doctor.llm.schema import Report
-from ci_doctor.providers.registry import make_ci_provider, make_segmenter
+from ci_doctor.providers.registry import make_ci_provider, make_segmenter, segmenter_for_log
 
 log = logging.getLogger("ci_doctor.pipeline")
 
@@ -37,7 +37,7 @@ class JobResult(NamedTuple):
     report: Report
 
 
-def process_job(job: Job, cfg: Config) -> JobResult:
+def process_job(job: Job, cfg: Config, segmenter: LogSegmenter | None = None) -> JobResult:
     """Segment, classify, assemble evidence and produce the report for one job.
 
     Deterministic when the LLM is disabled or unconfigured; one LLM call otherwise.
@@ -45,6 +45,9 @@ def process_job(job: Job, cfg: Config) -> JobResult:
     Args:
         job: The failed job, log already attached.
         cfg: The effective config.
+        segmenter: Parser for this log's format. Defaults to the one `config.ci`
+            names, which is right for a live run — the provider that produced the
+            log is the one we just read it from.
 
     Returns:
         The job, its verdict, and its report.
@@ -54,7 +57,7 @@ def process_job(job: Job, cfg: Config) -> JobResult:
     from ci_doctor.core.phases import assign_phases
     from ci_doctor.llm.report import produce_report
 
-    job.sections = make_segmenter(cfg).segment(job.log or "")
+    job.sections = (segmenter or make_segmenter(cfg)).segment(job.log or "")
     log.debug("job %s: %d top-level sections", job.name, len(job.sections))
     assign_phases(job.sections, cfg.phases)
     attr = attribute(job, job.sections)
@@ -125,7 +128,10 @@ def analyze_log(path: Path, cfg: Config) -> list[JobResult]:
     """
     jobs = run_from_file(path).jobs
     log.info("analyzing %d job(s) from %s", len(jobs), path)
-    return [process_job(job, cfg) for job in jobs]
+    # The format comes from the log, not from `config.ci`: a replayed file has no
+    # run metadata, so `ci` here is whatever the config defaults to.
+    segmenter = segmenter_for_log(jobs[0].log or "", cfg.ci)
+    return [process_job(job, cfg, segmenter) for job in jobs]
 
 
 def run_from_file(path: Path) -> Run:
