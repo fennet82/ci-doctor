@@ -10,41 +10,22 @@ target for the log blob, and we fetch that ourselves.
 import logging
 import re
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 from github import Auth, Github, GithubException
 
-from ci_doctor.config.schema import Config, GitHubConfig
+from ci_doctor.config.schema import Config
 from ci_doctor.core.models import Job, MergeRequestRef, RunnerInfo, Run
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.github.reasons import to_failure_reason
+from ci_doctor.providers.tokens import read_token
 
 log = logging.getLogger("ci_doctor.github")
 
 #: Conclusions that mean "this job failed". Mapped onto the domain's single
 #: "failed" status so core job-selection needs no GitHub knowledge.
 _FAILED_CONCLUSIONS = {"failure", "timed_out", "startup_failure", "cancelled"}
-
-
-def _read_token(cfg: GitHubConfig, environ: Mapping[str, str]) -> str | None:
-    """Resolve the API token, file first.
-
-    Args:
-        cfg: GitHub config supplying `token_file` and `token_env`.
-        environ: Environment to read `token_env` from.
-
-    Returns:
-        The token, or None when neither source has one — a public repo still
-        works unauthenticated.
-    """
-    if cfg.token_file:
-        path = Path(cfg.token_file)
-        if path.is_file():
-            return path.read_text().strip()
-        log.warning("token_file %s not found; falling back to env", path)
-    return environ.get(cfg.token_env)
 
 
 class GitHubProvider(CIProvider, SCMProvider):
@@ -86,7 +67,7 @@ class GitHubProvider(CIProvider, SCMProvider):
         """
         if not self.cfg.base_url:
             raise ValueError("github.base_url must not be empty")
-        token = _read_token(self.cfg, self.environ)
+        token = read_token(self.cfg.token_file, self.cfg.token_env, self.environ)
         return Github(
             auth=Auth.Token(token) if token else None,
             base_url=self.cfg.base_url.rstrip("/"),

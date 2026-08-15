@@ -21,7 +21,7 @@ classifier to blame, and it is the direct analogue of GitLab's `section_end`.
 
 import re
 
-from ci_doctor.core.models import LogLine, Section
+from ci_doctor.core.models import PREAMBLE, TRAILER, LogLine, Section
 from ci_doctor.core.ports import LogSegmenter
 
 _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z?\s+")
@@ -157,12 +157,12 @@ class GitHubSegmenter(LogSegmenter):
                 target = current
             elif not seen_group:
                 if preamble is None:
-                    preamble = Section(name="__preamble__", closed=True)
+                    preamble = Section(name=PREAMBLE, closed=True)
                     top.append(preamble)
                 target = preamble
             else:
                 if trailer is None:
-                    trailer = Section(name="__trailer__", closed=True)
+                    trailer = Section(name=TRAILER, closed=True)
                     top.append(trailer)
                 target = trailer
 

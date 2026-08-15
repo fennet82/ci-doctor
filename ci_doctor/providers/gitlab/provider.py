@@ -9,7 +9,6 @@ on older instances degrade to sensible defaults instead of crashing.
 
 import logging
 from collections.abc import Mapping
-from pathlib import Path
 
 import gitlab
 
@@ -18,6 +17,7 @@ from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, RunnerInf
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.gitlab.reasons import to_failure_reason
+from ci_doctor.providers.tokens import read_token
 
 log = logging.getLogger("ci_doctor.gitlab")
 
@@ -50,21 +50,6 @@ class GitLabProvider(CIProvider, SCMProvider):
 
     # --- connection -------------------------------------------------------
 
-    def _read_token(self) -> str | None:
-        """Resolve the API token.
-
-        Returns:
-            The token, or None when neither source has one — a public project
-            still works unauthenticated.
-        """
-        # token_file (k8s/Vault secret mount) takes precedence over the env var.
-        if self.cfg.token_file:
-            path = Path(self.cfg.token_file)
-            if path.is_file():
-                return path.read_text().strip()
-            log.warning("token_file %s not found; falling back to env", path)
-        return self.environ.get(self.cfg.token_env)
-
     def _connect(self):
         """Build the python-gitlab client and probe the instance version.
 
@@ -79,7 +64,7 @@ class GitLabProvider(CIProvider, SCMProvider):
         ssl_verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
         gl = gitlab.Gitlab(
             url=self.cfg.base_url,
-            private_token=self._read_token(),
+            private_token=read_token(self.cfg.token_file, self.cfg.token_env, self.environ),
             api_version=self.cfg.api_version.lstrip("v"),  # python-gitlab wants "4"
             ssl_verify=ssl_verify,
             timeout=self.cfg.timeout_seconds,

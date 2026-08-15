@@ -14,9 +14,16 @@ count, and ``_last_error_section`` for where it bites.
 import re
 from dataclasses import dataclass, field
 
-from ci_doctor.core.models import Confidence, FailureReason, Job, Phase, Section
-
-_SYNTHETIC = {"__preamble__", "__trailer__"}
+from ci_doctor.core.models import (
+    SYNTHETIC_SECTIONS,
+    TRAILER,
+    Confidence,
+    FailureReason,
+    Job,
+    Phase,
+    Section,
+    walk_sections,
+)
 
 #: Fatality signals for the structural fallback, and the whole of it. This answers
 #: one coarse question — "did anything in this section actually fail?" — to pick
@@ -96,7 +103,7 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
     Returns:
         The verdict, tagged with the `rule_id` that produced it.
     """
-    trailer = _find(sections, "__trailer__")
+    trailer = _find(sections, TRAILER)
 
     # Rule 1 — no / empty log => the job never really ran.
     if not job.log or not job.log.strip():
@@ -179,31 +186,17 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
 # --- helpers ----------------------------------------------------------------
 
 
-def _walk(sections):
-    """Yield every section depth-first, parents before their children.
-
-    Args:
-        sections: Top-level sections.
-
-    Yields:
-        Each section in the tree, in log order.
-    """
-    for sec in sections:
-        yield sec
-        yield from _walk(sec.children)
-
-
 def _find(sections, name) -> Section | None:
     """Find the first section with a given name.
 
     Args:
         sections: Top-level sections.
-        name: Section name to look for, e.g. "__trailer__".
+        name: Section name to look for, e.g. `TRAILER`.
 
     Returns:
         The section, or None when absent.
     """
-    return next((s for s in _walk(sections) if s.name == name), None)
+    return next((s for s in walk_sections(sections) if s.name == name), None)
 
 
 def _last_open_section(sections) -> Section | None:
@@ -219,8 +212,8 @@ def _last_open_section(sections) -> Section | None:
         The innermost/latest unclosed real section, or None when all are closed.
     """
     result = None
-    for sec in _walk(sections):
-        if sec.name not in _SYNTHETIC and not sec.closed:
+    for sec in walk_sections(sections):
+        if sec.name not in SYNTHETIC_SECTIONS and not sec.closed:
             result = sec
     return result
 
@@ -284,8 +277,8 @@ def _last_error_section(sections) -> Section | None:
         negative evidence is warning-level can never be selected here.
     """
     result = None
-    for sec in _walk(sections):
-        if sec.name in _SYNTHETIC:
+    for sec in walk_sections(sections):
+        if sec.name in SYNTHETIC_SECTIONS:
             continue
         if any(_is_error_line(line.text) for line in sec.lines):
             result = sec
@@ -320,7 +313,7 @@ def _terminal(trailer: Section | None) -> str | None:
     """The job's final line — usually the runner's verdict.
 
     Args:
-        trailer: The synthetic "__trailer__" section, or None when absent.
+        trailer: The synthetic `TRAILER` section, or None when absent.
 
     Returns:
         The last non-blank line, or None.
@@ -365,7 +358,7 @@ def _parse_trailer(trailer: Section | None):
     """Read the runner's closing verdict.
 
     Args:
-        trailer: The synthetic "__trailer__" section, or None.
+        trailer: The synthetic `TRAILER` section, or None.
 
     Returns:
         A ``(phase, reason, rule_id, evidence)`` tuple, or None when the trailer
@@ -410,8 +403,8 @@ def _warning_phases(sections, exclude: Phase) -> list[Phase]:
         contributing factors — worth mentioning to the reader, never the verdict.
     """
     out: list[Phase] = []
-    for sec in _walk(sections):
-        if sec.name in _SYNTHETIC or sec.phase == exclude:
+    for sec in walk_sections(sections):
+        if sec.name in SYNTHETIC_SECTIONS or sec.phase == exclude:
             continue
         if any(_is_warning_line(line.text) for line in sec.lines) and sec.phase not in out:
             out.append(sec.phase)

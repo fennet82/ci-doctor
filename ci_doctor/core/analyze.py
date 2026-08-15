@@ -14,7 +14,7 @@ from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.budget import estimate_tokens, fit
 from ci_doctor.core.denoise import denoise
 from ci_doctor.core.extract import extract
-from ci_doctor.core.models import Job, Phase, Section
+from ci_doctor.core.models import SYNTHETIC_SECTIONS, Job, Phase, Section, walk_sections
 
 log = logging.getLogger("ci_doctor.analyze")
 
@@ -41,20 +41,6 @@ class EvidenceBundle:
     truncated: bool = False
 
 
-def _walk(sections):
-    """Yield every section depth-first, parents before their children.
-
-    Args:
-        sections: Top-level sections.
-
-    Yields:
-        Each section in the tree, in log order.
-    """
-    for sec in sections:
-        yield sec
-        yield from _walk(sec.children)
-
-
 def _blamed_section(sections: list[Section], phase: Phase) -> Section | None:
     """Find the section to draw evidence from.
 
@@ -66,7 +52,7 @@ def _blamed_section(sections: list[Section], phase: Phase) -> Section | None:
         The *last* real section carrying that phase — later output is closer to
         the failure — or None when no section matches.
     """
-    match = [s for s in _walk(sections) if s.name not in {"__preamble__", "__trailer__"} and s.phase == phase]
+    match = [s for s in walk_sections(sections) if s.name not in SYNTHETIC_SECTIONS and s.phase == phase]
     return match[-1] if match else None
 
 
@@ -92,7 +78,7 @@ def build_bundle(job: Job, attr: Attribution, sections: list[Section], cfg: Conf
     else:
         # No section carries the blamed phase (e.g. PROVISION with an empty log):
         # fall back to whatever text exists so the report still has context.
-        raw = [line.text for sec in _walk(sections) for line in sec.lines]
+        raw = [line.text for sec in walk_sections(sections) for line in sec.lines]
 
     clean = denoise(raw, cfg.denoise)
     blamed_budget = int(cfg.llm.max_input_tokens * 0.7)

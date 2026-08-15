@@ -13,10 +13,10 @@ from ci_doctor.config.loader import load_config
 from ci_doctor.llm.backends import (
     ClaudeCodeClient,
     LiteLLMClient,
+    OpenAILLMClient,
     backend_ready,
     make_client,
 )
-from ci_doctor.llm.client import OpenAILLMClient
 
 
 def _llm(**over):

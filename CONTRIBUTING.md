@@ -166,9 +166,12 @@ and the pipeline will run as normal.
 ```sh
 uv run pytest                      # all green, no exceptions
 uv run ty check ci_doctor          # no type errors in the shipped package
-grep -ri gitlab ci_doctor/core/    # must be empty (invariant #2)
-grep -ri github ci_doctor/core/    # must be empty
 ```
+
+Invariant #2 (no provider names in `core/`) is enforced by
+`test_core_carries_no_vendor_name_in_its_code`, which reads the *code* — a
+grep also hits the prose explaining why the ports are vendor-neutral, which is
+the invariant being honoured, not broken.
 
 - New behaviour has a test. New matcher has a fixture.
 - Never commit `report.md` / `report.json` (local run artifacts).

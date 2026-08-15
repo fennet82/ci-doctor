@@ -18,6 +18,7 @@ no test: drop ``fixtures/logs/<provider>/`` and register its segmenter in
 
 from pathlib import Path
 
+from ci_doctor.core.models import walk_sections
 from ci_doctor.core.ports import LogSegmenter
 from ci_doctor.providers.github.segmenter import GitHubSegmenter
 from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
@@ -110,14 +111,8 @@ def log_lines(provider: str, case: str) -> list[str]:
         *these* lines — reading the raw file instead tests something the
         extractor never receives.
     """
-    return [line.text for sec in _walk(segment(provider, read_log(provider, case))) for line in sec.lines]
-
-
-def _walk(sections):
-    """Yield every section depth-first, parents before their children."""
-    for sec in sections:
-        yield sec
-        yield from _walk(sec.children)
+    sections = segment(provider, read_log(provider, case))
+    return [line.text for sec in walk_sections(sections) for line in sec.lines]
 
 
 def segment(provider: str, raw_log: str):

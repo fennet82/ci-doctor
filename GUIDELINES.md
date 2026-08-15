@@ -29,7 +29,7 @@ ci_doctor/
   core/             provider-neutral: models, ports, attribution (pure), denoise,
                     extract, budget, redact, analyze
   llm/              Report schema, prompt templates, backends
-  render/           terminal (rich), markdown, json
+  render/           terminal (rich), markdown
   providers/
     gitlab/         python-gitlab adapter + segmenter + reasons
     github/         PyGithub adapter + segmenter + reasons
@@ -60,7 +60,10 @@ number** — renumber an entry and you invalidate every reference to it, so new
 invariants go on the end. The first three, and #10, are load-bearing:
 
 1. **The LLM never selects the failure phase.** Attribution is deterministic and auditable.
-2. **No provider identifiers in `core/`.** Verify: `grep -ri gitlab ci_doctor/core/` must be empty.
+2. **No provider identifiers in `core/` code** — no import, identifier or string
+   literal. Pinned by `test_core_carries_no_vendor_name_in_its_code`, which strips
+   comments and docstrings first: prose naming the vendors a port deliberately
+   spans is the invariant being honoured, not broken.
 3. **Always `exit 0`.** The analyzer must never change a pipeline's outcome — `main()`
    catches `BaseException` and exits 0. Never add a code path that can exit non-zero.
 4. **Nothing reaches the public internet** by default — no telemetry, update checks, or
@@ -256,7 +259,8 @@ token read and a second version probe for nothing.
    (Forgejo and Gitea Actions both run act_runner and emit GitHub's `##[group]`).
 5. Add `tests/fixtures/logs/<name>/` and register the segmenter in `support.SEGMENTERS`.
    Fixtures are keyed on log format, so a git-host-only adapter owes none.
-6. Confirm `grep -ri <name> ci_doctor/core/` is empty. If it isn't, the abstraction broke.
+6. `test_core_carries_no_vendor_name_in_its_code` must stay green — add the new
+   vendor to its regex. If it fires, the abstraction broke.
 
 **Prefer the vendor's own SDK** over hand-rolled REST calls — `python-gitlab` and
 `PyGithub` are already dependencies, and pagination, retries and auth are not worth
