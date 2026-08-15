@@ -1,9 +1,9 @@
 """Map a GitLab job `failure_reason` string to the normalized `FailureReason`.
 
 Unknown / future GitLab reasons degrade to UNKNOWN rather than raising — older and
-newer self-managed instances both drift from what we know. The classifier (M2)
-does the real disambiguation from log structure; this is only the initial
-normalization. The provider's original string is always kept in
+newer self-managed instances both drift from what we know. The classifier in
+`core/attribution.py` does the real disambiguation from log structure; this is
+only the initial normalization. The provider's original string is always kept in
 `Job.raw_failure_reason`.
 """
 

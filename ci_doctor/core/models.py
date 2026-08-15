@@ -1,7 +1,7 @@
 """Provider-neutral domain model.
 
 Everything downstream of acquisition speaks *only* this model. No provider types
-leak past an adapter boundary. Purity guardrail: a case-insensitive grep for any
+leak past an adapter boundary. Invariant #2: a case-insensitive grep for any
 provider name over core/ must return nothing (keep this file free of them too).
 """
 

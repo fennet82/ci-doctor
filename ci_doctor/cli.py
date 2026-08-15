@@ -4,7 +4,7 @@
 a raw log offline. Both run the same pipeline: segment -> classify -> evidence ->
 report -> render/deliver.
 
-Guardrail #3: the analyzer must never change a pipeline's outcome, so `main()`
+Invariant #3: the analyzer must never change a pipeline's outcome, so `main()`
 catches everything and always exits 0.
 """
 
@@ -182,7 +182,7 @@ def _validate(paths: list[Path]) -> None:
         paths: The `--config/-f` files, lowest precedence first.
 
     Note:
-        Reports to stderr and still exits 0 — guardrail #3 applies to every
+        Reports to stderr and still exits 0 — invariant #3 applies to every
         subcommand, so grep the output rather than the exit code.
     """
     try:
@@ -481,7 +481,7 @@ def _maybe_post_mr(ci_provider, run, results, cfg) -> None:
 
     Gated on medium-or-better confidence: a low-confidence guess posted on
     someone's MR is worse than no comment. Delivery failures are swallowed —
-    guardrail #3 means a broken note must not change the pipeline's outcome.
+    invariant #3 means a broken note must not change the pipeline's outcome.
 
     Args:
         ci_provider: The CI adapter, or None for offline replay. Passed only so
@@ -527,7 +527,7 @@ _LEVEL_COLORS = Theme(
 def main() -> None:
     """Console-script entry point.
 
-    Guardrail #3: catches everything and always exits 0, so a crash in the
+    Invariant #3: catches everything and always exits 0, so a crash in the
     analyzer can never turn a passing pipeline red.
     """
     # NullHighlighter: rich otherwise repr-highlights the message body (numbers

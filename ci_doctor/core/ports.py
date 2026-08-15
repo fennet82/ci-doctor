@@ -20,7 +20,7 @@ class CIProvider(ABC):
     Jenkins builds GitLab repos, Woodpecker builds Forgejo ones. A vendor that is
     both (GitLab, GitHub) implements both ports over one client.
 
-    Guardrail #1: every method here is a *read*. Nothing may retry, cancel or
+    Invariant #10: every method here is a *read*. Nothing may retry, cancel or
     restart a job.
     """
 
@@ -51,7 +51,7 @@ class CIProvider(ABC):
 class SCMProvider(ABC):
     """Access to one git host — where the code lives and the note goes.
 
-    Guardrail #1 holds here too: the only write in the whole tool is
+    Invariant #10 holds here too: the only write in the whole tool is
     :meth:`post_note`, and it writes to a discussion thread. Nothing may push,
     merge, or change a repository.
     """

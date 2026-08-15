@@ -1,6 +1,6 @@
 """The blame classifier. Pure function: (Job, sections) -> Attribution.
 
-No I/O, no network, no clock (guardrail #7). This decides *where* the job failed;
+No I/O, no network, no clock (invariant #7). This decides *where* the job failed;
 the LLM never does. The precedence ladder below is first-match-wins and every rule
 records a ``rule_id`` so the report can say exactly why it decided.
 
@@ -84,7 +84,7 @@ class Attribution:
 def attribute(job: Job, sections: list[Section]) -> Attribution:
     """Decide which phase a job failed in.
 
-    A pure function — no I/O, no network, no clock (guardrail #7) — so the same
+    A pure function — no I/O, no network, no clock (invariant #7) — so the same
     log always yields the same verdict. The rules are a first-match-wins ladder:
     an empty log, then the provider's own reason, then `script_failure` short-
     circuiting straight to SCRIPT, then structural fallbacks for an UNKNOWN reason.

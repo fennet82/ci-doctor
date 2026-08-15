@@ -1,9 +1,9 @@
 """Orchestrator: turn a classified job into a budgeted evidence bundle.
 
-This is what the LLM step (M4) will consume, and what `--dry-run` will print. It
-wires the deterministic stages together; it does not call any model. Segmentation
-+ attribution happen upstream (they need a provider-specific segmenter); this takes
-the already-segmented job plus its Attribution.
+This is what the report step consumes, and all it consumes. It wires the
+deterministic stages together and calls no model. Segmentation + attribution
+happen upstream (they need a provider-specific segmenter); this takes the
+already-segmented job plus its Attribution.
 """
 
 import logging
