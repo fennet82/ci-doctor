@@ -1,0 +1,211 @@
+---
+/**
+ * What core/extract.py does to a match: window it, merge it, shed it, render it.
+ *
+ * The mermaid source declared `flowchart LR`, which is what made this one
+ * unreadable on anything narrower than a desktop — six stages left-to-right
+ * gave the SVG a natural width far past the content column, and `useMaxWidth`
+ * then scaled the type down along with the drawing. Direction is a hint, not
+ * an instruction, so this runs top-down instead and fits the column at 1:1.
+ *
+ * All seven source nodes survive; only the layout changed.
+ */
+---
+
+<figure class="diagram">
+  <div class="diagram-canvas">
+    <svg
+      viewBox="0 0 960 696"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-labelledby="ext-title ext-desc"
+    >
+      <title id="ext-title">From a match to rendered evidence</title>
+      <desc id="ext-desc"
+        >The denoised lines of the blamed section are fed to every matcher,
+        which turns each hit into a window either from a pattern with
+        before/after context or from a start/end block; a tail window is added
+        separately. Overlapping windows merge, keeping the highest priority
+        they absorbed, whole windows are shed lowest-priority-first until the
+        budget fits, and what remains is rendered with elision markers.</desc
+      >
+
+      <defs>
+        <marker
+          id="ext-arrow"
+          markerWidth="8"
+          markerHeight="6"
+          refX="7"
+          refY="3"
+          orient="auto"
+        >
+          <polygon class="dg-arrowhead" points="0 0, 8 3, 0 6" />
+        </marker>
+        <marker
+          id="ext-arrow-focal"
+          markerWidth="8"
+          markerHeight="6"
+          refX="7"
+          refY="3"
+          orient="auto"
+        >
+          <polygon class="dg-arrowhead-focal" points="0 0, 8 3, 0 6" />
+        </marker>
+      </defs>
+
+      {/* Edges before nodes. */}
+      <path
+        class="dg-edge"
+        d="M 436,104 V 136 Q 436,144 428,144 H 320 Q 312,144 312,152 V 168"
+        marker-end="url(#ext-arrow)"
+      />
+      <path
+        class="dg-edge"
+        d="M 524,104 V 136 Q 524,144 532,144 H 688 Q 696,144 696,152 V 168"
+        marker-end="url(#ext-arrow)"
+      />
+
+      {/* The two matcher kinds. Offset 96px so neither leg hides the other —
+          they are the whole reason a pack declares either a pattern or a
+          start/end pair. */}
+      <line
+        class="dg-edge"
+        x1="264"
+        y1="224"
+        x2="264"
+        y2="288"
+        marker-end="url(#ext-arrow)"
+      />
+      <line
+        class="dg-edge"
+        x1="360"
+        y1="224"
+        x2="360"
+        y2="288"
+        marker-end="url(#ext-arrow)"
+      />
+
+      {/* Both inputs converge on the merge, fanned 88px apart on its top edge. */}
+      <path
+        class="dg-edge-focal"
+        d="M 312,344 V 376 Q 312,384 320,384 H 428 Q 436,384 436,392 V 408"
+        marker-end="url(#ext-arrow-focal)"
+      />
+      <path
+        class="dg-edge"
+        d="M 696,224 V 376 Q 696,384 688,384 H 532 Q 524,384 524,392 V 408"
+        marker-end="url(#ext-arrow)"
+      />
+
+      <path
+        class="dg-edge-focal"
+        d="M 480,464 V 496 Q 480,504 472,504 H 320 Q 312,504 312,512 V 528"
+        marker-end="url(#ext-arrow-focal)"
+      />
+      <line
+        class="dg-edge"
+        x1="448"
+        y1="556"
+        x2="560"
+        y2="556"
+        marker-end="url(#ext-arrow)"
+      />
+
+      {/* Edge labels. */}
+      <rect class="dg-mask" x="580" y="124" width="60" height="12" rx="2" />
+      <text class="dg-label" x="610" y="133" text-anchor="middle">TAIL_LINES</text>
+
+      <rect class="dg-mask" x="196" y="250" width="60" height="12" rx="2" />
+      <text class="dg-label" x="226" y="259" text-anchor="middle">PATTERN ±N</text>
+
+      <rect class="dg-mask" x="368" y="250" width="56" height="12" rx="2" />
+      <text class="dg-label" x="396" y="259" text-anchor="middle">START…END</text>
+
+      {/* Nodes. */}
+      <rect class="dg-mask" x="352" y="48" width="256" height="56" rx="6" />
+      <rect class="dg-node-store" x="352" y="48" width="256" height="56" rx="6" />
+      <rect class="dg-tag" x="360" y="54" width="24" height="12" rx="2" />
+      <text class="dg-tag-text" x="372" y="63" text-anchor="middle">IN</text>
+      <text class="dg-name" x="480" y="80" text-anchor="middle">Denoised lines</text>
+      <text class="dg-sub" x="480" y="95" text-anchor="middle"
+        >of the blamed section</text
+      >
+
+      <rect class="dg-mask" x="176" y="168" width="272" height="56" rx="6" />
+      <rect class="dg-node" x="176" y="168" width="272" height="56" rx="6" />
+      <rect class="dg-tag" x="184" y="174" width="32" height="12" rx="2" />
+      <text class="dg-tag-text" x="200" y="183" text-anchor="middle">MTCH</text>
+      <text class="dg-name" x="312" y="200" text-anchor="middle"
+        >Every matcher runs over them</text
+      >
+      <text class="dg-sub" x="312" y="215" text-anchor="middle"
+        >anchor packs · block packs</text
+      >
+
+      <rect class="dg-mask" x="560" y="168" width="272" height="56" rx="6" />
+      <rect class="dg-node-store" x="560" y="168" width="272" height="56" rx="6" />
+      <rect class="dg-tag" x="568" y="174" width="32" height="12" rx="2" />
+      <text class="dg-tag-text" x="584" y="183" text-anchor="middle">TAIL</text>
+      <text class="dg-name" x="696" y="200" text-anchor="middle">Tail window</text>
+      <text class="dg-sub" x="696" y="215" text-anchor="middle">priority 0</text>
+
+      <rect class="dg-mask" x="176" y="288" width="272" height="56" rx="6" />
+      <rect class="dg-node" x="176" y="288" width="272" height="56" rx="6" />
+      <rect class="dg-tag" x="184" y="294" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="198" y="303" text-anchor="middle">WIN</text>
+      <text class="dg-name" x="312" y="320" text-anchor="middle">Window</text>
+      <text class="dg-sub" x="312" y="335" text-anchor="middle"
+        >one hit + its context</text
+      >
+
+      <rect class="dg-mask" x="352" y="408" width="256" height="56" rx="6" />
+      <rect class="dg-node-focal" x="352" y="408" width="256" height="56" rx="6" />
+      <rect class="dg-tag-focal" x="360" y="414" width="28" height="12" rx="2" />
+      <text class="dg-tag-text dg-tag-text-focal" x="374" y="423" text-anchor="middle"
+        >MRG</text
+      >
+      <text class="dg-name" x="480" y="440" text-anchor="middle">Merge overlaps</text>
+      <text class="dg-sub" x="480" y="455" text-anchor="middle"
+        >window keeps the highest priority</text
+      >
+
+      <rect class="dg-mask" x="176" y="528" width="272" height="56" rx="6" />
+      <rect class="dg-node-focal" x="176" y="528" width="272" height="56" rx="6" />
+      <rect class="dg-tag-focal" x="184" y="534" width="32" height="12" rx="2" />
+      <text class="dg-tag-text dg-tag-text-focal" x="200" y="543" text-anchor="middle"
+        >SHED</text
+      >
+      <text class="dg-name" x="312" y="560" text-anchor="middle"
+        >Shed whole windows</text
+      >
+      <text class="dg-sub" x="312" y="575" text-anchor="middle"
+        >lowest priority first, until it fits</text
+      >
+
+      <rect class="dg-mask" x="560" y="528" width="272" height="56" rx="6" />
+      <rect class="dg-node-store" x="560" y="528" width="272" height="56" rx="6" />
+      <rect class="dg-tag" x="568" y="534" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="582" y="543" text-anchor="middle">OUT</text>
+      <text class="dg-name" x="696" y="560" text-anchor="middle">Render</text>
+      <text class="dg-sub" x="696" y="575" text-anchor="middle"
+        >… N lines elided …</text
+      >
+
+      {/* Legend. */}
+      <line class="dg-legend-rule" x1="40" y1="612" x2="920" y2="612" />
+      <text class="dg-legend-label" x="40" y="628">LEGEND</text>
+
+      <rect class="dg-node-focal" x="40" y="644" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="60" y="652">Where priority decides</text>
+
+      <rect class="dg-node" x="260" y="644" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="280" y="652">Pipeline step</text>
+
+      <rect class="dg-node-store" x="480" y="644" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="500" y="652">Data in &amp; out</text>
+    </svg>
+  </div>
+  <figcaption>
+    core/extract.py — matching, merging, shedding, rendering.
+  </figcaption>
+</figure>

@@ -1,51 +1,12 @@
 ---
 import Base from "../../layouts/Base.astro";
-import Mermaid from "../../components/Mermaid.astro";
+import Architecture from "../../components/diagrams/Architecture.astro";
 import PageCards from "../../components/PageCards.astro";
 import { nav } from "../../lib/nav";
 import { url } from "../../lib/url";
 
 const section = nav.find((s) => s.href === "/concepts/")!;
 
-const architecture = `flowchart TD
-  SRC["provider API<br>or a saved log file"]
-
-  subgraph AD["providers/ — the only code that names a CI system"]
-    SEG["segmenter.py<br>raw log → Section tree"]
-    RSN["reasons.py<br>provider status → FailureReason"]
-  end
-
-  subgraph CO["core/ — provider-neutral, pure, offline"]
-    PH["phases.py<br>Section → Phase"]
-    ATT["attribution.py<br>WHICH PHASE FAILED"]
-    DEN["denoise.py<br>strip · collapse · fold"]
-    EXT["extract.py<br>matchers → windows"]
-    BUD["budget.py<br>fit to max_input_tokens"]
-  end
-
-  EV[["EvidenceBundle<br>all the report step may see"]]
-
-  subgraph OU["outputs"]
-    REP["llm/report.py<br>deterministic report"]
-    LLM["llm/ backend<br>explains WHY · optional"]
-    RED["core/redact.py<br>scrub again"]
-    REN["render/<br>terminal · md · json · MR note"]
-  end
-
-  SRC --> SEG
-  SRC --> RSN
-  SEG -- "core/ports.py — the only contract" --> PH
-  PH --> ATT
-  RSN --> ATT
-  ATT -- "the blamed section, and only it" --> DEN
-  DEN --> EXT
-  EXT --> BUD
-  BUD --> EV
-  EV --> REP
-  REP -. "redacted prompt" .-> LLM
-  LLM -. "cause + fix, validated" .-> REP
-  REP --> RED
-  RED --> REN`;
 ---
 
 <Base
@@ -80,11 +41,7 @@ const architecture = `flowchart TD
         evidence that has already been selected and redacted.
     </p>
 
-    <Mermaid
-        code={architecture}
-        label="Architecture: provider adapters segment the log and normalise the failure reason; core assigns phases, attributes the failure, then denoises, extracts and budgets the blamed section into an EvidenceBundle; the report is built deterministically, optionally explained by a model, redacted, and rendered."
-        caption="Solid edges are deterministic and offline. The dotted pair is the one optional model call."
-    />
+    <Architecture />
 
     <h2>The same code as layers</h2>
     <p>

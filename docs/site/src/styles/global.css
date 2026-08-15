@@ -36,6 +36,27 @@
 
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Diagram roles. The four aliases below inherit whatever the theme set above,
+     so they need no dark counterpart; only the derived rgba washes do. This is
+     the whole reason the diagrams ship as inline SVG rather than .svg files —
+     an <img> cannot see these, so it could never follow the reader's theme. */
+  --dg-paper: var(--card);
+  --dg-ink: var(--fg);
+  --dg-muted: var(--muted);
+  --dg-accent: var(--accent);
+
+  --dg-soft: #8b949e;
+  --dg-rule: rgba(16, 21, 28, 0.12);
+  --dg-zone-fill: rgba(16, 21, 28, 0.02);
+  --dg-zone-rule: rgba(16, 21, 28, 0.1);
+  --dg-seam: rgba(16, 21, 28, 0.28);
+  --dg-accent-tint: rgba(37, 99, 235, 0.09);
+  --dg-accent-rule: rgba(37, 99, 235, 0.5);
+  --dg-store-fill: rgba(16, 21, 28, 0.05);
+  --dg-optional-fill: rgba(16, 21, 28, 0.02);
+  --dg-optional-rule: rgba(16, 21, 28, 0.22);
+  --dg-tag-rule: rgba(16, 21, 28, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,6 +81,18 @@
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-md: 0 6px 20px rgb(0 0 0 / 0.45);
+
+    --dg-soft: #6f7d8c;
+    --dg-rule: rgba(230, 237, 243, 0.12);
+    --dg-zone-fill: rgba(230, 237, 243, 0.03);
+    --dg-zone-rule: rgba(230, 237, 243, 0.1);
+    --dg-seam: rgba(230, 237, 243, 0.28);
+    --dg-accent-tint: rgba(96, 152, 255, 0.14);
+    --dg-accent-rule: rgba(96, 152, 255, 0.5);
+    --dg-store-fill: rgba(230, 237, 243, 0.06);
+    --dg-optional-fill: rgba(230, 237, 243, 0.03);
+    --dg-optional-rule: rgba(230, 237, 243, 0.24);
+    --dg-tag-rule: rgba(230, 237, 243, 0.4);
   }
 }
 
@@ -85,6 +118,18 @@
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 6px 20px rgb(0 0 0 / 0.45);
+
+  --dg-soft: #6f7d8c;
+  --dg-rule: rgba(230, 237, 243, 0.12);
+  --dg-zone-fill: rgba(230, 237, 243, 0.03);
+  --dg-zone-rule: rgba(230, 237, 243, 0.1);
+  --dg-seam: rgba(230, 237, 243, 0.28);
+  --dg-accent-tint: rgba(96, 152, 255, 0.14);
+  --dg-accent-rule: rgba(96, 152, 255, 0.5);
+  --dg-store-fill: rgba(230, 237, 243, 0.06);
+  --dg-optional-fill: rgba(230, 237, 243, 0.03);
+  --dg-optional-rule: rgba(230, 237, 243, 0.24);
+  --dg-tag-rule: rgba(230, 237, 243, 0.4);
 }
 
 *,
@@ -490,6 +535,126 @@ tbody tr:last-child td { border-bottom: none; }
 ul.tight { padding-left: 1.15rem; margin: 1rem 0; }
 ul.tight li { margin: 0.4rem 0; max-width: 72ch; }
 ul.tight li::marker { color: var(--muted); }
+
+/* ---------- diagrams ---------- */
+
+/* Hand-laid inline SVG. Authored at 960 wide against a ~976px content column so
+   it lands at roughly 1:1 instead of being scaled down — the old mermaid render
+   had a natural width well past the column, and `useMaxWidth` shrank the whole
+   SVG, type included, to make it fit. Below --dg-min the figure scrolls rather
+   than shrinking further; past that width the labels stop being readable. */
+.diagram { margin: 1.75rem 0; }
+
+.diagram-canvas {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.diagram-canvas svg {
+  display: block;
+  width: 100%;
+  min-width: 680px;
+  height: auto;
+}
+
+.diagram figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Node fills and strokes. Every value is a token, so a theme flip repaints the
+   diagram with no redraw and no JS. */
+.dg-node { fill: var(--dg-paper); stroke: var(--dg-ink); stroke-width: 1; }
+.dg-node-focal { fill: var(--dg-accent-tint); stroke: var(--dg-accent); stroke-width: 1; }
+.dg-node-store { fill: var(--dg-store-fill); stroke: var(--dg-muted); stroke-width: 1; }
+.dg-node-opt {
+  fill: var(--dg-optional-fill);
+  stroke: var(--dg-optional-rule);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+/* Opaque plate under a box or an arrow label, so an edge cannot bleed through. */
+.dg-mask { fill: var(--dg-paper); }
+
+.dg-zone { fill: var(--dg-zone-fill); stroke: var(--dg-zone-rule); stroke-width: 0.8; }
+.dg-seam { stroke: var(--dg-seam); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
+
+.dg-edge { fill: none; stroke: var(--dg-muted); stroke-width: 1.2; }
+.dg-edge-focal { fill: none; stroke: var(--dg-accent); stroke-width: 1.4; }
+.dg-edge-opt {
+  fill: none;
+  stroke: var(--dg-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.dg-arrowhead { fill: var(--dg-muted); }
+.dg-arrowhead-focal { fill: var(--dg-accent); }
+
+.dg-tag { fill: none; stroke: var(--dg-tag-rule); stroke-width: 0.8; }
+.dg-tag-focal { fill: none; stroke: var(--dg-accent-rule); stroke-width: 0.8; }
+
+/* Type ramp. Mono carries technical content — paths, flags, formats; the sans
+   face carries anything a human reads as a name. */
+.dg-name {
+  fill: var(--dg-ink);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+.dg-sub {
+  fill: var(--dg-muted);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+.dg-tag-text {
+  fill: var(--dg-muted);
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+.dg-tag-text-focal { fill: var(--dg-accent); }
+.dg-zone-label {
+  fill: var(--dg-muted);
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+.dg-seam-label {
+  fill: var(--dg-muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+}
+.dg-label {
+  fill: var(--dg-soft);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+.dg-legend-rule { stroke: var(--dg-rule); stroke-width: 0.8; }
+.dg-legend-label {
+  fill: var(--dg-muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+.dg-legend-text {
+  fill: var(--dg-muted);
+  font-family: var(--sans);
+  font-size: 8.5px;
+}
 
 /* ---------- footer ---------- */
 
