@@ -6,12 +6,13 @@ that would surface only in the one environment where it can't be debugged).
 """
 
 import socket
+from typing import Never
 
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def _no_network(monkeypatch):
+def _no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     """Block every real socket connection for the duration of a test.
 
     Autouse, so no test can opt out by forgetting to request it.
@@ -20,7 +21,7 @@ def _no_network(monkeypatch):
         monkeypatch: pytest fixture used to patch the socket module.
     """
 
-    def guard(*args, **kwargs):
+    def guard(*args: object, **kwargs: object) -> Never:
         """Stand in for socket connect/create_connection.
 
         Raises:

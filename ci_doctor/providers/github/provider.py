@@ -13,10 +13,13 @@ import logging
 import os
 import re
 from collections.abc import Mapping
-from typing import Any
+from datetime import datetime
 
 import requests
 from github import Auth, Github, GithubException
+from github.Repository import Repository
+from github.WorkflowJob import WorkflowJob
+from github.WorkflowRun import WorkflowRun
 
 from ci_doctor.config.schema import Config
 from ci_doctor.core.models import Job, MergeRequestRef, Run, RunnerInfo
@@ -45,7 +48,12 @@ class GitHubProvider(CIProvider, SCMProvider):
     the same client, so one instance answers as CI system and as git host.
     """
 
-    def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
+    def __init__(
+        self,
+        config: Config,
+        client: Github | None = None,
+        environ: Mapping[str, str] | None = None,
+    ) -> None:
         """Connect to GitHub, unless a client is injected.
 
         Args:
@@ -56,10 +64,10 @@ class GitHubProvider(CIProvider, SCMProvider):
         self.cfg = config.github
         self.environ = os.environ if environ is None else environ
         self.verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
-        self._repo_obj = None
+        self._repo_obj: Repository | None = None
         #: Raw PyGithub jobs kept from fetch_run, keyed by id: the log lives behind
         #: a method on the job object and the API exposes no by-id job lookup.
-        self._raw_jobs: dict[str, Any] = {}
+        self._raw_jobs: dict[str, WorkflowJob] = {}
         self.gh = client if client is not None else self._connect()
 
     # --- connection -------------------------------------------------------
@@ -83,7 +91,7 @@ class GitHubProvider(CIProvider, SCMProvider):
             timeout=self.cfg.timeout_seconds,
         )
 
-    def _repo(self):
+    def _repo(self) -> Repository:
         """Resolve and cache the repository.
 
         Returns:
@@ -177,7 +185,7 @@ class GitHubProvider(CIProvider, SCMProvider):
 
     # --- mapping ----------------------------------------------------------
 
-    def _pr_ref(self, wr) -> MergeRequestRef | None:
+    def _pr_ref(self, wr: WorkflowRun) -> MergeRequestRef | None:
         """Resolve the pull request for a run.
 
         Args:
@@ -193,7 +201,7 @@ class GitHubProvider(CIProvider, SCMProvider):
         m = re.match(r"refs/pull/(\d+)/", self.environ.get("GITHUB_REF", ""))
         return MergeRequestRef(iid=m.group(1)) if m else None
 
-    def _to_job(self, j) -> Job:
+    def _to_job(self, j: WorkflowJob) -> Job:
         """Map a PyGithub workflow job onto the domain model.
 
         Args:
@@ -227,15 +235,21 @@ class GitHubProvider(CIProvider, SCMProvider):
         )
 
 
-def _str_or_none(value) -> str | None:
+def _str_or_none(value: object) -> str | None:
     """Stringify an optional id without turning None into "None"."""
     return None if value is None else str(value)
 
 
-def _iso(value) -> str | None:
+def _iso(value: datetime | None) -> str | None:
     """Normalise PyGithub's `datetime` timestamps to the domain's ISO strings.
 
     The domain model is a plain dataclass, so nothing downstream would catch a
     `datetime` slipping through — it would surface as a JSON dump crash instead.
+
+    Args:
+        value: A timestamp from PyGithub, or None when the job never reached it.
+
+    Returns:
+        The ISO string, or None.
     """
-    return value.isoformat() if hasattr(value, "isoformat") else value or None
+    return value.isoformat() if value is not None else None

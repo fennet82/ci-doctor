@@ -186,7 +186,7 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
 # --- helpers ----------------------------------------------------------------
 
 
-def _find(sections, name) -> Section | None:
+def _find(sections: list[Section], name: str) -> Section | None:
     """Find the first section with a given name.
 
     Args:
@@ -199,7 +199,7 @@ def _find(sections, name) -> Section | None:
     return next((s for s in walk_sections(sections) if s.name == name), None)
 
 
-def _last_open_section(sections) -> Section | None:
+def _last_open_section(sections: list[Section]) -> Section | None:
     """Find the last section that never saw its end marker.
 
     An unclosed section means execution died inside it — the strongest structural
@@ -218,7 +218,7 @@ def _last_open_section(sections) -> Section | None:
     return result
 
 
-def _open_phase(sections) -> Phase | None:
+def _open_phase(sections: list[Section]) -> Phase | None:
     """Phase of whatever section was still running.
 
     Args:
@@ -266,7 +266,7 @@ def _is_error_line(text: str) -> bool:
     return bool(_ERROR_RE.search(text.lstrip()))
 
 
-def _last_error_section(sections) -> Section | None:
+def _last_error_section(sections: list[Section]) -> Section | None:
     """Find the last section containing a genuinely fatal line.
 
     Args:
@@ -321,7 +321,7 @@ def _terminal(trailer: Section | None) -> str | None:
     return _last_line(trailer) if trailer is not None else None
 
 
-def _terminal_command(sections) -> str | None:
+def _terminal_command(sections: list[Section]) -> str | None:
     """The last command the user's script ran before it failed.
 
     Args:
@@ -354,7 +354,7 @@ def _matching_line(sec: Section, pattern: str) -> str | None:
     return hit if hit is not None else _last_line(sec)
 
 
-def _parse_trailer(trailer: Section | None):
+def _parse_trailer(trailer: Section | None) -> tuple[Phase, FailureReason, str, str | None] | None:
     """Read the runner's closing verdict.
 
     Args:
@@ -391,7 +391,7 @@ def _parse_trailer(trailer: Section | None):
     return None
 
 
-def _warning_phases(sections, exclude: Phase) -> list[Phase]:
+def _warning_phases(sections: list[Section], exclude: Phase) -> list[Phase]:
     """Phases that warned but were not blamed.
 
     Args:

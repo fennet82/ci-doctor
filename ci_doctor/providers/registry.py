@@ -40,7 +40,7 @@ SEGMENTERS: dict[str, str] = {
 _FALLBACK_SEGMENTER = SEGMENTERS["gitlab"]
 
 
-def _load(spec: str) -> Any:
+def _load(spec: str) -> Any:  # noqa: ANN401 - an import resolved by name cannot be typed
     """Import a `"module:attribute"` target.
 
     Args:
@@ -54,7 +54,7 @@ def _load(spec: str) -> Any:
     return getattr(import_module(module), name)
 
 
-def make_adapter(vendor: str, cfg: Config) -> Any:
+def make_adapter(vendor: str, cfg: Config) -> CIProvider | SCMProvider | None:
     """Build the adapter for one vendor, whichever ports it implements.
 
     Args:

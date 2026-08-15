@@ -18,9 +18,10 @@ automatically, and ``test_attribution_fixtures.py`` fails if a fixture directory
 has no registered segmenter.
 """
 
+from collections.abc import Iterable
 from pathlib import Path
 
-from ci_doctor.core.models import walk_sections
+from ci_doctor.core.models import Section, walk_sections
 from ci_doctor.providers.registry import SEGMENTERS, segmenter_for
 
 FIX = Path(__file__).parent / "fixtures"
@@ -82,7 +83,7 @@ def providers_with(case: str) -> list[str]:
     return [p for p in providers() if log_path(p, case).is_file()]
 
 
-def pairs_for(cases) -> list[tuple[str, str]]:
+def pairs_for(cases: Iterable[str]) -> list[tuple[str, str]]:
     """Cross a set of cases with the providers that ship each one.
 
     Args:
@@ -112,7 +113,7 @@ def log_lines(provider: str, case: str) -> list[str]:
     return [line.text for sec in walk_sections(sections) for line in sec.lines]
 
 
-def segment(provider: str, raw_log: str):
+def segment(provider: str, raw_log: str) -> list[Section]:
     """Parse a raw log with the segmenter for that provider's format.
 
     Args:

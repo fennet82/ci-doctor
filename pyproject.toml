@@ -74,13 +74,18 @@ line-length = 110
 # I:  one import order, so a diff never argues about it.
 # UP: the floor is 3.11; don't ship idioms written for older ones.
 # B, C4: bugbear's real traps, and comprehension literals.
-extend-select = ["S", "D", "I", "UP", "B", "C4"]
+# ANN: every parameter and return in the shipped package is annotated. `ty` only
+#      checks what it is given, so an unannotated argument is a hole it reads as
+#      Unknown and silently stops checking through.
+extend-select = ["S", "D", "I", "UP", "B", "C4", "ANN"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S603"]  # assert is the test; subprocess there is fixture setup
+# ANN off for tests: a test function returns None and says so by being a test.
+# `support.py` and `conftest.py` are annotated anyway — they are shared code.
+"tests/**" = ["S101", "S603", "ANN"]  # assert is the test; subprocess there is fixture setup
 "ci_doctor/cli.py" = ["B008"]  # typer declares options as call-valued defaults, by design
 
 [tool.pytest.ini_options]
