@@ -156,7 +156,7 @@ def _render(lines: list[str], windows: list[_Window]) -> list[str]:
         windows: Merged, sorted, non-overlapping windows.
 
     Returns:
-        Selected lines interleaved with explicit elision markers. Guardrail #8:
+        Selected lines interleaved with explicit elision markers. Invariant #6:
         no cut is ever silent.
     """
     out: list[str] = []

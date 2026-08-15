@@ -55,7 +55,9 @@ examples/           .gitlab-ci.yml + GitHub Actions workflows
 
 ## 3. Invariants — do not break these
 
-This list is the single source of truth for them. The first three are load-bearing:
+This list is the single source of truth for them, and code comments cite it **by
+number** — renumber an entry and you invalidate every reference to it, so new
+invariants go on the end. The first three, and #10, are load-bearing:
 
 1. **The LLM never selects the failure phase.** Attribution is deterministic and auditable.
 2. **No provider identifiers in `core/`.** Verify: `grep -ri gitlab ci_doctor/core/` must be empty.
@@ -68,6 +70,9 @@ This list is the single source of truth for them. The first three are load-beari
 7. `attribution.py` stays a pure function.
 8. Prompts live in `llm/prompts/*.txt`, not inline strings.
 9. Prefer a fixture over a manual test; prefer a config knob over a hardcoded pattern.
+10. **Read-only.** Every provider method is a read. The single exception in the whole
+    tool is `SCMProvider.post_note`, which writes to a discussion thread. Nothing
+    retries, cancels, restarts, pushes or merges anything — see `core/ports.py`.
 
 ## 4. Writing tests
 

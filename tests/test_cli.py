@@ -1,4 +1,4 @@
-"""CLI surface: the exit-0 guardrail, log levels, replay, and `config`."""
+"""CLI surface: the exit-0 invariant, log levels, replay, and `config`."""
 
 import json
 import sys
@@ -28,7 +28,7 @@ def _run(monkeypatch, capsys, *argv):
 
 
 def test_main_always_exits_zero_on_error(monkeypatch):
-    """Guardrail #3: even a crash exits 0, so a pipeline outcome never changes."""
+    """Invariant #3: even a crash exits 0, so a pipeline outcome never changes."""
     # A missing --config raises FileNotFoundError out of the loader, before anything renders.
     monkeypatch.setattr(sys, "argv", ["ci-doctor", "analyze", "-f", "/no/such/config.yml", "123"])
     with pytest.raises(SystemExit) as exc:
@@ -108,7 +108,7 @@ def test_format_json_stdout_has_nothing_but_json(tmp_path):
         text=True,
         check=False,
     )
-    assert proc.returncode == 0  # guardrail #3, even here
+    assert proc.returncode == 0  # invariant #3, even here
     json.loads(proc.stdout)  # raises if a log line leaked onto stdout
     assert "analyzing" in proc.stderr  # ...because the diagnostics went to stderr
 

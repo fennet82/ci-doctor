@@ -1,10 +1,10 @@
 """Produce the Report: one LLM call (plus one repair retry), or a deterministic
 report when the LLM is disabled/unconfigured/unreachable.
 
-The deterministic report is a first-class output (llm.enabled: false), the M2-grade
-verdict, AND the degraded fallback — it always carries phase, reason, terminal
-evidence, an excerpt, and templated remediation. Nothing here crashes; a broken
-analyzer must never change the pipeline outcome.
+The deterministic report is a first-class output (`llm.enabled: false`) *and*
+the degraded fallback — it always carries phase, reason, terminal evidence, an
+excerpt, and templated remediation. Nothing here crashes; a broken analyzer must
+never change the pipeline outcome.
 """
 
 import json
@@ -320,7 +320,7 @@ def _handoff(job: Job, attr: Attribution, excerpt: str) -> str:
 def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: dict) -> str:
     """Fill the system and user prompt templates.
 
-    Guardrail #10: prompt text lives in `llm/prompts/*.txt`, never inline here,
+    Invariant #8: prompt text lives in `llm/prompts/*.txt`, never inline here,
     so it can be reviewed and edited without touching code.
 
     Args:
