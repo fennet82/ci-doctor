@@ -10,8 +10,10 @@ on older instances degrade to sensible defaults instead of crashing.
 import logging
 import os
 from collections.abc import Mapping
+from typing import Any
 
 import gitlab
+from gitlab.v4.objects import Project, ProjectPipelineJob
 
 from ci_doctor.config.schema import Config
 from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, Run, RunnerInfo
@@ -31,7 +33,12 @@ class GitLabProvider(CIProvider, SCMProvider):
     build of a GitLab repo uses only the SCM half.
     """
 
-    def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
+    def __init__(
+        self,
+        config: Config,
+        client: gitlab.Gitlab | None = None,
+        environ: Mapping[str, str] | None = None,
+    ) -> None:
         """Connect to GitLab, unless a client is injected.
 
         Args:
@@ -44,12 +51,12 @@ class GitLabProvider(CIProvider, SCMProvider):
         """
         self.cfg = config.gitlab
         self.environ = os.environ if environ is None else environ
-        self._project_obj = None
+        self._project_obj: Project | None = None
         self.gl = client if client is not None else self._connect()
 
     # --- connection -------------------------------------------------------
 
-    def _connect(self):
+    def _connect(self) -> gitlab.Gitlab:
         """Build the python-gitlab client and probe the instance version.
 
         Returns:
@@ -75,7 +82,7 @@ class GitLabProvider(CIProvider, SCMProvider):
             log.warning("could not detect GitLab version (continuing): %s", exc)
         return gl
 
-    def _project(self):
+    def _project(self) -> Project:
         """Resolve and cache the project from `CI_PROJECT_ID`.
 
         Returns:
@@ -179,7 +186,7 @@ class GitLabProvider(CIProvider, SCMProvider):
 
     # --- mapping ----------------------------------------------------------
 
-    def _to_job(self, pj) -> Job:
+    def _to_job(self, pj: ProjectPipelineJob) -> Job:
         """Map a python-gitlab job onto the domain model.
 
         Args:
@@ -212,7 +219,7 @@ class GitLabProvider(CIProvider, SCMProvider):
         )
 
     @staticmethod
-    def _to_runner(runner) -> RunnerInfo | None:
+    def _to_runner(runner: dict[str, Any] | None) -> RunnerInfo | None:
         """Map GitLab's runner dict onto the domain model.
 
         Args:
@@ -231,7 +238,7 @@ class GitLabProvider(CIProvider, SCMProvider):
         )
 
     @staticmethod
-    def _to_needs(needs) -> list[str]:
+    def _to_needs(needs: list[dict[str, Any] | str] | None) -> list[str]:
         """Extract upstream job names from GitLab's `needs`.
 
         Args:

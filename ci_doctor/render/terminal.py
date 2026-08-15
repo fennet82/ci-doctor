@@ -12,12 +12,13 @@ cues only.
 """
 
 import time
+from typing import IO
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from ci_doctor.llm.schema import Report
+from ci_doctor.llm.schema import RemediationStep, Report
 
 #: Name of the collapsible section wrapping the report inside a GitLab job log.
 _SECTION = "ci_doctor_report"
@@ -30,7 +31,13 @@ _LABEL = "bold cyan"
 _SUBLABEL = "bold"  # headers nested inside the evidence panel
 
 
-def render_terminal(report: Report, *, no_color: bool = False, wrap_section: bool = False, file=None) -> None:
+def render_terminal(
+    report: Report,
+    *,
+    no_color: bool = False,
+    wrap_section: bool = False,
+    file: IO[str] | None = None,
+) -> None:
     """Print a report to the terminal.
 
     Args:
@@ -99,7 +106,7 @@ def render_terminal(report: Report, *, no_color: bool = False, wrap_section: boo
         console.file.write(f"\x1b[0Ksection_end:{ts}:{_SECTION}\r\x1b[0K\n")
 
 
-def _print_each(console: Console, items: list) -> None:
+def _print_each(console: Console, items: list[Text]) -> None:
     """Print a list, leaving one blank line after the last item only.
 
     Args:
@@ -111,7 +118,7 @@ def _print_each(console: Console, items: list) -> None:
     console.print(items[-1], end="\n\n")
 
 
-def _step_text(step) -> Text:
+def _step_text(step: RemediationStep) -> Text:
     """Format one remediation step.
 
     Args:

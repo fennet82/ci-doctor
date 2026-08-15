@@ -14,7 +14,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
 import yaml
 
@@ -27,7 +27,7 @@ _TOP_LEVEL = set(Config.model_fields)  # provider, gitlab, llm, ...
 _DEFAULT_REPO_CONFIG = Path(".ci-doctor.yml")
 
 
-def _is_id_keyed(value: Any) -> bool:
+def _is_id_keyed(value: object) -> TypeGuard[list[dict]]:
     """Whether ``value`` is a non-empty list whose every entry is a dict with an ``id``.
 
     Args:
@@ -132,7 +132,7 @@ def default_config() -> Config:
     return Config(**_shipped_defaults())
 
 
-def _coerce(raw: str) -> Any:
+def _coerce(raw: str) -> Any:  # noqa: ANN401 - a YAML scalar is genuinely any type
     """Parse an env var's string value into a YAML scalar.
 
     Args:

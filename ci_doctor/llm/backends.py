@@ -22,10 +22,15 @@ environment via httpx's trust_env.
 import json
 import os
 import shutil
-from typing import Any
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from ci_doctor.config.schema import LLMConfig
 from ci_doctor.core.ports import LLMClient
+
+if TYPE_CHECKING:
+    from openai import OpenAI
+    from openai.types.chat import ChatCompletionMessageParam
 
 #: System message shared by every backend. The reply schema lives in the user
 #: prompt; this only pins the *shape* of the response.
@@ -52,7 +57,7 @@ def strip_fences(text: str) -> str:
     return t.strip()
 
 
-def make_client(cfg: LLMConfig, environ: dict[str, str] | None = None) -> LLMClient:
+def make_client(cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> LLMClient:
     """Build the client for the configured backend.
 
     Args:
@@ -98,7 +103,7 @@ def backend_ready(cfg: LLMConfig) -> bool:
 class OpenAILLMClient(LLMClient):
     """Talks to any OpenAI-compatible chat-completions endpoint."""
 
-    def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+    def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
         """Store config; no connection is opened until a call is made.
 
         Args:
@@ -119,7 +124,7 @@ class OpenAILLMClient(LLMClient):
             return self.environ.get(self.cfg.api_key_env) or "no-key"
         return "no-key"  # openai SDK requires a non-empty string even when the server ignores it
 
-    def _client(self):
+    def _client(self) -> "OpenAI":
         """Build the SDK client, honouring a custom CA bundle.
 
         Returns:
@@ -139,7 +144,7 @@ class OpenAILLMClient(LLMClient):
             kwargs["http_client"] = httpx.Client(verify=self.cfg.ca_bundle)
         return OpenAI(**kwargs)
 
-    def complete_structured(self, prompt: str) -> dict:
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion and parse the reply as JSON.
 
         Args:
@@ -152,8 +157,11 @@ class OpenAILLMClient(LLMClient):
             json.JSONDecodeError: If the reply is not JSON.
             Exception: Any transport or API error from the SDK.
         """
+        if not self.cfg.model:
+            # `backend_ready` checks this, but an injected client skips that path.
+            raise ValueError("llm.model is required for the openai backend")
         client = self._client()
-        messages = [
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": prompt},
         ]
@@ -181,7 +189,7 @@ class LiteLLMClient(LLMClient):
     extra dependency.
     """
 
-    def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+    def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
         """Store config; litellm is imported only when a call is made.
 
         Args:
@@ -191,7 +199,7 @@ class LiteLLMClient(LLMClient):
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
-    def complete_structured(self, prompt: str) -> dict:
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion through litellm.
 
         Args:
@@ -233,7 +241,7 @@ class ClaudeCodeClient(LLMClient):
     needed here.
     """
 
-    def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+    def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
         """Store config; the CLI is located at call time, not here.
 
         Args:
@@ -243,7 +251,7 @@ class ClaudeCodeClient(LLMClient):
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
-    def complete_structured(self, prompt: str) -> dict:
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one headless `claude -p` and unwrap its JSON envelope.
 
         Args:

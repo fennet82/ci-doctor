@@ -12,8 +12,10 @@ never change the pipeline outcome.
 import json
 import logging
 import re
+from collections.abc import Mapping
 from importlib import resources
 from string import Template
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -21,6 +23,7 @@ from ci_doctor.config.schema import Config
 from ci_doctor.core.analyze import EvidenceBundle
 from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.models import FailureReason, Job, Phase
+from ci_doctor.core.ports import LLMClient
 from ci_doctor.core.redact import redact_report, redact_text
 from ci_doctor.llm.schema import Category, Evidence, RemediationStep, Report
 
@@ -123,7 +126,15 @@ def _infer_category(reason: FailureReason, text: str) -> Category:
     return "unknown"
 
 
-def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None) -> Report:
+def produce_report(
+    job: Job,
+    attr: Attribution,
+    bundle: EvidenceBundle,
+    cfg: Config,
+    *,
+    client: LLMClient | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Report:
     """Produce the final report, with or without an LLM.
 
     Degrades at every step rather than raising: LLM disabled, backend not
@@ -166,7 +177,7 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
         "job %s: calling LLM backend=%s model=%s (may take a while)", job.name, cfg.llm.backend, cfg.llm.model
     )
     log.debug("prompt=%d chars", len(prompt))
-    report = _call_and_validate(client, prompt, schema)
+    report = _call_and_validate(client, prompt)
     if report is None:
         log.info("no valid LLM report; using deterministic fallback")
         report = deterministic_report(job, attr, bundle, degraded=True)
@@ -186,13 +197,12 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
     return redact_report(report, cfg.redaction, environ)
 
 
-def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
+def _call_and_validate(client: LLMClient, prompt: str) -> Report | None:
     """Call the LLM and validate its reply, retrying once with a repair hint.
 
     Args:
         client: The LLM client.
-        prompt: The rendered prompt.
-        schema: JSON Schema the reply must satisfy.
+        prompt: The rendered prompt, the reply schema already embedded in it.
 
     Returns:
         The validated report, or None when the reply is still invalid after the
@@ -319,7 +329,7 @@ def _handoff(job: Job, attr: Attribution, excerpt: str) -> str:
     )
 
 
-def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: dict) -> str:
+def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: dict[str, Any]) -> str:
     """Fill the system and user prompt templates.
 
     Invariant #8: prompt text lives in `llm/prompts/*.txt`, never inline here,

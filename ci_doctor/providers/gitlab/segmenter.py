@@ -18,6 +18,11 @@ import re
 from ci_doctor.core.models import PREAMBLE, TRAILER, LogLine, Section
 from ci_doctor.core.ports import LogSegmenter
 
+#: One item of the token stream: ``(kind, payload, ts)``. `kind` is "content",
+#: "start" or "end"; `payload` is the text run or the section name; `ts` is the
+#: marker's epoch seconds, and None for a content run, which carries no time.
+_Token = tuple[str, str, int | None]
+
 _MARKER = re.compile(
     r"(?:\x1b\[0K)?"
     r"section_(?P<kind>start|end):(?P<ts>\d+):(?P<name>[A-Za-z0-9_.\-]+)"
@@ -45,25 +50,24 @@ class GitLabSegmenter(LogSegmenter):
         return _assemble(_tokenize(raw_log))
 
 
-def _tokenize(raw: str):
+def _tokenize(raw: str) -> list[_Token]:
     """Split a trace into content runs and section markers.
 
     Args:
         raw: The raw trace.
 
     Returns:
-        A list of ``("content", text)`` and ``(kind, name, ts)`` tuples in log
-        order, where `kind` is "start" or "end".
+        The tokens in log order.
     """
-    tokens = []
+    tokens: list[_Token] = []
     pos = 0
     for m in _MARKER.finditer(raw):
         if m.start() > pos:
-            tokens.append(("content", raw[pos : m.start()]))
+            tokens.append(("content", raw[pos : m.start()], None))
         tokens.append((m.group("kind"), m.group("name"), int(m.group("ts"))))
         pos = m.end()
     if pos < len(raw):
-        tokens.append(("content", raw[pos:]))
+        tokens.append(("content", raw[pos:], None))
     return tokens
 
 
@@ -87,7 +91,7 @@ def _pop_matching(stack: list[Section], name: str) -> Section | None:
     return None
 
 
-def _assemble(tokens) -> list[Section]:
+def _assemble(tokens: list[_Token]) -> list[Section]:
     """Build the section tree from a token stream.
 
     Args:
