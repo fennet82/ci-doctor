@@ -112,10 +112,6 @@ class AnalysisConfig(_Strict):
         default_factory=lambda: ["no_runner", "missing_dependency", "cancelled"],
         description="Failure reasons already fully determined, so they get a templated report and no LLM call.",
     )
-    known_flaky_tests: list[str] = Field(
-        default_factory=list,
-        description="Substrings that, when seen in the evidence, short-circuit the report to likely_flaky.",
-    )
 
 
 class MatcherConfig(_Strict):
@@ -194,7 +190,13 @@ class Config(_Strict):
         json_schema_extra={"$id": SCHEMA_ID},
     )
 
-    ci: str = Field("gitlab", description="Which CI system to read the failed run from: gitlab or github.")
+    ci: str = Field(
+        "github",
+        description=(
+            "Which CI system to read the failed run from: github or gitlab. Only used for a live "
+            "run — replaying a log file detects the format from the log itself."
+        ),
+    )
     scm: str | None = Field(
         None,
         description=(

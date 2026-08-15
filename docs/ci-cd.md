@@ -11,11 +11,14 @@ integration, publishing only on `master`.
 
 ## The flow
 
+The diagram is the topology — who merges into whom, where `hotfix/` skips the
+queue, and how a hotfix finds its way back. The table under it is the checks.
+
 ```mermaid
 flowchart TD
-    F["feat/… · fix/… · docs/…"] -->|"PR — ci + security"| D[development]
-    D -->|"PR — ci + security + release-gate"| M[master]
-    H["hotfix/…"] -->|"PR — ci + security + release-gate"| M
+    F["feat/… · fix/… · docs/…"] -->|PR| D[development]
+    D -->|PR| M[master]
+    H["hotfix/…"] -->|PR| M
 
     M -->|push| REL[release.yml]
     REL --> PUB["PyPI · Docker Hub · GitHub Release"]
@@ -24,6 +27,9 @@ flowchart TD
     H -.->|on merge| BM[backmerge.yml]
     BM -.->|opens PR| D
 ```
+
+Dotted is the backmerge: it opens a PR rather than pushing, so the hotfix lands
+in `development` through the same review as anything else.
 
 | Hop | Workflows |
 |---|---|

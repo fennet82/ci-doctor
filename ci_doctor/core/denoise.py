@@ -1,9 +1,14 @@
 """Log denoising. Cuts the volume before extraction without losing the signal.
 
 Order per line: strip ANSI, collapse carriage-return rewrites (progress bars),
-optionally strip the runner timestamp prefix, drop configured noise patterns.
-Then collapse runs of identical lines. A line that looks like an error is never
-dropped by a noise pattern — the escape hatch that keeps the cause visible.
+drop configured noise patterns. Then collapse runs of identical lines. A line
+that looks like an error is never dropped by a noise pattern — the escape hatch
+that keeps the cause visible.
+
+The provider's own framing (GitHub's ISO timestamp prefix, GitLab's section
+markers) is already gone by the time a line arrives here: the segmenter strips
+it, which is why a `^`-anchored matcher works against these lines and not
+against the raw file.
 """
 
 import re
@@ -12,7 +17,6 @@ from collections.abc import Callable
 from ci_doctor.config.schema import DenoiseConfig
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")  # CSI sequences (SGR colour, cursor, ...)
-_TS_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z?\s+")  # FF_TIMESTAMPS ISO prefix
 _ERRORISH = re.compile(
     r"\b(ERROR|FATAL)\b|Traceback \(most recent call last\)|exit code \d+|npm ERR!|\bFAILED?\b"
 )
@@ -46,38 +50,31 @@ def strip_ansi(text: str) -> str:
 
 
 def _collapse_cr(line: str) -> str:
-    """Reduce a carriage-return-rewritten line to its final visible state.
+    r"""Reduce a carriage-return-rewritten line to its final visible state.
 
     Args:
-        line: A line possibly containing `\\r` progress-bar rewrites.
+        line: A line possibly containing `\r` progress-bar rewrites.
 
     Returns:
-        The segment after the last `\\r`.
+        The segment after the last `\r`.
     """
     # Progress bars rewrite in place via \r; keep the final visible segment.
     # ponytail: naive last-\r-segment, not a true column overwrite. Fine for progress spam.
     return line.rsplit("\r", 1)[-1] if "\r" in line else line
 
 
-def denoise(
-    lines: list[str],
-    cfg: DenoiseConfig,
-    *,
-    keep: Callable[[str], bool] | None = None,
-    strip_timestamps: bool = False,
-) -> list[str]:
-    """Cut log volume without losing the signal.
+def denoise(lines: list[str], cfg: DenoiseConfig, *, keep: Callable[[str], bool] | None = None) -> list[str]:
+    r"""Cut log volume without losing the signal.
 
-    Per line: strip ANSI, collapse `\\r` rewrites, optionally strip the timestamp
-    prefix, then drop configured noise — unless `keep` protects the line. Finally
-    runs of identical lines collapse to one with a `(×N)` count.
+    Per line: strip ANSI, collapse `\r` rewrites, then drop configured noise —
+    unless `keep` protects the line. Finally runs of identical lines collapse to
+    one with a `(×N)` count.
 
     Args:
         lines: Raw log lines.
         cfg: Denoise knobs from `config.denoise`.
         keep: Predicate marking lines that noise patterns may not remove.
             Defaults to :func:`_default_keep`.
-        strip_timestamps: Drop the runner's ISO timestamp prefix.
 
     Returns:
         The cleaned lines.
@@ -89,8 +86,6 @@ def denoise(
         line = strip_ansi(raw)
         if cfg.collapse_carriage_returns:
             line = _collapse_cr(line)
-        if strip_timestamps:
-            line = _TS_PREFIX.sub("", line)
         if not keep(line) and any(n.search(line) for n in noise):
             continue  # noise — but an anchor line is never dropped here
         out.append(line)

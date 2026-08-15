@@ -1,5 +1,7 @@
-"""Golden-file attribution suite: segment + phase-map + classify each fixture log,
-compare {phase, reason, rule_id} to expected. No network, no LLM.
+"""Golden-file attribution suite.
+
+Segment + phase-map + classify each fixture log, then compare
+{phase, reason, rule_id} to expected. No network, no LLM.
 
 One `expected/<case>.json` covers every provider that ships a log for that case —
 attribution is provider-neutral, so adding `logs/github/oom_137.log` asserts it
@@ -149,7 +151,7 @@ def test_every_provider_dir_has_a_segmenter():
     zero tests instead of failing.
     """
     missing = set(support.providers()) - set(support.SEGMENTERS)
-    assert not missing, f"logs/ dirs with no segmenter in support.SEGMENTERS: {sorted(missing)}"
+    assert not missing, f"logs/ dirs with no segmenter in providers/registry.py: {sorted(missing)}"
 
 
 def test_every_expected_verdict_has_at_least_one_log():

@@ -1,0 +1,329 @@
+---
+/**
+ * Where each module sits and what flows between them.
+ *
+ * Hand-laid rather than generated: the mermaid version ran to ~1700px of
+ * natural height and had to live inside a scroll cage, and its auto-layout
+ * put the two provider branches on opposite sides of the canvas. Geometry
+ * here is on a 4px grid; colours are all `--dg-*` tokens, so light/dark is
+ * a repaint with no redraw.
+ *
+ * Eleven nodes, down from thirteen: denoise/extract/budget are one box, since
+ * they run in a fixed order with nothing branching between them.
+ */
+---
+
+<figure class="diagram">
+  <div class="diagram-canvas">
+    <svg
+      viewBox="0 0 960 748"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-labelledby="arch-title arch-desc"
+    >
+      <title id="arch-title">The shape of the whole thing</title>
+      <desc id="arch-desc"
+        >Provider adapters segment the log and normalise the failure reason,
+        then hand off across core/ports.py to a provider-neutral core that
+        assigns phases, decides which phase failed, and denoises, extracts and
+        budgets the blamed section into an EvidenceBundle. The report is built
+        deterministically, optionally explained by one model call, scrubbed
+        again, and rendered.</desc
+      >
+
+      <defs>
+        <marker
+          id="arch-arrow"
+          markerWidth="8"
+          markerHeight="6"
+          refX="7"
+          refY="3"
+          orient="auto"
+        >
+          <polygon class="dg-arrowhead" points="0 0, 8 3, 0 6" />
+        </marker>
+        <marker
+          id="arch-arrow-focal"
+          markerWidth="8"
+          markerHeight="6"
+          refX="7"
+          refY="3"
+          orient="auto"
+        >
+          <polygon class="dg-arrowhead-focal" points="0 0, 8 3, 0 6" />
+        </marker>
+      </defs>
+
+      {/* Zones first: background -> zones -> edges -> nodes. */}
+      <rect class="dg-zone" x="40" y="120" width="880" height="104" rx="8" />
+      <text class="dg-zone-label" x="60" y="133"
+        >PROVIDERS/ — NAMES A CI SYSTEM</text
+      >
+
+      <rect class="dg-zone" x="40" y="280" width="880" height="104" rx="8" />
+      <text class="dg-zone-label" x="60" y="293"
+        >CORE/ — PROVIDER-NEUTRAL · PURE · OFFLINE</text
+      >
+
+      <rect class="dg-zone" x="40" y="500" width="880" height="144" rx="8" />
+      <text class="dg-zone-label" x="60" y="513">OUTPUTS</text>
+
+      {/* The seam. It is a boundary between two layers, not a property of one
+          edge — which is why it reads across the full width. */}
+      <line class="dg-seam" x1="40" y1="252" x2="920" y2="252" />
+      <rect class="dg-mask" x="352" y="244" width="256" height="16" rx="2" />
+      <text class="dg-seam-label" x="480" y="256" text-anchor="middle"
+        >CORE/PORTS.PY — THE ONLY CONTRACT</text
+      >
+
+      {/* Edges, drawn before nodes so z-order puts them behind. */}
+      <path
+        class="dg-edge"
+        d="M 452,88 V 96 Q 452,104 444,104 H 264 Q 256,104 256,112 V 152"
+        marker-end="url(#arch-arrow)"
+      />
+      <path
+        class="dg-edge"
+        d="M 508,88 V 96 Q 508,104 516,104 H 648 Q 656,104 656,112 V 152"
+        marker-end="url(#arch-arrow)"
+      />
+
+      <line
+        class="dg-edge"
+        x1="256"
+        y1="208"
+        x2="256"
+        y2="312"
+        marker-end="url(#arch-arrow)"
+      />
+      <path
+        class="dg-edge"
+        d="M 656,208 V 260 Q 656,268 648,268 H 504 Q 496,268 496,276 V 312"
+        marker-end="url(#arch-arrow)"
+      />
+
+      <line
+        class="dg-edge-focal"
+        x1="340"
+        y1="340"
+        x2="396"
+        y2="340"
+        marker-end="url(#arch-arrow-focal)"
+      />
+      <line
+        class="dg-edge-focal"
+        x1="596"
+        y1="340"
+        x2="660"
+        y2="340"
+        marker-end="url(#arch-arrow-focal)"
+      />
+
+      <path
+        class="dg-edge"
+        d="M 752,368 V 400 Q 752,408 744,408 H 488 Q 480,408 480,416"
+        marker-end="url(#arch-arrow)"
+      />
+      <path
+        class="dg-edge"
+        d="M 480,468 V 484 Q 480,492 472,492 H 212 Q 204,492 204,500 V 532"
+        marker-end="url(#arch-arrow)"
+      />
+
+      {/* The one optional model call. Offset 24px so neither leg hides the
+          other. */}
+      <line
+        class="dg-edge-opt"
+        x1="296"
+        y1="548"
+        x2="368"
+        y2="548"
+        marker-end="url(#arch-arrow)"
+      />
+      <line
+        class="dg-edge-opt"
+        x1="368"
+        y1="572"
+        x2="296"
+        y2="572"
+        marker-end="url(#arch-arrow)"
+      />
+
+      {/* Routed under the row: a straight run would pass behind the LLM box,
+          which is not an endpoint of this edge. */}
+      <path
+        class="dg-edge"
+        d="M 204,588 V 604 Q 204,612 212,612 H 656 Q 664,612 664,604 V 588"
+        marker-end="url(#arch-arrow)"
+      />
+      <line
+        class="dg-edge"
+        x1="736"
+        y1="560"
+        x2="768"
+        y2="560"
+        marker-end="url(#arch-arrow)"
+      />
+
+      {/* Edge labels: mask sits 8px clear of the stroke so the line stays
+          traceable underneath. */}
+      <rect class="dg-mask" x="308" y="528" width="48" height="12" rx="2" />
+      <text class="dg-label" x="332" y="537" text-anchor="middle">REDACTED</text>
+
+      <rect class="dg-mask" x="306" y="552" width="52" height="12" rx="2" />
+      <text class="dg-label" x="332" y="561" text-anchor="middle">VALIDATED</text>
+
+      {/* Nodes. */}
+      <rect class="dg-mask" x="400" y="40" width="160" height="48" rx="6" />
+      <rect class="dg-node-store" x="400" y="40" width="160" height="48" rx="6" />
+      <rect class="dg-tag" x="408" y="46" width="24" height="12" rx="2" />
+      <text class="dg-tag-text" x="420" y="55" text-anchor="middle">IN</text>
+      <text class="dg-name" x="480" y="68" text-anchor="middle"
+        >Provider API or saved log</text
+      >
+      <text class="dg-sub" x="480" y="82" text-anchor="middle"
+        >--job-url · --log-file</text
+      >
+
+      <rect class="dg-mask" x="104" y="152" width="304" height="56" rx="6" />
+      <rect class="dg-node" x="104" y="152" width="304" height="56" rx="6" />
+      <rect class="dg-tag" x="112" y="158" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="126" y="167" text-anchor="middle">SEG</text>
+      <text class="dg-name" x="256" y="184" text-anchor="middle">Segmenter</text>
+      <text class="dg-sub" x="256" y="199" text-anchor="middle"
+        >raw log → Section tree</text
+      >
+
+      <rect class="dg-mask" x="504" y="152" width="304" height="56" rx="6" />
+      <rect class="dg-node" x="504" y="152" width="304" height="56" rx="6" />
+      <rect class="dg-tag" x="512" y="158" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="526" y="167" text-anchor="middle">RSN</text>
+      <text class="dg-name" x="656" y="184" text-anchor="middle"
+        >Failure reason</text
+      >
+      <text class="dg-sub" x="656" y="199" text-anchor="middle"
+        >provider status → FailureReason</text
+      >
+
+      <rect class="dg-mask" x="172" y="312" width="168" height="56" rx="6" />
+      <rect class="dg-node" x="172" y="312" width="168" height="56" rx="6" />
+      <rect class="dg-tag" x="180" y="318" width="24" height="12" rx="2" />
+      <text class="dg-tag-text" x="192" y="327" text-anchor="middle">PH</text>
+      <text class="dg-name" x="256" y="344" text-anchor="middle">Phases</text>
+      <text class="dg-sub" x="256" y="359" text-anchor="middle"
+        >core/phases.py</text
+      >
+
+      <rect class="dg-mask" x="396" y="312" width="200" height="56" rx="6" />
+      <rect class="dg-node-focal" x="396" y="312" width="200" height="56" rx="6" />
+      <rect class="dg-tag-focal" x="404" y="318" width="28" height="12" rx="2" />
+      <text class="dg-tag-text dg-tag-text-focal" x="418" y="327" text-anchor="middle"
+        >ATT</text
+      >
+      <text class="dg-name" x="496" y="344" text-anchor="middle"
+        >Which phase failed</text
+      >
+      <text class="dg-sub" x="496" y="359" text-anchor="middle"
+        >core/attribution.py</text
+      >
+
+      <rect class="dg-mask" x="660" y="312" width="184" height="56" rx="6" />
+      <rect class="dg-node" x="660" y="312" width="184" height="56" rx="6" />
+      <rect class="dg-tag" x="668" y="318" width="32" height="12" rx="2" />
+      <text class="dg-tag-text" x="684" y="327" text-anchor="middle">PIPE</text>
+      <text class="dg-name" x="752" y="344" text-anchor="middle"
+        >Blamed section only</text
+      >
+      <text class="dg-sub" x="752" y="359" text-anchor="middle"
+        >denoise · extract · budget</text
+      >
+
+      <rect class="dg-mask" x="336" y="416" width="288" height="52" rx="6" />
+      <rect class="dg-node-focal" x="336" y="416" width="288" height="52" rx="6" />
+      <rect class="dg-tag-focal" x="344" y="422" width="28" height="12" rx="2" />
+      <text class="dg-tag-text dg-tag-text-focal" x="358" y="431" text-anchor="middle"
+        >BND</text
+      >
+      <text class="dg-name" x="480" y="444" text-anchor="middle"
+        >EvidenceBundle</text
+      >
+      <text class="dg-sub" x="480" y="459" text-anchor="middle"
+        >all the report step may see</text
+      >
+
+      <rect class="dg-mask" x="112" y="532" width="184" height="56" rx="6" />
+      <rect class="dg-node" x="112" y="532" width="184" height="56" rx="6" />
+      <rect class="dg-tag" x="120" y="538" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="134" y="547" text-anchor="middle">REP</text>
+      <text class="dg-name" x="204" y="564" text-anchor="middle"
+        >Deterministic report</text
+      >
+      <text class="dg-sub" x="204" y="579" text-anchor="middle">llm/report.py</text>
+
+      <rect class="dg-mask" x="368" y="532" width="184" height="56" rx="6" />
+      <rect class="dg-node-opt" x="368" y="532" width="184" height="56" rx="6" />
+      <rect class="dg-tag" x="376" y="538" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="390" y="547" text-anchor="middle">OPT</text>
+      <text class="dg-name" x="460" y="564" text-anchor="middle">Explains why</text>
+      <text class="dg-sub" x="460" y="579" text-anchor="middle"
+        >llm/ backend · optional</text
+      >
+
+      <rect class="dg-mask" x="592" y="532" width="144" height="56" rx="6" />
+      <rect class="dg-node" x="592" y="532" width="144" height="56" rx="6" />
+      <rect class="dg-tag" x="600" y="538" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="614" y="547" text-anchor="middle">RED</text>
+      <text class="dg-name" x="664" y="564" text-anchor="middle">Scrub again</text>
+      <text class="dg-sub" x="664" y="579" text-anchor="middle">core/redact.py</text>
+
+      <rect class="dg-mask" x="768" y="532" width="152" height="56" rx="6" />
+      <rect class="dg-node-store" x="768" y="532" width="152" height="56" rx="6" />
+      <rect class="dg-tag" x="776" y="538" width="28" height="12" rx="2" />
+      <text class="dg-tag-text" x="790" y="547" text-anchor="middle">OUT</text>
+      <text class="dg-name" x="844" y="564" text-anchor="middle">Render</text>
+      <text class="dg-sub" x="844" y="579" text-anchor="middle"
+        >terminal · md · json · mr</text
+      >
+
+      {/* Legend. */}
+      <line class="dg-legend-rule" x1="40" y1="668" x2="920" y2="668" />
+      <text class="dg-legend-label" x="40" y="684">LEGEND</text>
+
+      <rect class="dg-node-focal" x="40" y="700" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="60" y="708">Focal</text>
+
+      <rect class="dg-node" x="170" y="700" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="190" y="708">Deterministic step</text>
+
+      <rect class="dg-node-store" x="350" y="700" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="370" y="708">Data in &amp; out</text>
+
+      <rect class="dg-node-opt" x="470" y="700" width="14" height="10" rx="2" />
+      <text class="dg-legend-text" x="490" y="708">Optional</text>
+
+      <line
+        class="dg-edge"
+        x1="600"
+        y1="706"
+        x2="628"
+        y2="706"
+        marker-end="url(#arch-arrow)"
+      />
+      <text class="dg-legend-text" x="636" y="708">Offline flow</text>
+
+      <line
+        class="dg-edge-opt"
+        x1="760"
+        y1="706"
+        x2="788"
+        y2="706"
+        marker-end="url(#arch-arrow)"
+      />
+      <text class="dg-legend-text" x="796" y="708">Model call</text>
+    </svg>
+  </div>
+  <figcaption>
+    Solid edges are deterministic and offline. The dotted pair is the one
+    optional model call.
+  </figcaption>
+</figure>

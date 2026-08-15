@@ -1,9 +1,9 @@
 """The structured-output contract: the report the tool emits.
 
 This is the interface between ci-doctor and any downstream consumer (renderers,
-the JSON artifact, a fixer agent reading `handoff_prompt`). Keep it stable.
-It is defined here in M0 because the ports reference it; the LLM code that fills
-it in lands in M4.
+the JSON artifact, a fixer agent reading `handoff_prompt`). Keep it stable —
+`report.json` is written against it on every run, and its JSON Schema is what
+the LLM is asked to answer in.
 """
 
 from typing import Literal
@@ -65,8 +65,9 @@ class Report(BaseModel):
 
     Attributes:
         summary: One sentence, 140 characters at most.
-        failure_phase: Always from deterministic attribution. Guardrail #1 — the
+        failure_phase: Always from deterministic attribution. Invariant #1 — the
             LLM may explain the failure but never re-decide where it happened.
+            `llm/report.py` overrules a model that answers with a different one.
         category: What kind of failure it was.
         confidence: How much to trust this verdict.
         is_infra_not_code: The "not your fault" signal, the single most useful bit

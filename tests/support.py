@@ -1,5 +1,6 @@
-"""Provider-generic access to the log fixtures. Import this instead of building
-fixture paths or picking a segmenter by hand.
+"""Provider-generic access to the log fixtures.
+
+Import this instead of building fixture paths or picking a segmenter by hand.
 
 Layout::
 
@@ -10,27 +11,25 @@ Logs are provider-scoped because every CI system frames a job differently.
 Verdicts are not: attribution lives in provider-neutral ``core/``, so the same
 scenario must classify identically whoever produced the log.
 
-**Adding a provider** (jenkins, bitbucket, travis, ...) is two steps and touches
-no test: drop ``fixtures/logs/<provider>/`` and register its segmenter in
-``SEGMENTERS``. Every provider-generic test then runs against it automatically.
-``test_attribution_fixtures.py`` fails if the directory and the registry drift.
+**Adding a provider** (jenkins, bitbucket, travis, ...) touches no test at all:
+drop ``fixtures/logs/<provider>/``, and the segmenter it needs is already in
+``providers/registry.py``. Every provider-generic test then runs against it
+automatically, and ``test_attribution_fixtures.py`` fails if a fixture directory
+has no registered segmenter.
 """
 
+from collections.abc import Iterable
 from pathlib import Path
 
-from ci_doctor.core.ports import LogSegmenter
-from ci_doctor.providers.github.segmenter import GitHubSegmenter
-from ci_doctor.providers.gitlab.segmenter import GitLabSegmenter
+from ci_doctor.core.models import Section, walk_sections
+from ci_doctor.providers.registry import SEGMENTERS, segmenter_for
 
 FIX = Path(__file__).parent / "fixtures"
 LOGS = FIX / "logs"
 EXPECTED = FIX / "expected"
 
-# provider name (== the logs/ subdirectory) -> segmenter for that log format.
-SEGMENTERS: dict[str, type[LogSegmenter]] = {
-    "gitlab": GitLabSegmenter,
-    "github": GitHubSegmenter,
-}
+# `SEGMENTERS` is the shipped registry, re-exported: a fixture directory is
+# named after the CI system whose log format it holds, so the two cannot drift.
 
 
 def providers() -> list[str]:
@@ -84,7 +83,7 @@ def providers_with(case: str) -> list[str]:
     return [p for p in providers() if log_path(p, case).is_file()]
 
 
-def pairs_for(cases) -> list[tuple[str, str]]:
+def pairs_for(cases: Iterable[str]) -> list[tuple[str, str]]:
     """Cross a set of cases with the providers that ship each one.
 
     Args:
@@ -110,17 +109,11 @@ def log_lines(provider: str, case: str) -> list[str]:
         *these* lines — reading the raw file instead tests something the
         extractor never receives.
     """
-    return [line.text for sec in _walk(segment(provider, read_log(provider, case))) for line in sec.lines]
+    sections = segment(provider, read_log(provider, case))
+    return [line.text for sec in walk_sections(sections) for line in sec.lines]
 
 
-def _walk(sections):
-    """Yield every section depth-first, parents before their children."""
-    for sec in sections:
-        yield sec
-        yield from _walk(sec.children)
-
-
-def segment(provider: str, raw_log: str):
+def segment(provider: str, raw_log: str) -> list[Section]:
     """Parse a raw log with the segmenter for that provider's format.
 
     Args:
@@ -132,6 +125,8 @@ def segment(provider: str, raw_log: str):
 
     Raises:
         KeyError: If the provider has no registered segmenter — which is the
-            point: a new `logs/` directory must register one.
+            point: a new `logs/` directory needs one in `providers/registry.py`.
     """
-    return SEGMENTERS[provider]().segment(raw_log)
+    if provider not in SEGMENTERS:
+        raise KeyError(f"no segmenter registered for {provider!r}")
+    return segmenter_for(provider).segment(raw_log)

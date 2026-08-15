@@ -1,13 +1,25 @@
 """Provider-neutral domain model.
 
 Everything downstream of acquisition speaks *only* this model. No provider types
-leak past an adapter boundary. Purity guardrail: a case-insensitive grep for any
+leak past an adapter boundary. Invariant #2: a case-insensitive grep for any
 provider name over core/ must return nothing (keep this file free of them too).
 """
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
+
+#: Output before the first section marker, and after the last one. Every
+#: segmenter emits these two names so no line is ever lost, and the classifier
+#: reads the trailer for the runner's closing verdict. They are part of the
+#: :class:`Section` contract, which is why they live here and not in a provider.
+PREAMBLE = "__preamble__"
+TRAILER = "__trailer__"
+
+#: The two names above as a set, for the "real sections only" test that
+#: attribution, phase assignment and evidence selection each need.
+SYNTHETIC_SECTIONS = frozenset({PREAMBLE, TRAILER})
 
 #: How much to trust a verdict. A Literal rather than a StrEnum because it is
 #: serialised straight into the report schema, where the enum would change the
@@ -55,15 +67,14 @@ class LogLine:
     """One line of a job log.
 
     Attributes:
-        number: 1-based line number in the original log, kept so evidence can
-            point back at the raw trace.
+        number: 1-based position among the log's *content* lines. The section
+            markers a segmenter consumes are not counted, so this tracks the
+            trace a reader sees rather than byte-for-byte file lines.
         text: The line, ANSI already stripped by the segmenter.
-        ts: Epoch seconds from the section marker, when the provider emits one.
     """
 
     number: int
     text: str
-    ts: int | None = None
 
 
 @dataclass
@@ -130,6 +141,23 @@ class Section:
     children: list["Section"] = field(default_factory=list)  # nesting is legal
 
 
+def walk_sections(sections: Iterable[Section]) -> Iterator[Section]:
+    """Yield every section depth-first, parents before their children.
+
+    Nesting is legal and providers do use it, so every consumer of the tree —
+    the classifier, phase assignment, evidence selection — needs this same walk.
+
+    Args:
+        sections: Top-level sections.
+
+    Yields:
+        Each section in the tree, in log order.
+    """
+    for sec in sections:
+        yield sec
+        yield from walk_sections(sec.children)
+
+
 @dataclass
 class Job:
     """One unit of work in a run — the thing that actually fails.
@@ -137,7 +165,10 @@ class Job:
     Attributes:
         id: Provider's job id.
         name: Job name as configured in the pipeline.
-        status: Normalised status string, e.g. "failed", "cancelled".
+        status: Normalised status. Adapters must map their vendor's spelling onto
+            these tokens — "failed", "cancelled", "success", "running" — because
+            :mod:`ci_doctor.core.select` decides what to analyze from this field
+            and cannot know that one CI writes "canceled" with one l.
         stage: Pipeline stage, when the provider has stages.
         failure_reason: The provider's verdict, normalised.
         raw_failure_reason: The provider's original string, kept so an unmapped

@@ -6,9 +6,7 @@ phase, else SCRIPT. Synthetic preamble/trailer stay UNKNOWN — the classifier
 handles them specially.
 """
 
-from ci_doctor.core.models import Phase, Section
-
-_SYNTHETIC = {"__preamble__", "__trailer__"}
+from ci_doctor.core.models import SYNTHETIC_SECTIONS, Phase, Section
 
 
 def assign_phases(sections: list[Section], phase_map: dict[str, str]) -> None:
@@ -36,7 +34,7 @@ def _assign(sec: Section, phase_map: dict[str, str], inherited: Phase | None) ->
     if mapped is not None:
         sec.phase = Phase(mapped)
         child_inherited = sec.phase
-    elif sec.name in _SYNTHETIC:
+    elif sec.name in SYNTHETIC_SECTIONS:
         sec.phase = Phase.UNKNOWN
         child_inherited = inherited
     else:

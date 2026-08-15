@@ -1,6 +1,6 @@
 """The blame classifier. Pure function: (Job, sections) -> Attribution.
 
-No I/O, no network, no clock (guardrail #7). This decides *where* the job failed;
+No I/O, no network, no clock (invariant #7). This decides *where* the job failed;
 the LLM never does. The precedence ladder below is first-match-wins and every rule
 records a ``rule_id`` so the report can say exactly why it decided.
 
@@ -14,9 +14,16 @@ count, and ``_last_error_section`` for where it bites.
 import re
 from dataclasses import dataclass, field
 
-from ci_doctor.core.models import Confidence, FailureReason, Job, Phase, Section
-
-_SYNTHETIC = {"__preamble__", "__trailer__"}
+from ci_doctor.core.models import (
+    SYNTHETIC_SECTIONS,
+    TRAILER,
+    Confidence,
+    FailureReason,
+    Job,
+    Phase,
+    Section,
+    walk_sections,
+)
 
 #: Fatality signals for the structural fallback, and the whole of it. This answers
 #: one coarse question — "did anything in this section actually fail?" — to pick
@@ -84,7 +91,7 @@ class Attribution:
 def attribute(job: Job, sections: list[Section]) -> Attribution:
     """Decide which phase a job failed in.
 
-    A pure function — no I/O, no network, no clock (guardrail #7) — so the same
+    A pure function — no I/O, no network, no clock (invariant #7) — so the same
     log always yields the same verdict. The rules are a first-match-wins ladder:
     an empty log, then the provider's own reason, then `script_failure` short-
     circuiting straight to SCRIPT, then structural fallbacks for an UNKNOWN reason.
@@ -96,7 +103,7 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
     Returns:
         The verdict, tagged with the `rule_id` that produced it.
     """
-    trailer = _find(sections, "__trailer__")
+    trailer = _find(sections, TRAILER)
 
     # Rule 1 — no / empty log => the job never really ran.
     if not job.log or not job.log.strip():
@@ -179,34 +186,20 @@ def attribute(job: Job, sections: list[Section]) -> Attribution:
 # --- helpers ----------------------------------------------------------------
 
 
-def _walk(sections):
-    """Yield every section depth-first, parents before their children.
-
-    Args:
-        sections: Top-level sections.
-
-    Yields:
-        Each section in the tree, in log order.
-    """
-    for sec in sections:
-        yield sec
-        yield from _walk(sec.children)
-
-
-def _find(sections, name) -> Section | None:
+def _find(sections: list[Section], name: str) -> Section | None:
     """Find the first section with a given name.
 
     Args:
         sections: Top-level sections.
-        name: Section name to look for, e.g. "__trailer__".
+        name: Section name to look for, e.g. `TRAILER`.
 
     Returns:
         The section, or None when absent.
     """
-    return next((s for s in _walk(sections) if s.name == name), None)
+    return next((s for s in walk_sections(sections) if s.name == name), None)
 
 
-def _last_open_section(sections) -> Section | None:
+def _last_open_section(sections: list[Section]) -> Section | None:
     """Find the last section that never saw its end marker.
 
     An unclosed section means execution died inside it — the strongest structural
@@ -219,13 +212,13 @@ def _last_open_section(sections) -> Section | None:
         The innermost/latest unclosed real section, or None when all are closed.
     """
     result = None
-    for sec in _walk(sections):
-        if sec.name not in _SYNTHETIC and not sec.closed:
+    for sec in walk_sections(sections):
+        if sec.name not in SYNTHETIC_SECTIONS and not sec.closed:
             result = sec
     return result
 
 
-def _open_phase(sections) -> Phase | None:
+def _open_phase(sections: list[Section]) -> Phase | None:
     """Phase of whatever section was still running.
 
     Args:
@@ -273,7 +266,7 @@ def _is_error_line(text: str) -> bool:
     return bool(_ERROR_RE.search(text.lstrip()))
 
 
-def _last_error_section(sections) -> Section | None:
+def _last_error_section(sections: list[Section]) -> Section | None:
     """Find the last section containing a genuinely fatal line.
 
     Args:
@@ -284,8 +277,8 @@ def _last_error_section(sections) -> Section | None:
         negative evidence is warning-level can never be selected here.
     """
     result = None
-    for sec in _walk(sections):
-        if sec.name in _SYNTHETIC:
+    for sec in walk_sections(sections):
+        if sec.name in SYNTHETIC_SECTIONS:
             continue
         if any(_is_error_line(line.text) for line in sec.lines):
             result = sec
@@ -320,7 +313,7 @@ def _terminal(trailer: Section | None) -> str | None:
     """The job's final line — usually the runner's verdict.
 
     Args:
-        trailer: The synthetic "__trailer__" section, or None when absent.
+        trailer: The synthetic `TRAILER` section, or None when absent.
 
     Returns:
         The last non-blank line, or None.
@@ -328,7 +321,7 @@ def _terminal(trailer: Section | None) -> str | None:
     return _last_line(trailer) if trailer is not None else None
 
 
-def _terminal_command(sections) -> str | None:
+def _terminal_command(sections: list[Section]) -> str | None:
     """The last command the user's script ran before it failed.
 
     Args:
@@ -361,11 +354,11 @@ def _matching_line(sec: Section, pattern: str) -> str | None:
     return hit if hit is not None else _last_line(sec)
 
 
-def _parse_trailer(trailer: Section | None):
+def _parse_trailer(trailer: Section | None) -> tuple[Phase, FailureReason, str, str | None] | None:
     """Read the runner's closing verdict.
 
     Args:
-        trailer: The synthetic "__trailer__" section, or None.
+        trailer: The synthetic `TRAILER` section, or None.
 
     Returns:
         A ``(phase, reason, rule_id, evidence)`` tuple, or None when the trailer
@@ -398,7 +391,7 @@ def _parse_trailer(trailer: Section | None):
     return None
 
 
-def _warning_phases(sections, exclude: Phase) -> list[Phase]:
+def _warning_phases(sections: list[Section], exclude: Phase) -> list[Phase]:
     """Phases that warned but were not blamed.
 
     Args:
@@ -410,8 +403,8 @@ def _warning_phases(sections, exclude: Phase) -> list[Phase]:
         contributing factors — worth mentioning to the reader, never the verdict.
     """
     out: list[Phase] = []
-    for sec in _walk(sections):
-        if sec.name in _SYNTHETIC or sec.phase == exclude:
+    for sec in walk_sections(sections):
+        if sec.name in SYNTHETIC_SECTIONS or sec.phase == exclude:
             continue
         if any(_is_warning_line(line.text) for line in sec.lines) and sec.phase not in out:
             out.append(sec.phase)

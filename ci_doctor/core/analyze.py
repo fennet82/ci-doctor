@@ -1,20 +1,20 @@
 """Orchestrator: turn a classified job into a budgeted evidence bundle.
 
-This is what the LLM step (M4) will consume, and what `--dry-run` will print. It
-wires the deterministic stages together; it does not call any model. Segmentation
-+ attribution happen upstream (they need a provider-specific segmenter); this takes
-the already-segmented job plus its Attribution.
+This is what the report step consumes, and all it consumes. It wires the
+deterministic stages together and calls no model. Segmentation + attribution
+happen upstream (they need a provider-specific segmenter); this takes the
+already-segmented job plus its Attribution.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ci_doctor.config.schema import Config
 from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.budget import estimate_tokens, fit
 from ci_doctor.core.denoise import denoise
 from ci_doctor.core.extract import extract
-from ci_doctor.core.models import Job, Phase, Section
+from ci_doctor.core.models import SYNTHETIC_SECTIONS, Job, Phase, Section, walk_sections
 
 log = logging.getLogger("ci_doctor.analyze")
 
@@ -31,7 +31,6 @@ class EvidenceBundle:
         token_estimate: Approximate prompt cost of the whole bundle.
         truncated: Whether the budget dropped lines. Always surfaced in the
             report — a silent truncation would be a lie about the evidence.
-        extra: Free-form slot for future stages.
     """
 
     blamed_phase: Phase
@@ -40,21 +39,6 @@ class EvidenceBundle:
     metadata: dict
     token_estimate: int
     truncated: bool = False
-    extra: dict = field(default_factory=dict)
-
-
-def _walk(sections):
-    """Yield every section depth-first, parents before their children.
-
-    Args:
-        sections: Top-level sections.
-
-    Yields:
-        Each section in the tree, in log order.
-    """
-    for sec in sections:
-        yield sec
-        yield from _walk(sec.children)
 
 
 def _blamed_section(sections: list[Section], phase: Phase) -> Section | None:
@@ -68,18 +52,11 @@ def _blamed_section(sections: list[Section], phase: Phase) -> Section | None:
         The *last* real section carrying that phase — later output is closer to
         the failure — or None when no section matches.
     """
-    match = [s for s in _walk(sections) if s.name not in {"__preamble__", "__trailer__"} and s.phase == phase]
+    match = [s for s in walk_sections(sections) if s.name not in SYNTHETIC_SECTIONS and s.phase == phase]
     return match[-1] if match else None
 
 
-def build_bundle(
-    job: Job,
-    attr: Attribution,
-    sections: list[Section],
-    cfg: Config,
-    *,
-    strip_timestamps: bool = False,
-) -> EvidenceBundle:
+def build_bundle(job: Job, attr: Attribution, sections: list[Section], cfg: Config) -> EvidenceBundle:
     """Denoise, window and budget the blamed section into a bundle.
 
     Deterministic and offline: no model is called here. Only the blamed phase's
@@ -91,7 +68,6 @@ def build_bundle(
         attr: The classifier's verdict.
         sections: The job's sections, phases already assigned.
         cfg: Config supplying the denoise, extraction and budget knobs.
-        strip_timestamps: Drop the runner's ISO timestamp prefix from each line.
 
     Returns:
         The bundle the report step consumes.
@@ -102,9 +78,9 @@ def build_bundle(
     else:
         # No section carries the blamed phase (e.g. PROVISION with an empty log):
         # fall back to whatever text exists so the report still has context.
-        raw = [line.text for sec in _walk(sections) for line in sec.lines]
+        raw = [line.text for sec in walk_sections(sections) for line in sec.lines]
 
-    clean = denoise(raw, cfg.denoise, strip_timestamps=strip_timestamps)
+    clean = denoise(raw, cfg.denoise)
     blamed_budget = int(cfg.llm.max_input_tokens * 0.7)
     # Budget the *selection* by matcher priority first; `fit` is the last resort
     # that cuts inside whatever survives.

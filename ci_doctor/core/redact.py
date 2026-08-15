@@ -1,5 +1,7 @@
-"""Secret scrubbing. Runs twice: on the prompt before it leaves the process, and
-on the rendered report before it is printed or posted.
+"""Secret scrubbing.
+
+Runs twice: on the prompt before it leaves the process, and on the rendered
+report before it is printed or posted.
 
 Local regex set + exact literals of secret-named environment variables (a
 best-effort stand-in for the CI's masked-variable values). Replacement keeps the
@@ -11,8 +13,13 @@ and must not fetch anything.
 import os
 import re
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ci_doctor.config.schema import RedactionConfig
+
+if TYPE_CHECKING:
+    # Only for the annotation: `core/` must not import `llm/` at runtime.
+    from ci_doctor.llm.schema import Report
 
 _URL_CREDS = re.compile(r"([a-zA-Z][a-zA-Z0-9+.\-]*://)[^/\s:@]+:[^/\s@]+@")
 _SECRET_ENV_NAME = re.compile(
@@ -32,7 +39,7 @@ _DEFAULT_PATTERNS = {
 }
 
 
-def _compiled(cfg: RedactionConfig):
+def _compiled(cfg: RedactionConfig) -> list[tuple[str, re.Pattern[str]]]:
     """Compile the built-in patterns plus the user's extras.
 
     Args:
@@ -92,7 +99,9 @@ def redact_text(
     return text
 
 
-def redact_report(report, cfg: RedactionConfig | None = None, environ: Mapping[str, str] | None = None):
+def redact_report(
+    report: "Report", cfg: RedactionConfig | None = None, environ: Mapping[str, str] | None = None
+) -> "Report":
     """Scrub every free-text field of a report.
 
     Applied to the finished report, after the LLM has spoken — a model can quote
@@ -108,9 +117,9 @@ def redact_report(report, cfg: RedactionConfig | None = None, environ: Mapping[s
         A scrubbed copy. The original is not mutated.
     """
 
-    def r(s):
+    def r(value: str | None) -> str | None:
         """Scrub a value if it is a string, else pass it through."""
-        return redact_text(s, cfg, environ) if isinstance(s, str) else s
+        return redact_text(value, cfg, environ) if isinstance(value, str) else value
 
     return report.model_copy(
         update={

@@ -1,5 +1,7 @@
-"""LLM report tests: deterministic path, LLM path with recorded responses, repair
-retry, degraded fallback, and the end-to-end secret round-trip. No network.
+"""LLM report tests.
+
+Deterministic path, LLM path with recorded responses, repair retry, degraded
+fallback, and the end-to-end secret round-trip. No network.
 """
 
 import pytest
@@ -36,7 +38,7 @@ class FakeClient:
         self.responses = list(responses)
         self.calls = 0
 
-    def complete_structured(self, prompt, schema):
+    def complete_structured(self, prompt):
         """Return the next queued response, or raise it if it is an exception."""
         r = self.responses[min(self.calls, len(self.responses) - 1)]
         self.calls += 1
@@ -82,6 +84,50 @@ def test_llm_path_returns_validated_report():
     report = produce_report(job, attr, bundle, cfg, client=client)
     assert report.summary == "unit tests failed on assert"
     assert client.calls == 1
+
+
+def test_skip_llm_for_short_circuits_before_the_client():
+    """A reason listed in `analysis.skip_llm_for` never reaches the backend.
+
+    The reason already settles the verdict, so paying for a call would buy
+    nothing — and the report must still be complete, not a stub.
+    """
+    log = "section_start:1:prepare_executor\nnothing here\n"
+    job, attr, bundle, cfg = _pipeline(log, reason=FailureReason.NO_RUNNER, overrides=_LLM_ON)
+    client = FakeClient([_GOOD])
+    report = produce_report(job, attr, bundle, cfg, client=client)
+    assert client.calls == 0
+    assert report.failure_phase == "provision"
+    assert report.remediation  # templated remediation, not an empty shell
+
+
+def test_skip_llm_for_can_be_emptied():
+    """Clearing the list lets even a fully-determined reason reach the LLM."""
+    log = "section_start:1:prepare_executor\nnothing here\n"
+    job, attr, bundle, cfg = _pipeline(
+        log, reason=FailureReason.NO_RUNNER, overrides={**_LLM_ON, "analysis": {"skip_llm_for": []}}
+    )
+    client = FakeClient([_GOOD])
+    produce_report(job, attr, bundle, cfg, client=client)
+    assert client.calls == 1
+
+
+def test_the_llm_cannot_overrule_the_attributed_phase():
+    """Invariant #1: attribution owns the phase, in code and not only in the prompt.
+
+    The reply here is schema-valid and claims `script`, while attribution said
+    `provision`. Accepting it would let a model relabel infrastructure as the
+    user's bug — the one verdict the deterministic pipeline exists to protect.
+    """
+    log = "section_start:1:prepare_executor\nnothing here\n"
+    job, attr, bundle, cfg = _pipeline(
+        log, reason=FailureReason.NO_RUNNER, overrides={**_LLM_ON, "analysis": {"skip_llm_for": []}}
+    )
+    assert _GOOD["failure_phase"] == "script"  # the reply disagrees on purpose
+    report = produce_report(job, attr, bundle, cfg, client=FakeClient([_GOOD]))
+    assert attr.phase == "provision"
+    assert report.failure_phase == "provision"
+    assert report.summary == _GOOD["summary"]  # only the phase is overruled
 
 
 def test_repair_retry_on_invalid_then_valid():
@@ -140,7 +186,7 @@ def test_deterministic_category_from_fixture(provider, fixture, expected):
 
 
 def test_litellm_backend_needs_no_api_base():
-    """litellm is ready on `model` alone — it routes by model name, not endpoint."""
+    """Litellm is ready on `model` alone — it routes by model name, not endpoint."""
     job, attr, bundle, cfg = _pipeline(
         _SIMPLE_LOG, overrides={"llm": {"backend": "litellm", "model": "bedrock/anthropic.claude-v2"}}
     )

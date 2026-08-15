@@ -1,5 +1,7 @@
-"""GitHub Actions adapter. Translates PyGithub objects into the domain model —
-the same domain model GitLab produces, so nothing downstream changes.
+"""GitHub Actions adapter.
+
+Translates PyGithub objects into the domain model — the same one GitLab
+produces, so nothing downstream changes.
 
 Self-hosted (GHE) is supported via a configurable base_url; token from file or
 env; custom CA and env proxies honoured by requests underneath PyGithub. The one
@@ -8,43 +10,35 @@ target for the log blob, and we fetch that ourselves.
 """
 
 import logging
+import os
 import re
 from collections.abc import Mapping
-from pathlib import Path
-from typing import Any
+from datetime import datetime
 
+import requests
 from github import Auth, Github, GithubException
+from github.Repository import Repository
+from github.WorkflowJob import WorkflowJob
+from github.WorkflowRun import WorkflowRun
 
-from ci_doctor.config.schema import Config, GitHubConfig
-from ci_doctor.core.models import Job, MergeRequestRef, RunnerInfo, Run
+from ci_doctor.config.schema import Config
+from ci_doctor.core.models import Job, MergeRequestRef, Run, RunnerInfo
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.github.reasons import to_failure_reason
+from ci_doctor.providers.tokens import read_token
 
 log = logging.getLogger("ci_doctor.github")
 
-#: Conclusions that mean "this job failed". Mapped onto the domain's single
-#: "failed" status so core job-selection needs no GitHub knowledge.
-_FAILED_CONCLUSIONS = {"failure", "timed_out", "startup_failure", "cancelled"}
-
-
-def _read_token(cfg: GitHubConfig, environ: Mapping[str, str]) -> str | None:
-    """Resolve the API token, file first.
-
-    Args:
-        cfg: GitHub config supplying `token_file` and `token_env`.
-        environ: Environment to read `token_env` from.
-
-    Returns:
-        The token, or None when neither source has one — a public repo still
-        works unauthenticated.
-    """
-    if cfg.token_file:
-        path = Path(cfg.token_file)
-        if path.is_file():
-            return path.read_text().strip()
-        log.warning("token_file %s not found; falling back to env", path)
-    return environ.get(cfg.token_env)
+#: Job conclusions -> the domain's normalised status, so core job-selection needs
+#: no GitHub knowledge. A timeout and a startup failure are failures; a
+#: cancellation stays its own status, because that is what it is on every CI.
+_CONCLUSION_STATUS = {
+    "failure": "failed",
+    "timed_out": "failed",
+    "startup_failure": "failed",
+    "cancelled": "cancelled",
+}
 
 
 class GitHubProvider(CIProvider, SCMProvider):
@@ -54,7 +48,12 @@ class GitHubProvider(CIProvider, SCMProvider):
     the same client, so one instance answers as CI system and as git host.
     """
 
-    def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
+    def __init__(
+        self,
+        config: Config,
+        client: Github | None = None,
+        environ: Mapping[str, str] | None = None,
+    ) -> None:
         """Connect to GitHub, unless a client is injected.
 
         Args:
@@ -62,15 +61,13 @@ class GitHubProvider(CIProvider, SCMProvider):
             client: Pre-built `github.Github`, used by tests to stay offline.
             environ: Environment for the token and GITHUB_* vars. Defaults to os.environ.
         """
-        import os
-
         self.cfg = config.github
         self.environ = os.environ if environ is None else environ
         self.verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
-        self._repo_obj = None
+        self._repo_obj: Repository | None = None
         #: Raw PyGithub jobs kept from fetch_run, keyed by id: the log lives behind
         #: a method on the job object and the API exposes no by-id job lookup.
-        self._raw_jobs: dict[str, Any] = {}
+        self._raw_jobs: dict[str, WorkflowJob] = {}
         self.gh = client if client is not None else self._connect()
 
     # --- connection -------------------------------------------------------
@@ -86,7 +83,7 @@ class GitHubProvider(CIProvider, SCMProvider):
         """
         if not self.cfg.base_url:
             raise ValueError("github.base_url must not be empty")
-        token = _read_token(self.cfg, self.environ)
+        token = read_token(self.cfg.token_file, self.cfg.token_env, self.environ)
         return Github(
             auth=Auth.Token(token) if token else None,
             base_url=self.cfg.base_url.rstrip("/"),
@@ -94,7 +91,7 @@ class GitHubProvider(CIProvider, SCMProvider):
             timeout=self.cfg.timeout_seconds,
         )
 
-    def _repo(self):
+    def _repo(self) -> Repository:
         """Resolve and cache the repository.
 
         Returns:
@@ -147,8 +144,6 @@ class GitHubProvider(CIProvider, SCMProvider):
             identifies the "never got a runner" case — so a fetch failure is
             logged and swallowed rather than raised.
         """
-        import requests
-
         raw = self._raw_jobs.get(job.id)
         if raw is None:
             log.warning("no raw job cached for %s; cannot fetch its log", job.id)
@@ -190,7 +185,7 @@ class GitHubProvider(CIProvider, SCMProvider):
 
     # --- mapping ----------------------------------------------------------
 
-    def _pr_ref(self, wr) -> MergeRequestRef | None:
+    def _pr_ref(self, wr: WorkflowRun) -> MergeRequestRef | None:
         """Resolve the pull request for a run.
 
         Args:
@@ -206,7 +201,7 @@ class GitHubProvider(CIProvider, SCMProvider):
         m = re.match(r"refs/pull/(\d+)/", self.environ.get("GITHUB_REF", ""))
         return MergeRequestRef(iid=m.group(1)) if m else None
 
-    def _to_job(self, j) -> Job:
+    def _to_job(self, j: WorkflowJob) -> Job:
         """Map a PyGithub workflow job onto the domain model.
 
         Args:
@@ -218,8 +213,7 @@ class GitHubProvider(CIProvider, SCMProvider):
         """
         conclusion = j.conclusion
         startup = j.status == "startup_failure" or conclusion == "startup_failure"
-        # Normalize to the domain's "failed" so core job-selection needs no GitHub knowledge.
-        status = "failed" if conclusion in _FAILED_CONCLUSIONS else (j.status or "")
+        status = _CONCLUSION_STATUS.get(conclusion, j.status or "")
         runner = (
             RunnerInfo(id=_str_or_none(j.runner_id), description=j.runner_name) if j.runner_name else None
         )
@@ -241,15 +235,21 @@ class GitHubProvider(CIProvider, SCMProvider):
         )
 
 
-def _str_or_none(value) -> str | None:
+def _str_or_none(value: object) -> str | None:
     """Stringify an optional id without turning None into "None"."""
     return None if value is None else str(value)
 
 
-def _iso(value) -> str | None:
+def _iso(value: datetime | None) -> str | None:
     """Normalise PyGithub's `datetime` timestamps to the domain's ISO strings.
 
     The domain model is a plain dataclass, so nothing downstream would catch a
     `datetime` slipping through — it would surface as a JSON dump crash instead.
+
+    Args:
+        value: A timestamp from PyGithub, or None when the job never reached it.
+
+    Returns:
+        The ISO string, or None.
     """
-    return value.isoformat() if hasattr(value, "isoformat") else value or None
+    return value.isoformat() if value is not None else None

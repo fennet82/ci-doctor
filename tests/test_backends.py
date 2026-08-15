@@ -13,10 +13,10 @@ from ci_doctor.config.loader import load_config
 from ci_doctor.llm.backends import (
     ClaudeCodeClient,
     LiteLLMClient,
+    OpenAILLMClient,
     backend_ready,
     make_client,
 )
-from ci_doctor.llm.client import OpenAILLMClient
 
 
 def _llm(**over):
@@ -74,7 +74,7 @@ def test_claude_code_client_parses_cli_envelope(monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout=envelope, stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    out = ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("prompt", {})
+    out = ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("prompt")
     assert out == report
 
 
@@ -87,4 +87,4 @@ def test_claude_code_client_raises_on_cli_failure(monkeypatch):
         lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="boom"),
     )
     with pytest.raises(RuntimeError, match="claude CLI failed"):
-        ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("p", {})
+        ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("p")

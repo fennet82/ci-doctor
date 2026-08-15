@@ -1,17 +1,21 @@
-"""Produce the Report: one LLM call (plus one repair retry), or a deterministic
-report when the LLM is disabled/unconfigured/unreachable.
+"""Produce the Report: one LLM call plus one repair retry, or no call at all.
 
-The deterministic report is a first-class output (llm.enabled: false), the M2-grade
-verdict, AND the degraded fallback — it always carries phase, reason, terminal
-evidence, an excerpt, and templated remediation. Nothing here crashes; a broken
-analyzer must never change the pipeline outcome.
+A deterministic report stands in whenever the LLM is disabled, unconfigured or
+unreachable.
+
+The deterministic report is a first-class output (`llm.enabled: false`) *and*
+the degraded fallback — it always carries phase, reason, terminal evidence, an
+excerpt, and templated remediation. Nothing here crashes; a broken analyzer must
+never change the pipeline outcome.
 """
 
 import json
 import logging
 import re
+from collections.abc import Mapping
 from importlib import resources
 from string import Template
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -19,6 +23,7 @@ from ci_doctor.config.schema import Config
 from ci_doctor.core.analyze import EvidenceBundle
 from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.models import FailureReason, Job, Phase
+from ci_doctor.core.ports import LLMClient
 from ci_doctor.core.redact import redact_report, redact_text
 from ci_doctor.llm.schema import Category, Evidence, RemediationStep, Report
 
@@ -121,7 +126,15 @@ def _infer_category(reason: FailureReason, text: str) -> Category:
     return "unknown"
 
 
-def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None) -> Report:
+def produce_report(
+    job: Job,
+    attr: Attribution,
+    bundle: EvidenceBundle,
+    cfg: Config,
+    *,
+    client: LLMClient | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> Report:
     """Produce the final report, with or without an LLM.
 
     Degrades at every step rather than raising: LLM disabled, backend not
@@ -141,6 +154,12 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
     """
     from ci_doctor.llm.backends import backend_ready, make_client
 
+    if str(attr.reason) in cfg.analysis.skip_llm_for:
+        # The reason already settles it (no runner, missing artifact, cancelled):
+        # a model has nothing left to explain, so don't pay for the call.
+        log.debug("reason %s is in analysis.skip_llm_for -> deterministic report", attr.reason)
+        return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
+
     if not (cfg.llm.enabled and (client is not None or backend_ready(cfg.llm))):
         log.debug("LLM disabled/not ready (backend=%s) -> deterministic report", cfg.llm.backend)
         return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
@@ -158,22 +177,32 @@ def produce_report(job, attr, bundle, cfg: Config, *, client=None, environ=None)
         "job %s: calling LLM backend=%s model=%s (may take a while)", job.name, cfg.llm.backend, cfg.llm.model
     )
     log.debug("prompt=%d chars", len(prompt))
-    report = _call_and_validate(client, prompt, schema)
+    report = _call_and_validate(client, prompt)
     if report is None:
         log.info("no valid LLM report; using deterministic fallback")
         report = deterministic_report(job, attr, bundle, degraded=True)
     else:
         log.debug("LLM returned a valid report")
+        if report.failure_phase != attr.phase:
+            # Invariant #1, enforced here and not only in the prompt: attribution
+            # owns the phase. A model that argues with it gets overruled, silently
+            # for the reader but loudly in the log.
+            log.warning(
+                "LLM answered phase=%s; overruled by attribution phase=%s (rule %s)",
+                report.failure_phase,
+                attr.phase,
+                attr.rule_id,
+            )
+            report = report.model_copy(update={"failure_phase": attr.phase})
     return redact_report(report, cfg.redaction, environ)
 
 
-def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
+def _call_and_validate(client: LLMClient, prompt: str) -> Report | None:
     """Call the LLM and validate its reply, retrying once with a repair hint.
 
     Args:
         client: The LLM client.
-        prompt: The rendered prompt.
-        schema: JSON Schema the reply must satisfy.
+        prompt: The rendered prompt, the reply schema already embedded in it.
 
     Returns:
         The validated report, or None when the reply is still invalid after the
@@ -183,7 +212,7 @@ def _call_and_validate(client, prompt: str, schema: dict) -> Report | None:
     hint = ""
     for _ in range(2):  # one call + one repair retry
         try:
-            data = client.complete_structured(prompt + hint, schema)
+            data = client.complete_structured(prompt + hint)
             return Report.model_validate(data)
         except (ValidationError, ValueError, json.JSONDecodeError) as exc:
             log.debug("LLM reply invalid, repair retry: %s", exc)
@@ -300,10 +329,10 @@ def _handoff(job: Job, attr: Attribution, excerpt: str) -> str:
     )
 
 
-def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: dict) -> str:
+def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: dict[str, Any]) -> str:
     """Fill the system and user prompt templates.
 
-    Guardrail #10: prompt text lives in `llm/prompts/*.txt`, never inline here,
+    Invariant #8: prompt text lives in `llm/prompts/*.txt`, never inline here,
     so it can be reviewed and edited without touching code.
 
     Args:

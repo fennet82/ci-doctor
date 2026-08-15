@@ -13,10 +13,12 @@ def test_defaults_load_and_validate():
     """The shipped config loads and validates with no user input at all."""
     cfg = load_config(environ={})
     assert isinstance(cfg, Config)
-    assert cfg.ci == "gitlab"
+    assert cfg.ci == "github"
+    assert cfg.scm is None and cfg.scm_vendor == "github"  # the note follows the CI system
     assert cfg.phases["step_script"] == "script"  # from defaults.yml
-    assert cfg.gitlab.timeout_seconds == 30  # scalar default from schema
-    assert cfg.gitlab.base_url == "https://gitlab.com"  # official default, overridable
+    assert cfg.github.timeout_seconds == 30  # scalar default from schema
+    assert cfg.github.base_url == "https://api.github.com"  # official default, overridable
+    assert cfg.gitlab.base_url == "https://gitlab.com"
 
 
 def test_shipped_matchers_parse():

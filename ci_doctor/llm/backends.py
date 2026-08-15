@@ -1,7 +1,9 @@
-"""LLM backend registry. Every backend implements the LLMClient port; the config
-`llm.backend` selects one. All use prompt-and-parse (the prompt already embeds the
-schema and a JSON-only instruction), so correctness is enforced by the caller's
-pydantic validation + repair retry — not by the backend.
+"""LLM backend registry.
+
+Every backend implements the LLMClient port; the config `llm.backend` selects
+one. All use prompt-and-parse (the prompt already embeds the schema and a
+JSON-only instruction), so correctness is enforced by the caller's pydantic
+validation + repair retry — not by the backend.
 
 `openai` is the base install and covers anything speaking the OpenAI Chat Completions
 shape, which is most of the field. `litellm` exists for the providers that do *not*
@@ -10,22 +12,52 @@ the base install stays lean and air-gap-clean (`ci-doctor[litellm]`); it can pul
 tiktoken, which fetches vocab at runtime, so it is unfit for a strict air gap.
 `claude_code` shells out to the local `claude` CLI (stdlib subprocess, no dep, but
 the binary must be on PATH).
+
+Every SDK is imported inside the call that needs it, so importing this module
+costs nothing on a run that never reaches a model. The `openai` backend honours
+the endpoint's own CA bundle, and picks up proxies and `SSL_CERT_FILE` from the
+environment via httpx's trust_env.
 """
 
 import json
 import os
 import shutil
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from ci_doctor.config.schema import LLMConfig
 from ci_doctor.core.ports import LLMClient
-from ci_doctor.llm.client import _strip_fences
+
+if TYPE_CHECKING:
+    from openai import OpenAI
+    from openai.types.chat import ChatCompletionMessageParam
 
 #: System message shared by every backend. The reply schema lives in the user
 #: prompt; this only pins the *shape* of the response.
 _SYSTEM = "Respond with a single JSON object and nothing else. No markdown, no code fences, no prose."
 
 
-def make_client(cfg: LLMConfig, environ: dict[str, str] | None = None) -> LLMClient:
+def strip_fences(text: str) -> str:
+    """Unwrap a ```-fenced code block.
+
+    Models add fences even when told to reply with bare JSON, so this runs
+    unconditionally rather than as an error path.
+
+    Args:
+        text: The model's raw reply.
+
+    Returns:
+        The reply with any surrounding fence removed.
+    """
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[-1] if "\n" in t else t
+        if t.endswith("```"):
+            t = t[: t.rfind("```")]
+    return t.strip()
+
+
+def make_client(cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> LLMClient:
     """Build the client for the configured backend.
 
     Args:
@@ -39,8 +71,6 @@ def make_client(cfg: LLMConfig, environ: dict[str, str] | None = None) -> LLMCli
         ValueError: On an unknown backend name.
     """
     if cfg.backend == "openai":
-        from ci_doctor.llm.client import OpenAILLMClient
-
         return OpenAILLMClient(cfg, environ=environ)
     if cfg.backend == "litellm":
         return LiteLLMClient(cfg, environ=environ)
@@ -70,11 +100,96 @@ def backend_ready(cfg: LLMConfig) -> bool:
     return False
 
 
-class LiteLLMClient(LLMClient):
-    """A provider litellm can reach that the OpenAI shape cannot — Bedrock, Vertex,
-    Azure. For anything OpenAI-compatible prefer `openai`: no extra dependency."""
+class OpenAILLMClient(LLMClient):
+    """Talks to any OpenAI-compatible chat-completions endpoint."""
 
-    def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+    def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
+        """Store config; no connection is opened until a call is made.
+
+        Args:
+            cfg: LLM settings — model, api_base, key env var, CA bundle, timeout.
+            environ: Environment to read the API key from. Defaults to os.environ.
+        """
+        self.cfg = cfg
+        self.environ = os.environ if environ is None else environ
+
+    def _api_key(self) -> str:
+        """Resolve the API key.
+
+        Returns:
+            The configured key, or the literal "no-key" — local servers ignore it,
+            but the openai SDK refuses an empty string.
+        """
+        if self.cfg.api_key_env:
+            return self.environ.get(self.cfg.api_key_env) or "no-key"
+        return "no-key"  # openai SDK requires a non-empty string even when the server ignores it
+
+    def _client(self) -> "OpenAI":
+        """Build the SDK client, honouring a custom CA bundle.
+
+        Returns:
+            A configured `openai.OpenAI`. Imported lazily so the SDK is never
+            pulled in unless a model is actually configured and called.
+        """
+        from openai import OpenAI
+
+        kwargs: dict[str, Any] = {
+            "base_url": self.cfg.api_base,
+            "api_key": self._api_key(),
+            "timeout": self.cfg.timeout_seconds,
+        }
+        if self.cfg.ca_bundle:
+            import httpx
+
+            kwargs["http_client"] = httpx.Client(verify=self.cfg.ca_bundle)
+        return OpenAI(**kwargs)
+
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
+        """Run one completion and parse the reply as JSON.
+
+        Args:
+            prompt: The rendered, already-redacted prompt, schema included.
+
+        Returns:
+            The parsed reply. Validation is the caller's job.
+
+        Raises:
+            json.JSONDecodeError: If the reply is not JSON.
+            Exception: Any transport or API error from the SDK.
+        """
+        if not self.cfg.model:
+            # `backend_ready` checks this, but an injected client skips that path.
+            raise ValueError("llm.model is required for the openai backend")
+        client = self._client()
+        messages: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user", "content": prompt},
+        ]
+        try:
+            resp = client.chat.completions.create(
+                model=self.cfg.model,
+                messages=messages,
+                temperature=self.cfg.temperature,
+                response_format={"type": "json_object"},
+            )
+        except Exception:  # noqa: BLE001 - some OpenAI-compatible servers reject response_format
+            resp = client.chat.completions.create(
+                model=self.cfg.model,
+                messages=messages,
+                temperature=self.cfg.temperature,
+            )
+        content = resp.choices[0].message.content or ""
+        return json.loads(strip_fences(content))
+
+
+class LiteLLMClient(LLMClient):
+    """A provider litellm can reach that the OpenAI shape cannot.
+
+    Bedrock, Vertex, Azure. For anything OpenAI-compatible prefer `openai`: no
+    extra dependency.
+    """
+
+    def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
         """Store config; litellm is imported only when a call is made.
 
         Args:
@@ -84,12 +199,11 @@ class LiteLLMClient(LLMClient):
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
-    def complete_structured(self, prompt: str, schema: dict) -> dict:
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion through litellm.
 
         Args:
-            prompt: The rendered, already-redacted prompt.
-            schema: JSON Schema of the expected reply, already embedded in the prompt.
+            prompt: The rendered, already-redacted prompt, schema included.
 
         Returns:
             The parsed reply.
@@ -105,26 +219,29 @@ class LiteLLMClient(LLMClient):
 
         litellm.telemetry = False  # no phone-home
         api_key = self.environ.get(self.cfg.api_key_env) if self.cfg.api_key_env else None
-        kwargs = dict(
-            model=self.cfg.model,
-            messages=[{"role": "system", "content": _SYSTEM}, {"role": "user", "content": prompt}],
-            api_base=self.cfg.api_base or None,
-            api_key=api_key,
-            temperature=self.cfg.temperature,
-            timeout=self.cfg.timeout_seconds,
-        )
+        kwargs = {
+            "model": self.cfg.model,
+            "messages": [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": prompt}],
+            "api_base": self.cfg.api_base or None,
+            "api_key": api_key,
+            "temperature": self.cfg.temperature,
+            "timeout": self.cfg.timeout_seconds,
+        }
         try:
             resp = litellm.completion(response_format={"type": "json_object"}, **kwargs)
         except Exception:  # noqa: BLE001 - provider may reject response_format; retry without
             resp = litellm.completion(**kwargs)
-        return json.loads(_strip_fences(resp.choices[0].message.content or ""))
+        return json.loads(strip_fences(resp.choices[0].message.content or ""))
 
 
 class ClaudeCodeClient(LLMClient):
-    """Shell out to the local `claude` CLI in headless print mode. Uses whatever
-    auth Claude Code is configured with; no API key/endpoint needed here."""
+    """Shell out to the local `claude` CLI in headless print mode.
 
-    def __init__(self, cfg: LLMConfig, environ: dict[str, str] | None = None):
+    Uses whatever auth Claude Code is configured with; no API key or endpoint is
+    needed here.
+    """
+
+    def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
         """Store config; the CLI is located at call time, not here.
 
         Args:
@@ -134,13 +251,12 @@ class ClaudeCodeClient(LLMClient):
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
 
-    def complete_structured(self, prompt: str, schema: dict) -> dict:
+    def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one headless `claude -p` and unwrap its JSON envelope.
 
         Args:
-            prompt: The rendered, already-redacted prompt. Passed on stdin, which
-                avoids ARG_MAX on large evidence bundles.
-            schema: JSON Schema of the expected reply, already embedded in the prompt.
+            prompt: The rendered, already-redacted prompt, schema included.
+                Passed on stdin, which avoids ARG_MAX on large evidence bundles.
 
         Returns:
             The parsed reply, taken from the envelope's `result` field.
@@ -165,9 +281,10 @@ class ClaudeCodeClient(LLMClient):
             text=True,
             timeout=self.cfg.timeout_seconds,
             env=self.environ,
+            check=False,  # the return code is read below, with the CLI's own stderr
         )
         if proc.returncode != 0:
             raise RuntimeError(f"claude CLI failed ({proc.returncode}): {proc.stderr[:500]}")
         envelope = json.loads(proc.stdout)  # {"result": "<model text>", ...}
         result = envelope.get("result", "") if isinstance(envelope, dict) else str(envelope)
-        return json.loads(_strip_fences(result))
+        return json.loads(strip_fences(result))

@@ -3,7 +3,6 @@
 import json
 
 from ci_doctor.llm.schema import Evidence, RemediationStep, Report
-from ci_doctor.render.json_out import JsonRenderer
 from ci_doctor.render.markdown import MarkdownRenderer
 
 
@@ -43,7 +42,7 @@ def test_markdown_has_sections():
 
 def test_json_roundtrips():
     """The JSON artifact parses and preserves nested fields."""
-    data = json.loads(JsonRenderer().render(_report()))
+    data = json.loads(_report().model_dump_json(indent=2))
     assert data["failure_phase"] == "script"
     assert data["remediation"][0]["where"] == "tests/test_x.py"
 

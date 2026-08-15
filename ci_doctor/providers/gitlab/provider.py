@@ -8,16 +8,19 @@ on older instances degrade to sensible defaults instead of crashing.
 """
 
 import logging
+import os
 from collections.abc import Mapping
-from pathlib import Path
+from typing import Any
 
 import gitlab
+from gitlab.v4.objects import Project, ProjectPipelineJob
 
 from ci_doctor.config.schema import Config
-from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, RunnerInfo, Run
+from ci_doctor.core.models import FailureReason, Job, MergeRequestRef, Run, RunnerInfo
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.gitlab.reasons import to_failure_reason
+from ci_doctor.providers.tokens import read_token
 
 log = logging.getLogger("ci_doctor.gitlab")
 
@@ -30,7 +33,12 @@ class GitLabProvider(CIProvider, SCMProvider):
     build of a GitLab repo uses only the SCM half.
     """
 
-    def __init__(self, config: Config, client=None, environ: Mapping[str, str] | None = None):
+    def __init__(
+        self,
+        config: Config,
+        client: gitlab.Gitlab | None = None,
+        environ: Mapping[str, str] | None = None,
+    ) -> None:
         """Connect to GitLab, unless a client is injected.
 
         Args:
@@ -41,31 +49,14 @@ class GitLabProvider(CIProvider, SCMProvider):
         Raises:
             ValueError: If `gitlab.base_url` is empty.
         """
-        import os
-
         self.cfg = config.gitlab
         self.environ = os.environ if environ is None else environ
-        self._project_obj = None
+        self._project_obj: Project | None = None
         self.gl = client if client is not None else self._connect()
 
     # --- connection -------------------------------------------------------
 
-    def _read_token(self) -> str | None:
-        """Resolve the API token.
-
-        Returns:
-            The token, or None when neither source has one — a public project
-            still works unauthenticated.
-        """
-        # token_file (k8s/Vault secret mount) takes precedence over the env var.
-        if self.cfg.token_file:
-            path = Path(self.cfg.token_file)
-            if path.is_file():
-                return path.read_text().strip()
-            log.warning("token_file %s not found; falling back to env", path)
-        return self.environ.get(self.cfg.token_env)
-
-    def _connect(self):
+    def _connect(self) -> gitlab.Gitlab:
         """Build the python-gitlab client and probe the instance version.
 
         Returns:
@@ -79,7 +70,7 @@ class GitLabProvider(CIProvider, SCMProvider):
         ssl_verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
         gl = gitlab.Gitlab(
             url=self.cfg.base_url,
-            private_token=self._read_token(),
+            private_token=read_token(self.cfg.token_file, self.cfg.token_env, self.environ),
             api_version=self.cfg.api_version.lstrip("v"),  # python-gitlab wants "4"
             ssl_verify=ssl_verify,
             timeout=self.cfg.timeout_seconds,
@@ -91,7 +82,7 @@ class GitLabProvider(CIProvider, SCMProvider):
             log.warning("could not detect GitLab version (continuing): %s", exc)
         return gl
 
-    def _project(self):
+    def _project(self) -> Project:
         """Resolve and cache the project from `CI_PROJECT_ID`.
 
         Returns:
@@ -195,7 +186,7 @@ class GitLabProvider(CIProvider, SCMProvider):
 
     # --- mapping ----------------------------------------------------------
 
-    def _to_job(self, pj) -> Job:
+    def _to_job(self, pj: ProjectPipelineJob) -> Job:
         """Map a python-gitlab job onto the domain model.
 
         Args:
@@ -205,13 +196,14 @@ class GitLabProvider(CIProvider, SCMProvider):
             The neutral job. Every field is read defensively — older instances
             omit attributes, and a missing one must degrade, not crash.
         """
-        status = getattr(pj, "status", "") or ""
+        raw_status = getattr(pj, "status", "") or ""
         raw_reason = getattr(pj, "failure_reason", "") or ""
-        reason = FailureReason.CANCELLED if status == "canceled" else to_failure_reason(raw_reason)
+        cancelled = raw_status == "canceled"  # GitLab spells it with one l
+        reason = FailureReason.CANCELLED if cancelled else to_failure_reason(raw_reason)
         return Job(
             id=str(pj.id),
             name=getattr(pj, "name", "") or "",
-            status=status,
+            status="cancelled" if cancelled else raw_status,
             stage=getattr(pj, "stage", None),
             failure_reason=reason,
             raw_failure_reason=raw_reason,
@@ -227,7 +219,7 @@ class GitLabProvider(CIProvider, SCMProvider):
         )
 
     @staticmethod
-    def _to_runner(runner) -> RunnerInfo | None:
+    def _to_runner(runner: dict[str, Any] | None) -> RunnerInfo | None:
         """Map GitLab's runner dict onto the domain model.
 
         Args:
@@ -246,7 +238,7 @@ class GitLabProvider(CIProvider, SCMProvider):
         )
 
     @staticmethod
-    def _to_needs(needs) -> list[str]:
+    def _to_needs(needs: list[dict[str, Any] | str] | None) -> list[str]:
         """Extract upstream job names from GitLab's `needs`.
 
         Args:
