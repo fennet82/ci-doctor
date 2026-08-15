@@ -50,13 +50,13 @@ def strip_ansi(text: str) -> str:
 
 
 def _collapse_cr(line: str) -> str:
-    """Reduce a carriage-return-rewritten line to its final visible state.
+    r"""Reduce a carriage-return-rewritten line to its final visible state.
 
     Args:
-        line: A line possibly containing `\\r` progress-bar rewrites.
+        line: A line possibly containing `\r` progress-bar rewrites.
 
     Returns:
-        The segment after the last `\\r`.
+        The segment after the last `\r`.
     """
     # Progress bars rewrite in place via \r; keep the final visible segment.
     # ponytail: naive last-\r-segment, not a true column overwrite. Fine for progress spam.
@@ -64,9 +64,9 @@ def _collapse_cr(line: str) -> str:
 
 
 def denoise(lines: list[str], cfg: DenoiseConfig, *, keep: Callable[[str], bool] | None = None) -> list[str]:
-    """Cut log volume without losing the signal.
+    r"""Cut log volume without losing the signal.
 
-    Per line: strip ANSI, collapse `\\r` rewrites, then drop configured noise —
+    Per line: strip ANSI, collapse `\r` rewrites, then drop configured noise —
     unless `keep` protects the line. Finally runs of identical lines collapse to
     one with a `(×N)` count.
 

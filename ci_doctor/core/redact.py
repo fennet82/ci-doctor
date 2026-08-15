@@ -1,5 +1,7 @@
-"""Secret scrubbing. Runs twice: on the prompt before it leaves the process, and
-on the rendered report before it is printed or posted.
+"""Secret scrubbing.
+
+Runs twice: on the prompt before it leaves the process, and on the rendered
+report before it is printed or posted.
 
 Local regex set + exact literals of secret-named environment variables (a
 best-effort stand-in for the CI's masked-variable values). Replacement keeps the

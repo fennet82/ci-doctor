@@ -1,5 +1,7 @@
-"""GitHub Actions adapter. Translates PyGithub objects into the domain model —
-the same domain model GitLab produces, so nothing downstream changes.
+"""GitHub Actions adapter.
+
+Translates PyGithub objects into the domain model — the same one GitLab
+produces, so nothing downstream changes.
 
 Self-hosted (GHE) is supported via a configurable base_url; token from file or
 env; custom CA and env proxies honoured by requests underneath PyGithub. The one
@@ -8,14 +10,16 @@ target for the log blob, and we fetch that ourselves.
 """
 
 import logging
+import os
 import re
 from collections.abc import Mapping
 from typing import Any
 
+import requests
 from github import Auth, Github, GithubException
 
 from ci_doctor.config.schema import Config
-from ci_doctor.core.models import Job, MergeRequestRef, RunnerInfo, Run
+from ci_doctor.core.models import Job, MergeRequestRef, Run, RunnerInfo
 from ci_doctor.core.ports import CIProvider, SCMProvider
 from ci_doctor.providers.git_origin import origin_repo
 from ci_doctor.providers.github.reasons import to_failure_reason
@@ -49,8 +53,6 @@ class GitHubProvider(CIProvider, SCMProvider):
             client: Pre-built `github.Github`, used by tests to stay offline.
             environ: Environment for the token and GITHUB_* vars. Defaults to os.environ.
         """
-        import os
-
         self.cfg = config.github
         self.environ = os.environ if environ is None else environ
         self.verify: bool | str = self.cfg.ca_bundle or self.cfg.verify_ssl
@@ -134,8 +136,6 @@ class GitHubProvider(CIProvider, SCMProvider):
             identifies the "never got a runner" case — so a fetch failure is
             logged and swallowed rather than raised.
         """
-        import requests
-
         raw = self._raw_jobs.get(job.id)
         if raw is None:
             log.warning("no raw job cached for %s; cannot fetch its log", job.id)

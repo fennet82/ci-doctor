@@ -11,7 +11,7 @@ catches everything and always exits 0.
 import logging
 import os
 import sys
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import typer
@@ -31,7 +31,7 @@ app = typer.Typer(add_completion=False, help="Explain why a CI pipeline failed (
 log = logging.getLogger("ci_doctor.cli")
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     """What `analyze` writes to stdout. The artifacts are written either way."""
 
     TERMINAL = "terminal"
@@ -555,10 +555,10 @@ def main() -> None:
         app()
     except SystemExit:
         # typer/click signal both normal and usage exits via SystemExit; force 0.
-        raise SystemExit(0)
+        raise SystemExit(0) from None
     except BaseException as exc:  # noqa: BLE001 - analyzer must never alter pipeline outcome
         print(f"ci-doctor: internal error, exiting 0 to preserve pipeline status: {exc}", file=sys.stderr)
-        raise SystemExit(0)
+        raise SystemExit(0) from None
 
 
 if __name__ == "__main__":

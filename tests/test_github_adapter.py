@@ -1,8 +1,9 @@
-"""GitHub adapter: segmenter, reasons, provider mapping, and a full end-to-end
-attribution through the GitHub path — proving core needed no changes.
+"""GitHub adapter: segmenter, reasons, provider mapping, attribution end to end.
+
+The full run through the GitHub path proves core needed no changes for it.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from ci_doctor.config.loader import load_config
@@ -108,7 +109,7 @@ def test_provider_maps_jobs_and_normalizes_status():
             runner_name="gh-runner-1",
             runner_id=7,
             html_url="http://gh/11",
-            started_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            started_at=datetime(2024, 1, 1, tzinfo=UTC),
         ),
         _job(id=12, name="flaky", status="completed", conclusion="timed_out"),
         _job(id=13, name="ok", status="completed", conclusion="success"),

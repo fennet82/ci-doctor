@@ -4,6 +4,11 @@ from ci_doctor.core.ports import Renderer
 from ci_doctor.llm.schema import Report
 
 
+def _yn(value: bool) -> str:
+    """Render a boolean as the table cell a reader can scan."""
+    return "yes" if value else "no"
+
+
 class MarkdownRenderer(Renderer):
     """Emits the report as Markdown — the `report.md` artifact and MR-note body."""
 
@@ -19,14 +24,13 @@ class MarkdownRenderer(Renderer):
             sections are omitted rather than rendered as headings with nothing
             under them.
         """
-        yn = lambda b: "yes" if b else "no"  # noqa: E731
         out = [
             f"## ci-doctor — {report.summary}",
             "",
             "| Phase | Category | Confidence | Infra not code | Likely flaky |",
             "|---|---|---|---|---|",
             f"| {report.failure_phase} | {report.category} | {report.confidence} | "
-            f"{yn(report.is_infra_not_code)} | {yn(report.likely_flaky)} |",
+            f"{_yn(report.is_infra_not_code)} | {_yn(report.likely_flaky)} |",
             "",
             "### Root cause",
             report.root_cause,

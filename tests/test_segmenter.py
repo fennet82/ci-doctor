@@ -125,7 +125,7 @@ def test_output_does_not_pile_up_in_the_trailer():
 
 
 def test_sub_groups_nest_into_their_step_and_inherit_its_phase():
-    """checkout's "Getting Git version info" is part of checkout, not a sibling step."""
+    """Checkout's "Getting Git version info" is part of checkout, not a sibling step."""
     checkout = _by_header(_gh(), "Run actions/checkout@v4")
 
     assert checkout.phase == Phase.FETCH

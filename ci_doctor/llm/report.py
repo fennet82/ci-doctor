@@ -1,5 +1,7 @@
-"""Produce the Report: one LLM call (plus one repair retry), or a deterministic
-report when the LLM is disabled/unconfigured/unreachable.
+"""Produce the Report: one LLM call plus one repair retry, or no call at all.
+
+A deterministic report stands in whenever the LLM is disabled, unconfigured or
+unreachable.
 
 The deterministic report is a first-class output (`llm.enabled: false`) *and*
 the degraded fallback — it always carries phase, reason, terminal evidence, an

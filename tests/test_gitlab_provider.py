@@ -10,20 +10,20 @@ from ci_doctor.providers.gitlab.provider import GitLabProvider
 
 def _pipeline_job(**kw):
     """Build a python-gitlab-shaped job double, overridden by kwargs."""
-    base = dict(
-        id=0,
-        name="",
-        status="failed",
-        stage=None,
-        allow_failure=False,
-        failure_reason="",
-        started_at=None,
-        finished_at=None,
-        duration=None,
-        runner=None,
-        web_url="",
-        needs=None,
-    )
+    base = {
+        "id": 0,
+        "name": "",
+        "status": "failed",
+        "stage": None,
+        "allow_failure": False,
+        "failure_reason": "",
+        "started_at": None,
+        "finished_at": None,
+        "duration": None,
+        "runner": None,
+        "web_url": "",
+        "needs": None,
+    }
     base.update(kw)
     return SimpleNamespace(**base)
 
