@@ -4,6 +4,7 @@ from pathlib import Path
 
 from ci_doctor import cli
 from ci_doctor.core.models import FailureReason, Job, LogLine, Phase, Run, Section
+from ci_doctor.pipeline import run_from_file
 
 
 def test_domain_model_instantiates():
@@ -27,7 +28,7 @@ def test_run_from_file(tmp_path):
     """A raw log file becomes a single-job run named after the file."""
     f = tmp_path / "build.log"
     f.write_text("line1\nERROR: boom\n")
-    run = cli._run_from_file(f)
+    run = run_from_file(f)
     assert run.jobs[0].name == "build"
     assert run.jobs[0].log == "line1\nERROR: boom\n"
 
