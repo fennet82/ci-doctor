@@ -76,19 +76,3 @@ def job_verdict(jr: JobResult) -> str:
     """
     r = jr.report
     return f"{r.failure_phase} · {r.category} · {r.confidence}"
-
-
-def culprit_index(results: list[JobResult]) -> int:
-    """Which job the reader most likely came to see.
-
-    Args:
-        results: The analyzed jobs, in pipeline order.
-
-    Returns:
-        The index of the first high-confidence code fault, else the first code
-        fault, else 0 — so an interactive cursor lands on the probable culprit
-        rather than on whichever job happens to be first.
-    """
-    code = [i for i, r in enumerate(results) if not r.report.is_infra_not_code]
-    high = [i for i in code if results[i].report.confidence == "high"]
-    return next(iter(high + code), 0)

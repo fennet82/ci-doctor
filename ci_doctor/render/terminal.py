@@ -11,9 +11,7 @@ Colour is deliberately restrained: section headers, a status line, and severity
 cues only.
 """
 
-import logging
 import time
-from collections.abc import Callable
 from typing import IO
 
 from rich.console import Console
@@ -24,13 +22,7 @@ from rich.text import Text
 from ci_doctor.core.models import Run
 from ci_doctor.llm.schema import RemediationStep, Report
 from ci_doctor.pipeline import JobResult
-from ci_doctor.render.pipeline import culprit_index, header_line, job_verdict
-
-log = logging.getLogger("ci_doctor.render")
-
-#: Picks a job to open, or None to quit. Injectable so the interactive loop is
-#: testable without a real terminal — tests pass a scripted one.
-AskJob = Callable[[list[JobResult], bool], int | None]
+from ci_doctor.render.pipeline import header_line, job_verdict
 
 #: Name of the collapsible section wrapping the report inside a GitLab job log.
 _SECTION = "ci_doctor_report"
@@ -173,131 +165,11 @@ def render_pipeline(
     """
     console = Console(no_color=no_color, file=file, highlight=False, soft_wrap=True)
     _pipeline_header(console, run, results)
-    for jr in results:
+    for i, jr in enumerate(results):
+        if i:
+            console.print("\n")  # blank lines between jobs, so each section stands apart
         _job_rule(console, jr)
         render_terminal(jr.report, no_color=no_color, wrap_section=False, file=file)
-
-
-def select_and_show(
-    run: Run,
-    results: list[JobResult],
-    *,
-    no_color: bool = False,
-    ask: AskJob | None = None,
-    file: IO[str] | None = None,
-) -> None:
-    """Let a human pick a failed job and read its findings, on a TTY.
-
-    Prints the pipeline header once, then loops: pick a job, render it, back to
-    the list, until the reader quits. The picker is injectable (`ask`) so the loop
-    is testable; by default it is an arrow-key dropdown when `questionary` is
-    installed, and a numbered prompt otherwise.
-
-    Args:
-        run: The analyzed run.
-        results: The analyzed jobs, in pipeline order.
-        no_color: Force plain text.
-        ask: Picker returning a job index, or None to quit. Defaults to the
-            questionary dropdown with a numbered fallback.
-        file: Output stream. Defaults to stdout.
-    """
-    console = Console(no_color=no_color, file=file, highlight=False, soft_wrap=True)
-    _pipeline_header(console, run, results)
-    ask = ask or _default_ask()
-    while True:
-        idx = ask(results, no_color)
-        if idx is None:
-            return
-        _job_rule(console, results[idx])
-        render_terminal(results[idx].report, no_color=no_color, wrap_section=False, file=file)
-
-
-def _default_ask() -> AskJob:
-    """Choose the picker: the dropdown if available, else the numbered prompt.
-
-    Returns:
-        A picker. Resolved once per run so the "install the extra" hint is logged
-        at most once, not on every loop. Probes with `find_spec` rather than an
-        import, so the base install (no questionary) neither imports it nor trips
-        the type checker over an optional dependency.
-    """
-    from importlib.util import find_spec
-
-    if find_spec("questionary") is None:
-        log.info("install ci-doctorr[interactive] for arrow-key selection; using a numbered prompt")
-        return _ask_numbered
-    return _ask_questionary
-
-
-def _choice_title(jr: JobResult, no_color: bool) -> str | list[tuple[str, str]]:
-    """Build one dropdown row: a fault-coloured dot, the job, its verdict, a tag.
-
-    Args:
-        jr: The analyzed job.
-        no_color: Drop the colour tokens.
-
-    Returns:
-        A plain string when `no_color`, else questionary formatted-text (a list of
-        ``(style, text)`` tuples) so the dot carries the code-vs-infra colour.
-    """
-    tag = "infra" if jr.report.is_infra_not_code else "your code"
-    label = jr.job.name + (f" ({jr.job.stage})" if jr.job.stage else "")
-    label += f"  {job_verdict(jr)}  [{tag}]"
-    if no_color:
-        return "● " + label
-    dot = "fg:ansiyellow" if jr.report.is_infra_not_code else "fg:ansired"
-    return [(dot, "● "), ("", label)]
-
-
-def _ask_questionary(results: list[JobResult], no_color: bool) -> int | None:
-    """Arrow-key dropdown over the failed jobs, cursor on the likely culprit.
-
-    Args:
-        results: The analyzed jobs.
-        no_color: Force plain rows.
-
-    Returns:
-        The chosen job index, or None on "Quit" or Ctrl-C/Esc.
-    """
-    import questionary  # ty: ignore[unresolved-import] - present when [interactive] is installed
-
-    # title is a list of (style, text) tuples — valid formatted text, which is how
-    # the dot carries its colour; value is the index the caller renders.
-    choices = [questionary.Choice(title=_choice_title(jr, no_color), value=i) for i, jr in enumerate(results)]
-    choices.append(questionary.Choice(title="Quit", value=None))
-    return questionary.select(
-        "Open a failed job",
-        choices=choices,
-        default=choices[culprit_index(results)],  # match by Choice, not by raw index
-        pointer="▸",
-        instruction="(↑↓, ↵ to open, q to quit)",
-        use_shortcuts=False,
-    ).ask()
-
-
-def _ask_numbered(results: list[JobResult], no_color: bool) -> int | None:
-    """Numbered-menu fallback when questionary is not installed.
-
-    Args:
-        results: The analyzed jobs.
-        no_color: Force plain rows.
-
-    Returns:
-        The chosen job index, or None to quit. Re-prompts on unparseable input.
-    """
-    console = Console(no_color=no_color, highlight=False, stderr=True)
-    for i, jr in enumerate(results, 1):
-        color = "yellow" if jr.report.is_infra_not_code else "red"
-        row = Text(f"  {i}. ")
-        row.append(jr.job.name, style=f"bold {color}")
-        row.append(f"  {job_verdict(jr)}", style="dim")
-        console.print(row)
-    while True:
-        raw = input(f"Open job [1-{len(results)}, q to quit]: ").strip().lower()
-        if raw in ("q", "quit", ""):
-            return None
-        if raw.isdigit() and 1 <= int(raw) <= len(results):
-            return int(raw) - 1
 
 
 def _print_each(console: Console, items: list[Text]) -> None:

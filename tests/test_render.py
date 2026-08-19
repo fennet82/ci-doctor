@@ -98,14 +98,13 @@ def test_terminal_preserves_bracketed_log_content():
 # --- pipeline framing -------------------------------------------------------
 
 
-def test_pipeline_helpers_triage_and_culprit():
-    """The shared helpers count blame and pick the likely culprit."""
-    from ci_doctor.render.pipeline import culprit_index, header_line, triage
+def test_pipeline_helpers_triage_and_header():
+    """The shared helpers count blame and summarise it in the header."""
+    from ci_doctor.render.pipeline import header_line, triage
 
     results = [_jr("build", infra=True), _jr("test", infra=False, confidence="high")]
     assert triage(results) == (2, 1, 1)  # total, code, infra
     assert "2 failed · 1 your code · 1 infra" in header_line("42", "main", "a1b2c3d", results)
-    assert culprit_index(results) == 1  # the code fault, not the infra one that comes first
 
 
 def test_render_pipeline_has_header_and_a_rule_per_job():
@@ -133,59 +132,14 @@ def test_render_pipeline_markdown_is_one_document_per_job():
     assert "[View pipeline](https://ci/42)" in md
 
 
-def test_interactive_selector_opens_the_chosen_job_then_quits():
-    """select_and_show renders the picked job and stops when the picker quits."""
-    from ci_doctor.render.terminal import select_and_show
+def test_render_pipeline_spaces_jobs_apart():
+    """Consecutive jobs are separated by blank lines, not run together."""
+    from ci_doctor.render.terminal import render_pipeline
 
-    results = [_jr("build"), _jr("deploy", infra=True)]
-    picks = iter([1, None])  # open the second job, then quit
+    results = [_jr("build", stage="build"), _jr("deploy", stage="deploy", infra=True)]
     buf = io.StringIO()
-    select_and_show(_run(results), results, no_color=True, ask=lambda res, nc: next(picks), file=buf)
-    out = buf.getvalue()
-    assert "deploy (build)" in out  # the chosen job's separator was rendered
-    assert "deploy failed" in out  # ...and its report
-    assert "build failed" not in out  # the unchosen job was not
-
-
-def test_interactive_selector_shows_nothing_but_the_header_on_immediate_quit():
-    """Quitting without a pick leaves just the pipeline header."""
-    from ci_doctor.render.terminal import select_and_show
-
-    results = [_jr("build"), _jr("deploy")]
-    buf = io.StringIO()
-    select_and_show(_run(results), results, no_color=True, ask=lambda res, nc: None, file=buf)
-    out = buf.getvalue()
-    assert "Pipeline 42" in out
-    assert "Root cause" not in out  # no job body rendered
-
-
-def test_choice_title_colours_the_dot_by_fault():
-    """The dropdown row's dot is red for a code fault, yellow for infra."""
-    from ci_doctor.render.terminal import _choice_title
-
-    code = _choice_title(_jr("build", infra=False), no_color=False)
-    infra = _choice_title(_jr("deploy", infra=True), no_color=False)
-    assert code[0][0] == "fg:ansired" and infra[0][0] == "fg:ansiyellow"
-    plain = _choice_title(_jr("build"), no_color=True)
-    assert plain.startswith("● ") and "your code" in plain
-
-
-def test_numbered_fallback_reads_a_choice(monkeypatch):
-    """The no-questionary path parses a number, and quits on q/blank."""
-    from ci_doctor.render import terminal
-
-    results = [_jr("build"), _jr("deploy")]
-    monkeypatch.setattr("builtins.input", lambda _: "2")
-    assert terminal._ask_numbered(results, True) == 1
-    monkeypatch.setattr("builtins.input", lambda _: "q")
-    assert terminal._ask_numbered(results, True) is None
-
-
-def test_default_ask_falls_back_when_questionary_is_absent(monkeypatch):
-    """Without the extra installed, the selector is the numbered prompt."""
-    import sys
-
-    from ci_doctor.render import terminal
-
-    monkeypatch.setitem(sys.modules, "questionary", None)  # make `import questionary` raise
-    assert terminal._default_ask() is terminal._ask_numbered
+    render_pipeline(_run(results), results, no_color=True, file=buf)
+    # The deploy separator is preceded by a run of blank lines that the first job's
+    # body does not carry on its own — the extra spacing between sections.
+    before_deploy = buf.getvalue().split("deploy (deploy)")[0]
+    assert "\n\n\n" in before_deploy
