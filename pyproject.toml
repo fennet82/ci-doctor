@@ -18,6 +18,9 @@ dependencies = [
     # fetch it ourselves. It arrives with PyGithub either way; declared because
     # we import it, not because it adds a wheel.
     "requests>=2.32",
+    # Direct import: the openai backend builds its own httpx.Client to honour
+    # llm.ca_bundle. openai brings httpx either way; declared because we import it.
+    "httpx>=0.27",
 ]
 classifiers = [
     "License :: OSI Approved :: MIT License",
