@@ -60,6 +60,34 @@ def test_ansi_wrapped_markers_parse():
     assert secs[0].header == "Running script"
 
 
+def test_gitlab_com_line_metadata_is_stripped():
+    """gitlab.com prefixes every line with a timestamp + `00O`/`01E` stream token.
+
+    That prefix sits before the section markers too, so without stripping it the
+    segmenter would see no sections and the timestamps would leak into the
+    evidence. `00O+` is a continued line and carries no separating space.
+    """
+    log = (
+        "2026-08-19T21:44:16.163313Z 00O section_start:1787175856:step_script\r\x1b[0K\n"
+        "2026-08-19T21:44:47.218423Z 01O $ ruff check .\n"
+        "2026-08-19T21:44:47.225115Z 01O F401 [*] `math` imported but unused\n"
+        "2026-08-19T21:44:47.100393Z 01E [notice] A new release of pip is available\n"
+        "2026-08-19T21:44:16.163318Z 00O+\x1b[0KPreparing executor\n"
+        "2026-08-19T21:44:48.000000Z 00O section_end:1787175880:step_script\r\x1b[0K\n"
+        "2026-08-19T21:44:48.100000Z 00O ERROR: Job failed: exit code 1\n"
+    )
+    secs = _seg(log)
+    assert [s.name for s in secs] == ["step_script", "__trailer__"]  # markers were found
+    step = secs[0]
+    assert step.start_ts == 1787175856 and step.closed is True
+    body = [line.text for line in step.lines]
+    assert "F401 [*] `math` imported but unused" in body  # no timestamp/`01O` prefix
+    assert "$ ruff check ." in body
+    assert "\x1b[0KPreparing executor" in body  # `00O+` continuation stripped, ANSI kept
+    assert not any("00O" in line or "2026-08-19T" in line for line in body)
+    assert "exit code 1" in secs[1].lines[-1].text
+
+
 def test_phase_assignment_and_inheritance():
     """An unknown nested section inherits its parent's phase."""
     log = (

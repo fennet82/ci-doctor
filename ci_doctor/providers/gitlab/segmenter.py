@@ -11,6 +11,14 @@ wrapper and the trailing ``\r\e[0K`` are optional in this parser so plain-text
 fixtures parse the same way. Content outside any section becomes the synthetic
 ``__preamble__`` (before the first section) or ``__trailer__`` (after) — the
 trailer carries the terminal ``ERROR: Job failed:`` line.
+
+gitlab.com's trace prefixes every line with its own metadata —
+``2026-01-02T03:04:05.678901Z 00O <content>`` — an RFC 3339 timestamp and a
+``<hex-flags><stream>`` token (``00O``/``01E``, a ``+`` for a continued line).
+That prefix sits *before* the ``section_start`` markers too, so it is stripped
+first or the segmenter would see no sections at all and leave the timestamps in
+the evidence. Older logs and the fixtures carry no such prefix, so the strip is a
+no-op on them.
 """
 
 import re
@@ -22,6 +30,11 @@ from ci_doctor.core.ports import LogSegmenter
 #: "start" or "end"; `payload` is the text run or the section name; `ts` is the
 #: marker's epoch seconds, and None for a content run, which carries no time.
 _Token = tuple[str, str, int | None]
+
+#: gitlab.com's per-line log metadata: ``<RFC3339 timestamp> <hex-flags><stream>``,
+#: e.g. ``2026-...Z 00O ``. The stream is ``O`` (stdout) or ``E`` (stderr); a
+#: trailing ``+`` marks a continued line and then carries no separating space.
+_LOG_META = re.compile(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z [0-9A-Fa-f]{2}[OE]\+? ?", re.MULTILINE)
 
 _MARKER = re.compile(
     r"(?:\x1b\[0K)?"
@@ -47,7 +60,7 @@ class GitLabSegmenter(LogSegmenter):
             Top-level sections, plus synthetic `__preamble__`/`__trailer__` for
             content outside any marker.
         """
-        return _assemble(_tokenize(raw_log))
+        return _assemble(_tokenize(_LOG_META.sub("", raw_log)))
 
 
 def _tokenize(raw: str) -> list[_Token]:
