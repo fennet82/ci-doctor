@@ -81,6 +81,25 @@ def process_job(job: Job, cfg: Config, segmenter: LogSegmenter | None = None) ->
     return JobResult(job, attr, report)
 
 
+def _ordered(jobs: list[Job]) -> list[Job]:
+    """Put failed jobs in the order the pipeline ran them.
+
+    The provider returns jobs in API order, which is not pipeline order — GitLab
+    hands back the newest first, so a report would recap `deploy` before `build`.
+    Sort by `started_at` instead, which is the order a reader watched them run.
+    A job that never started (no runner) has no timestamp and sorts first, where
+    it belongs in the lifecycle; the sort is stable, so same-instant ties keep
+    API order rather than shuffling.
+
+    Args:
+        jobs: The selected failed jobs.
+
+    Returns:
+        The same jobs, chronological.
+    """
+    return sorted(jobs, key=lambda j: (j.started_at is not None, j.started_at or ""))
+
+
 def analyze_run(
     run_id: str, cfg: Config, job_id: str | None = None
 ) -> tuple[Run, CIProvider, list[JobResult]]:
@@ -104,7 +123,7 @@ def analyze_run(
         jobs = [j for j in jobs if j.id == job_id]
     log.debug("run %s: %d jobs, %d failed and selected", run_id, len(run.jobs), len(jobs))
 
-    selected = jobs[: cfg.analysis.max_jobs_analyzed]
+    selected = _ordered(jobs)[: cfg.analysis.max_jobs_analyzed]
     log.info("analyzing %d failed job(s) from run %s", len(selected), run_id)
     results = []
     for job in selected:

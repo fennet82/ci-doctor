@@ -110,6 +110,10 @@ uv run ci-doctor analyze 18234567890
 changed, `--schema` emits the JSON Schema. Full CLI and config reference on the
 [documentation site](https://fennet82.github.io/ci-doctor).
 
+When a pipeline has several failed jobs, the report is framed as a pipeline: a header
+with a code-vs-infra triage count, then each job under its own separator, in the order
+they ran.
+
 ## Configuration
 
 Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_DOCTOR_*` env

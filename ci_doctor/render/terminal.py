@@ -16,9 +16,13 @@ from typing import IO
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.rule import Rule
 from rich.text import Text
 
+from ci_doctor.core.models import Run
 from ci_doctor.llm.schema import RemediationStep, Report
+from ci_doctor.pipeline import JobResult
+from ci_doctor.render.pipeline import header_line, job_verdict
 
 #: Name of the collapsible section wrapping the report inside a GitLab job log.
 _SECTION = "ci_doctor_report"
@@ -104,6 +108,68 @@ def render_terminal(
 
     if wrap_section:
         console.file.write(f"\x1b[0Ksection_end:{ts}:{_SECTION}\r\x1b[0K\n")
+
+
+def _job_rule(console: Console, jr: JobResult) -> None:
+    """Print the heavy separator that opens one job's section.
+
+    Args:
+        console: The output console.
+        jr: The analyzed job.
+
+    The rule is the answer to "where does one job end and the next begin" — the
+    complaint that started this. Red for a code fault, yellow for infrastructure,
+    with the verdict inline so the header alone places the failure.
+    """
+    color = "yellow" if jr.report.is_infra_not_code else "red"
+    title = Text()
+    title.append(f" {jr.job.name} ", style=f"bold {color}")
+    if jr.job.stage:
+        title.append(f"({jr.job.stage}) ", style="dim")
+    title.append(f"{job_verdict(jr)} ", style=color)
+    console.print(Rule(title=title, characters="═", style=color, align="left"), end="\n\n")
+
+
+def _pipeline_header(console: Console, run: Run, results: list[JobResult]) -> None:
+    """Print the one-line pipeline header, the link, and the job index.
+
+    Args:
+        console: The output console.
+        run: The analyzed run.
+        results: The analyzed jobs, in pipeline order.
+    """
+    console.print(Text(header_line(run.id, run.ref, run.sha, results), style="bold"))
+    if run.web_url:
+        console.print(Text(run.web_url, style="dim"))
+    console.print(Text("  " + " · ".join(jr.job.name for jr in results), style="dim"), end="\n\n")
+
+
+def render_pipeline(
+    run: Run,
+    results: list[JobResult],
+    *,
+    no_color: bool = False,
+    file: IO[str] | None = None,
+) -> None:
+    """Render every job of a pipeline, linearly, for CI logs and pipes.
+
+    The non-interactive view: a pipeline header and a chronological index, then
+    each job under its own heavy rule. No prompts — safe to pipe or read in a CI
+    log, where the reader cannot answer anyway.
+
+    Args:
+        run: The analyzed run.
+        results: The analyzed jobs, in pipeline order.
+        no_color: Force plain text.
+        file: Output stream. Defaults to stdout.
+    """
+    console = Console(no_color=no_color, file=file, highlight=False, soft_wrap=True)
+    _pipeline_header(console, run, results)
+    for i, jr in enumerate(results):
+        if i:
+            console.print("\n")  # blank lines between jobs, so each section stands apart
+        _job_rule(console, jr)
+        render_terminal(jr.report, no_color=no_color, wrap_section=False, file=file)
 
 
 def _print_each(console: Console, items: list[Text]) -> None:
