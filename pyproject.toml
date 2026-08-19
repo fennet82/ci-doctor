@@ -45,7 +45,11 @@ Changelog = "https://github.com/fennet82/ci-doctor/blob/master/CHANGELOG.md"
 # Optional LLM backends (base install stays lean/air-gap-clean). openai is included
 # in the base deps; claude_code needs only the `claude` CLI on PATH.
 litellm = ["litellm>=1.40"]
-all = ["litellm>=1.40"]
+# Arrow-key job selector on a local TTY. Out of base deps on purpose: the image
+# runs in CI (non-interactive) and never loads prompt_toolkit, so the base and
+# air-gap installs stay lean. Absent, the selector degrades to a numbered prompt.
+interactive = ["questionary>=2.0"]
+all = ["litellm>=1.40", "questionary>=2.0"]
 
 [project.scripts]
 ci-doctor = "ci_doctor.cli:main"

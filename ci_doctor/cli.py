@@ -99,6 +99,11 @@ def analyze(
         help="stdout format. `json` prints the report instead of the rendered panels.",
     ),
     no_color: bool = typer.Option(False, "--no-color", help="Disable coloured terminal output."),
+    interactive: bool | None = typer.Option(
+        None,
+        "--interactive/--no-interactive",
+        help="Pick jobs from a menu (default: on when attached to a terminal outside CI).",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging."),
 ) -> None:
     """Explain why a CI run failed.
@@ -114,6 +119,8 @@ def analyze(
         output_format: What goes to stdout — the rendered panels, or the report
             as JSON for a script or a coding agent to read.
         no_color: Disable coloured terminal output.
+        interactive: Force the job menu on or off. Left unset, it is auto-detected:
+            on for a real terminal outside CI, off in CI, a pipe, or `--format json`.
         verbose: Enable debug logging.
     """
     _configure_logging(verbose)
@@ -132,7 +139,14 @@ def analyze(
         typer.echo("nothing to do: pass a pipeline id, or the path to a log to replay.", err=True)
         return
 
-    _deliver(results, cfg, no_color=no_color, output_format=output_format)
+    _deliver(
+        results,
+        cfg,
+        run=run,
+        no_color=no_color,
+        output_format=output_format,
+        interactive=_is_interactive(output_format, interactive),
+    )
     _maybe_post_mr(provider, run, results, cfg)
 
 
@@ -251,41 +265,100 @@ def _diff_lines(before: str, after: str) -> list[str]:
     return [line.rstrip("\n") for line in diff][2:]
 
 
+_CI_ENV = ("CI", "GITHUB_ACTIONS", "GITLAB_CI")
+
+
+def _in_ci() -> bool:
+    """Whether we are running inside a CI system.
+
+    Returns:
+        True if any of the usual CI markers is set. `CI` alone covers GitHub and
+        GitLab, which both export `CI=true`; the others are belt and braces.
+    """
+    return any(os.environ.get(v) for v in _CI_ENV)
+
+
+def _is_interactive(output_format: OutputFormat, override: bool | None) -> bool:
+    """Decide whether the job menu should run.
+
+    Args:
+        output_format: JSON is a payload, never interactive.
+        override: `--interactive/--no-interactive`, or None to auto-detect.
+
+    Returns:
+        The override when given; otherwise True only for a real terminal outside
+        CI. A pipe, a CI log, or `--format json` all read non-interactively —
+        nobody is there to answer the prompt.
+    """
+    if output_format is OutputFormat.JSON:
+        return False
+    if override is not None:
+        return override
+    return sys.stdout.isatty() and not _in_ci()
+
+
+def _pipeline_markdown(run: Run | None, results: list[JobResult]) -> str:
+    """The Markdown for the artifact and the MR note.
+
+    Args:
+        run: The analyzed run, or None for offline replay.
+        results: One :class:`~ci_doctor.pipeline.JobResult` per analyzed job.
+
+    Returns:
+        A pipeline document (header + a section per job) for a live run of more
+        than one job; a single report otherwise, so replay and one-job runs stay
+        unframed.
+    """
+    from ci_doctor.render.markdown import MarkdownRenderer, render_pipeline_markdown
+
+    if run is not None and len(results) > 1:
+        return render_pipeline_markdown(run, results)
+    return "\n\n---\n\n".join(MarkdownRenderer().render(r.report) for r in results)
+
+
 def _deliver(
     results: list[JobResult],
     cfg: Config,
     *,
+    run: Run | None,
     no_color: bool,
     output_format: OutputFormat = OutputFormat.TERMINAL,
+    interactive: bool = False,
 ) -> None:
     """Render the reports to stdout and write the artifacts.
 
     Args:
         results: One :class:`~ci_doctor.pipeline.JobResult` per analyzed job.
         cfg: The effective config, supplying the output paths.
+        run: The analyzed run, or None for offline replay. Present unlocks the
+            pipeline framing — a header and a job menu or per-job separators.
         no_color: Disable coloured terminal output.
         output_format: JSON puts the report on stdout instead of the panels, for a
             script or an agent to read. The artifacts are written either way, and
             every human-facing line already goes to stderr, so stdout stays parseable.
+        interactive: Offer the job menu instead of printing every job linearly.
     """
-    from ci_doctor.render.markdown import MarkdownRenderer
-    from ci_doctor.render.terminal import render_terminal
+    from ci_doctor.render.terminal import render_pipeline, render_terminal, select_and_show
 
     if not results:
         typer.echo("no failed jobs to analyze.")
         return
 
-    reports = [r.report for r in results]
-    payload = [r.model_dump(mode="json") for r in reports]
+    payload = [r.report.model_dump(mode="json") for r in results]
+    multi_job = run is not None and len(results) > 1
     if output_format is OutputFormat.JSON:
         typer.echo(json.dumps(payload, indent=2))
     elif cfg.output.terminal:
         wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
-        for report in reports:
-            render_terminal(report, no_color=no_color, wrap_section=wrap)
+        if interactive and multi_job:
+            select_and_show(run, results, no_color=no_color)
+        elif multi_job:
+            render_pipeline(run, results, no_color=no_color, wrap_section=wrap)
+        else:
+            for r in results:
+                render_terminal(r.report, no_color=no_color, wrap_section=wrap)
 
-    md = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
-    Path(cfg.output.markdown_path).write_text(md)
+    Path(cfg.output.markdown_path).write_text(_pipeline_markdown(run, results))
     Path(cfg.output.json_path).write_text(json.dumps(payload, indent=2))
     typer.echo(f"wrote {cfg.output.markdown_path} and {cfg.output.json_path}", err=True)
 
@@ -316,9 +389,7 @@ def _maybe_post_mr(ci_provider: object, run: Run | None, results: list[JobResult
         typer.echo(f"MR note skipped: no git-host adapter for {cfg.scm_vendor!r}.", err=True)
         return
 
-    from ci_doctor.render.markdown import MarkdownRenderer
-
-    body = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
+    body = _pipeline_markdown(run, results)
     marker = f"<!-- ci-doctor:pipeline:{run.id} -->"
     try:
         scm.post_note(run.mr, body, marker)
