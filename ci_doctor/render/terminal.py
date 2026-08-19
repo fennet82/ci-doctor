@@ -224,11 +224,13 @@ def _default_ask() -> AskJob:
 
     Returns:
         A picker. Resolved once per run so the "install the extra" hint is logged
-        at most once, not on every loop.
+        at most once, not on every loop. Probes with `find_spec` rather than an
+        import, so the base install (no questionary) neither imports it nor trips
+        the type checker over an optional dependency.
     """
-    try:
-        import questionary  # noqa: F401 - availability probe only
-    except ImportError:
+    from importlib.util import find_spec
+
+    if find_spec("questionary") is None:
         log.info("install ci-doctorr[interactive] for arrow-key selection; using a numbered prompt")
         return _ask_numbered
     return _ask_questionary
@@ -264,7 +266,7 @@ def _ask_questionary(results: list[JobResult], no_color: bool) -> int | None:
     Returns:
         The chosen job index, or None on "Quit" or Ctrl-C/Esc.
     """
-    import questionary
+    import questionary  # ty: ignore[unresolved-import] - present when [interactive] is installed
 
     # title is a list of (style, text) tuples — valid formatted text, which is how
     # the dot carries its colour; value is the index the caller renders.
