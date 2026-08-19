@@ -14,10 +14,8 @@ dependencies = [
     "python-gitlab>=8.4.0",
     "openai>=2.48.0",
     "pygithub>=2.9.1",
-    # Direct import: PyGithub hands back a redirect URL for a job log and we
-    # fetch it ourselves. It arrives with PyGithub either way; declared because
-    # we import it, not because it adds a wheel.
-    "requests>=2.32",
+    "requests>=2.32",  # imported directly to fetch GitHub's job-log redirect
+    "httpx>=0.27",  # imported directly for the openai backend's ca_bundle client
 ]
 classifiers = [
     "License :: OSI Approved :: MIT License",

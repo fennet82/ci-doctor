@@ -132,7 +132,7 @@ def analyze(
         typer.echo("nothing to do: pass a pipeline id, or the path to a log to replay.", err=True)
         return
 
-    _deliver(results, cfg, no_color=no_color, output_format=output_format)
+    _deliver(results, cfg, run=run, no_color=no_color, output_format=output_format)
     _maybe_post_mr(provider, run, results, cfg)
 
 
@@ -251,10 +251,30 @@ def _diff_lines(before: str, after: str) -> list[str]:
     return [line.rstrip("\n") for line in diff][2:]
 
 
+def _pipeline_markdown(run: Run | None, results: list[JobResult]) -> str:
+    """The Markdown for the artifact and the MR note.
+
+    Args:
+        run: The analyzed run, or None for offline replay.
+        results: One :class:`~ci_doctor.pipeline.JobResult` per analyzed job.
+
+    Returns:
+        A pipeline document (header + a section per job) for a live run of more
+        than one job; a single report otherwise, so replay and one-job runs stay
+        unframed.
+    """
+    from ci_doctor.render.markdown import MarkdownRenderer, render_pipeline_markdown
+
+    if run is not None and len(results) > 1:
+        return render_pipeline_markdown(run, results)
+    return "\n\n---\n\n".join(MarkdownRenderer().render(r.report) for r in results)
+
+
 def _deliver(
     results: list[JobResult],
     cfg: Config,
     *,
+    run: Run | None,
     no_color: bool,
     output_format: OutputFormat = OutputFormat.TERMINAL,
 ) -> None:
@@ -263,29 +283,32 @@ def _deliver(
     Args:
         results: One :class:`~ci_doctor.pipeline.JobResult` per analyzed job.
         cfg: The effective config, supplying the output paths.
+        run: The analyzed run, or None for offline replay. Present unlocks the
+            pipeline framing — a header and per-job separators.
         no_color: Disable coloured terminal output.
         output_format: JSON puts the report on stdout instead of the panels, for a
             script or an agent to read. The artifacts are written either way, and
             every human-facing line already goes to stderr, so stdout stays parseable.
     """
-    from ci_doctor.render.markdown import MarkdownRenderer
-    from ci_doctor.render.terminal import render_terminal
+    from ci_doctor.render.terminal import render_pipeline, render_terminal
 
     if not results:
         typer.echo("no failed jobs to analyze.")
         return
 
-    reports = [r.report for r in results]
-    payload = [r.model_dump(mode="json") for r in reports]
+    payload = [r.report.model_dump(mode="json") for r in results]
+    multi_job = run is not None and len(results) > 1
     if output_format is OutputFormat.JSON:
         typer.echo(json.dumps(payload, indent=2))
     elif cfg.output.terminal:
-        wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
-        for report in reports:
-            render_terminal(report, no_color=no_color, wrap_section=wrap)
+        if multi_job:
+            render_pipeline(run, results, no_color=no_color)
+        else:
+            wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
+            for r in results:
+                render_terminal(r.report, no_color=no_color, wrap_section=wrap)
 
-    md = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
-    Path(cfg.output.markdown_path).write_text(md)
+    Path(cfg.output.markdown_path).write_text(_pipeline_markdown(run, results))
     Path(cfg.output.json_path).write_text(json.dumps(payload, indent=2))
     typer.echo(f"wrote {cfg.output.markdown_path} and {cfg.output.json_path}", err=True)
 
@@ -316,9 +339,7 @@ def _maybe_post_mr(ci_provider: object, run: Run | None, results: list[JobResult
         typer.echo(f"MR note skipped: no git-host adapter for {cfg.scm_vendor!r}.", err=True)
         return
 
-    from ci_doctor.render.markdown import MarkdownRenderer
-
-    body = "\n\n---\n\n".join(MarkdownRenderer().render(r) for r in reports)
+    body = _pipeline_markdown(run, results)
     marker = f"<!-- ci-doctor:pipeline:{run.id} -->"
     try:
         scm.post_note(run.mr, body, marker)
