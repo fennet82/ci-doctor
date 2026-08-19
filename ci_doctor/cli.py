@@ -349,12 +349,12 @@ def _deliver(
     if output_format is OutputFormat.JSON:
         typer.echo(json.dumps(payload, indent=2))
     elif cfg.output.terminal:
-        wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
         if interactive and multi_job:
             select_and_show(run, results, no_color=no_color)
         elif multi_job:
-            render_pipeline(run, results, no_color=no_color, wrap_section=wrap)
+            render_pipeline(run, results, no_color=no_color)
         else:
+            wrap = os.environ.get("GITLAB_CI") == "true"  # collapsible only inside GitLab CI
             for r in results:
                 render_terminal(r.report, no_color=no_color, wrap_section=wrap)
 

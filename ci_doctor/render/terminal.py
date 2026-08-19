@@ -157,7 +157,6 @@ def render_pipeline(
     results: list[JobResult],
     *,
     no_color: bool = False,
-    wrap_section: bool = False,
     file: IO[str] | None = None,
 ) -> None:
     """Render every job of a pipeline, linearly, for CI logs and pipes.
@@ -170,19 +169,13 @@ def render_pipeline(
         run: The analyzed run.
         results: The analyzed jobs, in pipeline order.
         no_color: Force plain text.
-        wrap_section: Wrap the whole report in a GitLab collapsible section.
         file: Output stream. Defaults to stdout.
     """
     console = Console(no_color=no_color, file=file, highlight=False, soft_wrap=True)
-    ts = int(time.time())
-    if wrap_section:
-        console.file.write(f"\x1b[0Ksection_start:{ts}:{_SECTION}[collapsed=true]\r\x1b[0K")
     _pipeline_header(console, run, results)
     for jr in results:
         _job_rule(console, jr)
         render_terminal(jr.report, no_color=no_color, wrap_section=False, file=file)
-    if wrap_section:
-        console.file.write(f"\x1b[0Ksection_end:{ts}:{_SECTION}\r\x1b[0K\n")
 
 
 def select_and_show(
