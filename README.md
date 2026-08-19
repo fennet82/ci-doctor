@@ -110,6 +110,13 @@ uv run ci-doctor analyze 18234567890
 changed, `--schema` emits the JSON Schema. Full CLI and config reference on the
 [documentation site](https://fennet82.github.io/ci-doctor).
 
+When a pipeline has several failed jobs, the output adapts to where it is going. In
+CI or a pipe it prints a pipeline header (a code-vs-infra triage count) and each job
+under its own separator, in the order they ran. On a terminal it offers a job menu
+instead — install the arrow-key version with `pip install ci-doctorr[interactive]`;
+without it you get a numbered prompt. Force either way with
+`--interactive` / `--no-interactive`.
+
 ## Configuration
 
 Layered and pydantic-validated — `defaults.yml` < repo `.ci-doctor.yml` < `CI_DOCTOR_*` env
