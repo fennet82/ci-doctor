@@ -109,6 +109,19 @@ jobs:
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$repo:$VERSION" | cut -d@ -f2)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
+      # Docker Hub's repo page is blank until something writes it. Push the overview
+      # and the one-line description from the repo, so the page can never drift from
+      # what shipped. docs/dockerhub.md is Docker-Hub-specific (absolute links only —
+      # the README's relative links and local badges don't resolve there).
+      - uses: peter-evans/dockerhub-description@v4  # tag pin, per .github/zizmor.yml ref-pin policy
+        if: steps.gate.outputs.release == 'true' && env.DOCKERHUB_USERNAME != ''
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: fennet/ci-doctor
+          short-description: "Postmortem CI failure analyzer: deterministic phase attribution plus one LLM explanation."
+          readme-filepath: ./docs/dockerhub.md
+
       # The JSON Schema for .ci-doctor.yml, generated from the pydantic model so it can
       # never drift from the code. Editors resolve it via the $id baked into the schema,
       # which points at /releases/latest/download/ci-doctor.schema.json.
