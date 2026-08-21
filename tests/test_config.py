@@ -183,3 +183,18 @@ def test_json_schema_documents_every_field():
         if not spec.get("description")
     ]
     assert not undocumented, f"config fields missing a description: {undocumented}"
+
+
+def test_latency_knobs_have_defaults():
+    """The two knobs that bound LLM latency ship with working defaults."""
+    cfg = load_config(environ={})
+    assert cfg.llm.max_retries == 1  # HTTP-level retries; the SDK default of 2 amplifies
+    assert cfg.analysis.max_parallel_jobs == 4
+
+
+def test_latency_knobs_reject_nonsense():
+    """Neither knob accepts a value that would stall or disable the run."""
+    with pytest.raises(ValidationError):
+        load_config(environ={}, overrides={"llm": {"max_retries": -1}})
+    with pytest.raises(ValidationError):
+        load_config(environ={}, overrides={"analysis": {"max_parallel_jobs": 0}})
