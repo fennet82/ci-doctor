@@ -109,16 +109,6 @@ jobs:
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$repo:$VERSION" | cut -d@ -f2)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
-      - name: Update the Docker Hub overview
-        uses: peter-evans/dockerhub-description@v4
-        if: steps.gate.outputs.release == 'true' && env.DOCKERHUB_USERNAME != ''
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: fennet/ci-doctor
-          short-description: "Postmortem CI failure analyzer: deterministic phase attribution plus one LLM explanation."
-          readme-filepath: ./docs/dockerhub.md
-
       # The JSON Schema for .ci-doctor.yml, generated from the pydantic model so it can
       # never drift from the code. Editors resolve it via the $id baked into the schema,
       # which points at /releases/latest/download/ci-doctor.schema.json.
