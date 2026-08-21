@@ -10,13 +10,14 @@ pure and provider-neutral (invariant #2). This is the layer that knows both.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import NamedTuple
 
 from ci_doctor.config.schema import Config
 from ci_doctor.core.attribution import Attribution
 from ci_doctor.core.models import FailureReason, Job, Run
-from ci_doctor.core.ports import CIProvider, LogSegmenter
+from ci_doctor.core.ports import CIProvider, LLMClient, LogSegmenter
 from ci_doctor.llm.schema import Report
 from ci_doctor.providers.registry import make_ci_provider, make_segmenter, segmenter_for_log
 
@@ -37,7 +38,12 @@ class JobResult(NamedTuple):
     report: Report
 
 
-def process_job(job: Job, cfg: Config, segmenter: LogSegmenter | None = None) -> JobResult:
+def process_job(
+    job: Job,
+    cfg: Config,
+    segmenter: LogSegmenter | None = None,
+    client: LLMClient | None = None,
+) -> JobResult:
     """Segment, classify, assemble evidence and produce the report for one job.
 
     Deterministic when the LLM is disabled or unconfigured; one LLM call otherwise.
@@ -48,6 +54,9 @@ def process_job(job: Job, cfg: Config, segmenter: LogSegmenter | None = None) ->
         segmenter: Parser for this log's format. Defaults to the one `config.ci`
             names, which is right for a live run — the provider that produced the
             log is the one we just read it from.
+        client: The run's shared LLM client, from `llm.report.client_for_run`.
+            None lets `produce_report` build its own, which is what a single-job
+            caller wants.
 
     Returns:
         The job, its verdict, and its report.
@@ -70,7 +79,7 @@ def process_job(job: Job, cfg: Config, segmenter: LogSegmenter | None = None) ->
         attr.confidence,
     )
     bundle = build_bundle(job, attr, job.sections, cfg)
-    report = produce_report(job, attr, bundle, cfg)
+    report = produce_report(job, attr, bundle, cfg, client=client)
     log.debug(
         "job %s: report category=%s confidence=%s infra=%s",
         job.name,
@@ -125,11 +134,40 @@ def analyze_run(
 
     selected = _ordered(jobs)[: cfg.analysis.max_jobs_analyzed]
     log.info("analyzing %d failed job(s) from run %s", len(selected), run_id)
-    results = []
+    # Logs are fetched sequentially on purpose: python-gitlab and PyGithub make no
+    # thread-safety promise, and the fetch is not what makes a run slow. Only the
+    # analysis — which is one LLM call per job — is worth parallelising.
     for job in selected:
         job.log = provider.fetch_job_log(job)
-        results.append(process_job(job, cfg))
-    return run, provider, results
+    return run, provider, _analyze(selected, cfg)
+
+
+def _analyze(jobs: list[Job], cfg: Config, segmenter: LogSegmenter | None = None) -> list[JobResult]:
+    """Analyze every job, concurrently when the config allows it.
+
+    The jobs are independent and the LLM call dominates each one, so this is where
+    a run's wall-clock time actually goes. Order is preserved regardless of which
+    job finishes first — the reader expects pipeline order, not completion order.
+
+    Args:
+        jobs: The selected jobs, logs already attached.
+        cfg: The effective config; `analysis.max_parallel_jobs` sets the width.
+        segmenter: Parser for the log format, or None to derive it per job.
+
+    Returns:
+        One result per job, in the order given.
+    """
+    from ci_doctor.llm.report import client_for_run
+
+    client = client_for_run(cfg)
+    workers = min(cfg.analysis.max_parallel_jobs, len(jobs))
+    if workers <= 1:
+        return [process_job(job, cfg, segmenter, client) for job in jobs]
+    log.debug("analyzing %d job(s) across %d workers", len(jobs), workers)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="ci-doctor") as pool:
+        # `map` yields in submission order, so the report reads chronologically even
+        # though the jobs finished in whatever order the endpoint answered them.
+        return list(pool.map(lambda job: process_job(job, cfg, segmenter, client), jobs))
 
 
 def analyze_log(path: Path, cfg: Config) -> list[JobResult]:
@@ -150,7 +188,7 @@ def analyze_log(path: Path, cfg: Config) -> list[JobResult]:
     # The format comes from the log, not from `config.ci`: a replayed file has no
     # run metadata, so `ci` here is whatever the config defaults to.
     segmenter = segmenter_for_log(jobs[0].log or "", cfg.ci)
-    return [process_job(job, cfg, segmenter) for job in jobs]
+    return _analyze(jobs, cfg, segmenter)
 
 
 def run_from_file(path: Path) -> Run:

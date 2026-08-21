@@ -126,6 +126,36 @@ def _infer_category(reason: FailureReason, text: str) -> Category:
     return "unknown"
 
 
+def client_for_run(cfg: Config, environ: Mapping[str, str] | None = None) -> LLMClient | None:
+    """Build the single LLM client a whole run shares.
+
+    Built once per run rather than once per job: every backend holds a connection
+    pool (and the `openai` one remembers whether the server accepts
+    `response_format`), so a client per job threw both away 10 times over.
+
+    Degrades to None rather than raising, exactly like `produce_report` — a broken
+    backend must still leave the deterministic report standing (invariant #3).
+
+    Args:
+        cfg: The effective config.
+        environ: Environment for API keys. Defaults to os.environ.
+
+    Returns:
+        The client, or None when the LLM is disabled, unconfigured, or failed to
+        build. `produce_report` then takes its own deterministic path.
+    """
+    from ci_doctor.llm.backends import backend_ready, make_client
+
+    if not (cfg.llm.enabled and backend_ready(cfg.llm)):
+        log.debug("LLM disabled/not ready (backend=%s); no client for this run", cfg.llm.backend)
+        return None
+    try:
+        return make_client(cfg.llm, environ=environ)
+    except Exception as exc:  # noqa: BLE001 - never crash on a bad backend
+        log.info("LLM backend %s unavailable (%s); deterministic reports", cfg.llm.backend, exc)
+        return None
+
+
 def produce_report(
     job: Job,
     attr: Attribution,
