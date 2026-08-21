@@ -99,6 +99,14 @@ class LLMConfig(_Strict):
         0.1, description="Sampling temperature. Low keeps the postmortem reproducible."
     )
     timeout_seconds: int = Field(120, description="Timeout for the single LLM call.")
+    max_retries: int = Field(
+        1,
+        ge=0,
+        description=(
+            "HTTP-level retries per request, handed to the SDK. Kept low on purpose: the "
+            "repair retry in llm/report.py already retries, and the two multiply."
+        ),
+    )
 
 
 class AnalysisConfig(_Strict):
@@ -108,6 +116,15 @@ class AnalysisConfig(_Strict):
         False, description="Analyze jobs marked allow_failure. They are noise by default."
     )
     max_jobs_analyzed: int = Field(10, description="Cap on failed jobs analyzed per run.")
+    max_parallel_jobs: int = Field(
+        4,
+        ge=1,
+        description=(
+            "Jobs analyzed concurrently. The LLM call dominates a run and the calls are "
+            "independent, so this is the main latency lever. Set 1 for a strictly "
+            "sequential run against a rate-limited endpoint."
+        ),
+    )
     skip_llm_for: list[str] = Field(
         default_factory=lambda: ["no_runner", "missing_dependency", "cancelled"],
         description="Failure reasons already fully determined, so they get a templated report and no LLM call.",

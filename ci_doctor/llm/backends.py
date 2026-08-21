@@ -22,6 +22,7 @@ environment via httpx's trust_env.
 import json
 import os
 import shutil
+import threading
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -35,6 +36,27 @@ if TYPE_CHECKING:
 #: System message shared by every backend. The reply schema lives in the user
 #: prompt; this only pins the *shape* of the response.
 _SYSTEM = "Respond with a single JSON object and nothing else. No markdown, no code fences, no prose."
+
+#: Flags that cut the `claude` CLI down to "answer this one prompt".
+#:
+#: Without them it starts a full interactive-grade session per call: the developer's
+#: MCP servers, settings and CLAUDE.md are loaded and prepended to every ci-doctor
+#: prompt, and the subprocess inherits their tool permissions. Two reasons that is
+#: wrong here — it measured 31s/job against 19s with these flags, and a subprocess
+#: whose only job is to *read* a log must not be able to run Bash or edit the repo
+#: it is analyzing (invariant #10). `--max-turns 1` also pins it to one answer
+#: rather than an agent loop that runs until `timeout_seconds`.
+_CLAUDE_ISOLATION = [
+    "--max-turns",
+    "1",
+    "--allowed-tools",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+    "--setting-sources",
+    "",
+]
 
 
 def strip_fences(text: str) -> str:
@@ -112,6 +134,11 @@ class OpenAILLMClient(LLMClient):
         """
         self.cfg = cfg
         self.environ = os.environ if environ is None else environ
+        self._sdk: OpenAI | None = None
+        self._sdk_lock = threading.Lock()
+        #: Set once a server answers 400 to `response_format`, so the probe that
+        #: discovers it costs one request per run rather than one per job.
+        self._no_response_format = False
 
     def _api_key(self) -> str:
         """Resolve the API key.
@@ -125,24 +152,36 @@ class OpenAILLMClient(LLMClient):
         return "no-key"  # openai SDK requires a non-empty string even when the server ignores it
 
     def _client(self) -> "OpenAI":
-        """Build the SDK client, honouring a custom CA bundle.
+        """Build the SDK client once, honouring a custom CA bundle.
+
+        Memoized: one client means one connection pool for the whole run instead of
+        a fresh TCP + TLS handshake per job. The lock is not paranoia — a run
+        analyzes its jobs on a thread pool (`analysis.max_parallel_jobs`), so this
+        is reached concurrently.
 
         Returns:
             A configured `openai.OpenAI`. Imported lazily so the SDK is never
             pulled in unless a model is actually configured and called.
         """
-        from openai import OpenAI
+        import openai
 
-        kwargs: dict[str, Any] = {
-            "base_url": self.cfg.api_base,
-            "api_key": self._api_key(),
-            "timeout": self.cfg.timeout_seconds,
-        }
-        if self.cfg.ca_bundle:
-            import httpx
+        with self._sdk_lock:
+            if self._sdk is None:
+                kwargs: dict[str, Any] = {
+                    "base_url": self.cfg.api_base,
+                    "api_key": self._api_key(),
+                    "timeout": self.cfg.timeout_seconds,
+                    # Left unset, the SDK retries twice on its own. That multiplies
+                    # with the repair retry in `llm/report.py` and turns one dead
+                    # endpoint into six requests, each waiting out `timeout_seconds`.
+                    "max_retries": self.cfg.max_retries,
+                }
+                if self.cfg.ca_bundle:
+                    import httpx
 
-            kwargs["http_client"] = httpx.Client(verify=self.cfg.ca_bundle)
-        return OpenAI(**kwargs)
+                    kwargs["http_client"] = httpx.Client(verify=self.cfg.ca_bundle)
+                self._sdk = openai.OpenAI(**kwargs)
+        return self._sdk
 
     def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion and parse the reply as JSON.
@@ -157,6 +196,8 @@ class OpenAILLMClient(LLMClient):
             json.JSONDecodeError: If the reply is not JSON.
             Exception: Any transport or API error from the SDK.
         """
+        from openai import BadRequestError
+
         if not self.cfg.model:
             # `backend_ready` checks this, but an injected client skips that path.
             raise ValueError("llm.model is required for the openai backend")
@@ -165,19 +206,22 @@ class OpenAILLMClient(LLMClient):
             {"role": "system", "content": _SYSTEM},
             {"role": "user", "content": prompt},
         ]
-        try:
-            resp = client.chat.completions.create(
-                model=self.cfg.model,
-                messages=messages,
-                temperature=self.cfg.temperature,
-                response_format={"type": "json_object"},
-            )
-        except Exception:  # noqa: BLE001 - some OpenAI-compatible servers reject response_format
-            resp = client.chat.completions.create(
-                model=self.cfg.model,
-                messages=messages,
-                temperature=self.cfg.temperature,
-            )
+        kwargs: dict[str, Any] = {
+            "model": self.cfg.model,
+            "messages": messages,
+            "temperature": self.cfg.temperature,
+        }
+        if self._no_response_format:
+            resp = client.chat.completions.create(**kwargs)
+        else:
+            try:
+                resp = client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
+            except BadRequestError:
+                # Only a 400 means the server rejects the parameter. Catching every
+                # exception here re-sent the request after a timeout, a 429 or an
+                # auth failure — doubling the wall time of every outage.
+                self._no_response_format = True
+                resp = client.chat.completions.create(**kwargs)
         content = resp.choices[0].message.content or ""
         return json.loads(strip_fences(content))
 
@@ -227,9 +271,16 @@ class LiteLLMClient(LLMClient):
             "temperature": self.cfg.temperature,
             "timeout": self.cfg.timeout_seconds,
         }
+        # Only a 400-shaped error means the provider rejects the parameter; retrying
+        # a timeout or a 429 just waits out `timeout_seconds` twice. litellm re-exports
+        # openai's exception types, and `UnsupportedParamsError` is not in every version.
+        rejected = (litellm.exceptions.BadRequestError,)
+        unsupported = getattr(litellm.exceptions, "UnsupportedParamsError", None)
+        if unsupported is not None:
+            rejected += (unsupported,)
         try:
             resp = litellm.completion(response_format={"type": "json_object"}, **kwargs)
-        except Exception:  # noqa: BLE001 - provider may reject response_format; retry without
+        except rejected:
             resp = litellm.completion(**kwargs)
         return json.loads(strip_fences(resp.choices[0].message.content or ""))
 
@@ -243,6 +294,11 @@ class ClaudeCodeClient(LLMClient):
 
     def __init__(self, cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> None:
         """Store config; the CLI is located at call time, not here.
+
+        Only `model` and `timeout_seconds` reach the CLI. `llm.temperature` does
+        **not** — `claude -p` exposes no temperature flag — so the reproducibility
+        that knob promises elsewhere is not available on this backend. Documented
+        rather than silently dropped, because the config says otherwise.
 
         Args:
             cfg: LLM settings; only `model` and `timeout_seconds` are used.
@@ -271,7 +327,7 @@ class ClaudeCodeClient(LLMClient):
         binary = shutil.which("claude")
         if binary is None:
             raise RuntimeError("`claude` CLI not found on PATH")
-        cmd = [binary, "-p", "--output-format", "json"]
+        cmd = [binary, "-p", "--output-format", "json", *_CLAUDE_ISOLATION]
         if self.cfg.model:
             cmd += ["--model", self.cfg.model]
         proc = subprocess.run(  # noqa: S603 — argv list, no shell; binary resolved above
