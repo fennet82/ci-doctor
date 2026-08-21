@@ -365,7 +365,7 @@ wheels = [
 
 [[package]]
 name = "ci-doctorr"
-version = "0.0.1a6"
+version = "0.0.1a7"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
