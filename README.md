@@ -132,6 +132,9 @@ llm:
   backend: openai                     # openai | litellm | claude_code
   model: qwen2.5-coder:32b
   api_base: http://openai-compatible-endpoint.internal:8000/v1
+
+analysis:
+  max_parallel_jobs: 4                # jobs analyzed at once; 1 to serialize
 ```
 
 Every knob, and the three LLM backends, are documented on the

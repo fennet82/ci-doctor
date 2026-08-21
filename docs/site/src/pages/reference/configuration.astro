@@ -53,14 +53,15 @@ llm:
   api_key_env: null              # optional; local servers often need none
   ca_bundle: null                # LLM endpoint's own CA, independent of the provider's
   max_input_tokens: 12000
-  temperature: 0.1
+  temperature: 0.1               # ignored by claude_code: the CLI has no temperature flag
   timeout_seconds: 120
+  max_retries: 1                 # HTTP retries per request; multiplies with the repair retry
 
 analysis:
   include_allowed_failures: false   # allow_failure jobs are noise by default
   max_jobs_analyzed: 10
+  max_parallel_jobs: 4              # jobs analyzed at once; 1 for a strictly sequential run
   skip_llm_for: [no_runner, missing_dependency, cancelled]  # fully-determined -> templated
-  known_flaky_tests: []             # substrings that short-circuit to likely_flaky
 
 phases:                          # section/step name -> phase (merged onto the shipped map)
   my_custom_deploy_section: script
@@ -193,6 +194,17 @@ redaction:
         <code>tiktoken</code>, which fetches vocab at runtime, so it is unfit
         for a strict air gap. When the LLM is disabled or unavailable, ci-doctor
         emits the deterministic report instead of failing.
+    </div>
+    <div class="note">
+        <strong><code>claude_code</code> runs the CLI isolated.</strong> ci-doctor
+        invokes it with no tools, no MCP servers, no inherited settings or
+        <code>CLAUDE.md</code>, and <code>--max-turns 1</code>. That keeps the answer
+        reproducible across machines, keeps your own Claude Code setup out of every
+        prompt (measured: 31s per job without the flags, 19s with them), and means a
+        subprocess whose only job is to read a log cannot run commands or edit the
+        repository it is analyzing. One consequence:
+        <code>llm.temperature</code> has no effect on this backend, because
+        <code>claude -p</code> exposes no temperature flag.
     </div>
 
     <h2>Full reference</h2>
