@@ -134,9 +134,7 @@ def analyze_run(
 
     selected = _ordered(jobs)[: cfg.analysis.max_jobs_analyzed]
     log.info("analyzing %d failed job(s) from run %s", len(selected), run_id)
-    # Logs are fetched sequentially on purpose: python-gitlab and PyGithub make no
-    # thread-safety promise, and the fetch is not what makes a run slow. Only the
-    # analysis — which is one LLM call per job — is worth parallelising.
+    # Sequential on purpose: python-gitlab and PyGithub make no thread-safety promise.
     for job in selected:
         job.log = provider.fetch_job_log(job)
     return run, provider, _analyze(selected, cfg)

@@ -219,7 +219,10 @@ def test_claude_code_cli_runs_isolated(monkeypatch):
     cmd = seen["cmd"]
     assert cmd[1:4] == ["-p", "--output-format", "json"]
     assert "--max-turns" in cmd and cmd[cmd.index("--max-turns") + 1] == "1"
-    assert cmd[cmd.index("--allowed-tools") + 1] == ""
+    assert cmd[cmd.index("--disallowedTools") + 1] == "*"
     assert "--strict-mcp-config" in cmd
     assert json.loads(cmd[cmd.index("--mcp-config") + 1]) == {"mcpServers": {}}
     assert cmd[cmd.index("--setting-sources") + 1] == ""
+    assert "--no-session-persistence" in cmd
+    # --bare is deliberately absent: it authenticates only via ANTHROPIC_API_KEY.
+    assert "--bare" not in cmd

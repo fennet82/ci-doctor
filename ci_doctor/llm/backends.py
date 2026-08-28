@@ -37,25 +37,20 @@ if TYPE_CHECKING:
 #: prompt; this only pins the *shape* of the response.
 _SYSTEM = "Respond with a single JSON object and nothing else. No markdown, no code fences, no prose."
 
-#: Flags that cut the `claude` CLI down to "answer this one prompt".
-#:
-#: Without them it starts a full interactive-grade session per call: the developer's
-#: MCP servers, settings and CLAUDE.md are loaded and prepended to every ci-doctor
-#: prompt, and the subprocess inherits their tool permissions. Two reasons that is
-#: wrong here — it measured 31s/job against 19s with these flags, and a subprocess
-#: whose only job is to *read* a log must not be able to run Bash or edit the repo
-#: it is analyzing (invariant #10). `--max-turns 1` also pins it to one answer
-#: rather than an agent loop that runs until `timeout_seconds`.
+#: Without these the CLI loads the developer's MCP servers, settings and CLAUDE.md into
+#: every call (31s/job against 16s) and a log reader inherits their tool permissions.
+#: Not `--bare`: it authenticates only via ANTHROPIC_API_KEY, never the CLI's own login.
 _CLAUDE_ISOLATION = [
     "--max-turns",
     "1",
-    "--allowed-tools",
-    "",
+    "--disallowedTools",
+    "*",
     "--strict-mcp-config",
     "--mcp-config",
     '{"mcpServers":{}}',
     "--setting-sources",
     "",
+    "--no-session-persistence",
 ]
 
 
@@ -171,9 +166,6 @@ class OpenAILLMClient(LLMClient):
                     "base_url": self.cfg.api_base,
                     "api_key": self._api_key(),
                     "timeout": self.cfg.timeout_seconds,
-                    # Left unset, the SDK retries twice on its own. That multiplies
-                    # with the repair retry in `llm/report.py` and turns one dead
-                    # endpoint into six requests, each waiting out `timeout_seconds`.
                     "max_retries": self.cfg.max_retries,
                 }
                 if self.cfg.ca_bundle:
