@@ -7,11 +7,9 @@ cancelled job into "failed" and GitLab left it as its own status.
 
 from ci_doctor.core.models import Job
 
-#: Statuses worth analyzing. A cancelled job is included because *why* it was
-#: still running when the axe fell is exactly the question — a timeout, a
-#: superseding pipeline, or a hang — and attribution has a rule for it
-#: (`reason_cancelled`, which blames whatever section was open). It is cheap:
-#: `analysis.skip_llm_for` ships with "cancelled" in it, so no model is called.
+#: Statuses worth analyzing. "cancelled" is included because *why* it was still
+#: running is the question, and `reason_cancelled` answers it. Cheap: `skip_llm_for`
+#: ships with "cancelled", so no model is called.
 _ANALYZED = frozenset({"failed", "cancelled"})
 
 

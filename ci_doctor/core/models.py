@@ -10,10 +10,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
 
-#: Output before the first section marker, and after the last one. Every
-#: segmenter emits these two names so no line is ever lost, and the classifier
-#: reads the trailer for the runner's closing verdict. They are part of the
-#: :class:`Section` contract, which is why they live here and not in a provider.
+#: Output before the first section marker, and after the last one. Every segmenter
+#: emits both so no line is lost; part of the :class:`Section` contract, which is why
+#: they live here and not in a provider.
 PREAMBLE = "__preamble__"
 TRAILER = "__trailer__"
 

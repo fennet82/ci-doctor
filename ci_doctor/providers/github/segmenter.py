@@ -122,9 +122,8 @@ class GitHubSegmenter(LogSegmenter):
                 if sec.name in _STEP_TOKENS:
                     if current is not None:
                         current.closed = True  # the next step starting is what ends this one
-                    # An action can error out without closing its own sub-group. A
-                    # later step running proves execution did not die in there, so
-                    # close them too — an unclosed section is a blame signal.
+                    # A later step running proves execution survived any sub-group the
+                    # action left open, so close those too — unclosed is a blame signal.
                     for abandoned in nested:
                         abandoned.closed = True
                     nested.clear()

@@ -25,31 +25,14 @@ from ci_doctor.core.models import (
     walk_sections,
 )
 
-#: Fatality signals for the structural fallback, and the whole of it. This answers
-#: one coarse question — "did anything in this section actually fail?" — to pick
-#: which *section* to blame. Which *lines* are the evidence is a different question,
-#: asked later, by the config matcher catalogue in `extraction.matchers`.
-#:
-#: So this list stays runner-level: the runner's own error annotations, and a
-#: non-zero exit. No vendor tokens. A pytest/jest/npm signature added here would be
-#: a second, hardcoded copy of the catalogue that no `.ci-doctor.yml` can tune, and
-#: it would buy nothing — a tool that fails at all makes its runner say so.
+#: "Did anything in this *section* fail?" — which *lines* are the evidence is the
+#: catalogue's job (`extraction.matchers`). Stays runner-level, no vendor tokens:
+#: GUIDELINES §5.2 has the table, and a test pins it.
 _ERROR_RE = re.compile(r"^##\[error\]|\b(ERROR|FATAL)\b|exit code \d+")
 
-#: How a runner marks its *own* line as a warning, which is not the same thing as a
-#: tool printing the word. Two forms, because the two runners we read differ: a
-#: literal `WARNING:` prefix, and the `##[warning]` annotation. A line carrying
-#: either is non-fatal by definition, whatever alarming words follow it.
-#:
-#: Deliberately case-sensitive. `Warning:` and `warning:` are what apt, docker and
-#: pip print from *inside* a step, and that is the step's output, not the runner
-#: excusing it — swallowing those would let a real failure go unblamed.
-#:
-#: Deliberately warnings only, not every non-`error` annotation level. `##[notice]`
-#: and `##[debug]` are also non-fatal, but this predicate does double duty: it also
-#: decides which phases get reported as contributing factors. Widening it to the
-#: whole syntax would surface a phase whose only annotation was a debug line as
-#: "warnings present", which is a lie to the reader for no gain.
+#: How a runner marks its *own* line as a warning — not a tool printing the word.
+#: Case-sensitive, and warnings only, both deliberately: GUIDELINES §7 has the two
+#: bugs that wrote this line.
 _WARNING_RE = re.compile(r"^(WARNING:|##\[warning\])")
 
 #: Fallback reason when the phase was concluded from log structure rather than

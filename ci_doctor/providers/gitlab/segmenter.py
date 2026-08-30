@@ -41,9 +41,7 @@ _MARKER = re.compile(
     r"section_(?P<kind>start|end):(?P<ts>\d+):(?P<name>[A-Za-z0-9_.\-]+)"
     r"(?:\[[^\]]*\])?"  # options like [collapsed=true] — parsed but ignored
     r"(?:\r(?:\x1b\[0K)?)?"  # optional CR + line-clear
-    r"\n?"  # swallow the marker's own trailing newline so it
-    # doesn't leak into a section as an empty line, or
-    # split depth-0 content between back-to-back sections
+    r"\n?"  # the marker's own newline, which would otherwise leak in as a blank line
 )
 
 

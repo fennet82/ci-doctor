@@ -330,7 +330,7 @@ def _maybe_post_mr(ci_provider: object, run: Run | None, results: list[JobResult
     if not cfg.output.mr_note or run is None or run.mr is None:
         return
     reports = [r.report for r in results]
-    if not any(r.confidence in ("medium", "high") for r in reports):  # user's gate
+    if not any(r.confidence in ("medium", "high") for r in reports):
         typer.echo("MR note skipped: confidence below medium.", err=True)
         return
 
@@ -365,14 +365,8 @@ def main() -> None:
     Invariant #3: catches everything and always exits 0, so a crash in the
     analyzer can never turn a passing pipeline red.
     """
-    # NullHighlighter: rich otherwise repr-highlights the message body (numbers
-    # cyan, words yellow/magenta), which drowns out the level colour. Passing
-    # highlighter=None does NOT disable it — rich falls back to ReprHighlighter.
-    #
-    # stderr=True: stdout is the payload — the rendered report, or the JSON that
-    # `--format json` exists to be piped into something. A log line there corrupts
-    # it. Diagnostics belong on stderr, where `typer.echo(..., err=True)` already
-    # puts every other human-facing message.
+    # NullHighlighter, not highlighter=None: rich falls back to ReprHighlighter on None.
+    # stderr, because stdout carries the report or the JSON meant to be piped onward.
     logging.basicConfig(
         level=logging.INFO,
         format="%(message)s",
