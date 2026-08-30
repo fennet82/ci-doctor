@@ -47,13 +47,9 @@ _CATEGORY: dict[FailureReason, Category] = {
     FailureReason.MISSING_DEPENDENCY: "dependency",
 }
 
-#: ``(category, regex)`` pairs matched against the blamed evidence when the reason
-#: alone can't classify it (i.e. `script_failure`). **First match wins, so the order
-#: is load-bearing** — see the inline notes and `test_matcher_packs.py`'s ordering
-#: guards before moving anything.
-#:
-#: ponytail: signature heuristic, known ceiling — the LLM is more accurate; upgrade
-#: path is to let the model set category (enable an llm.backend).
+#: ``(category, regex)`` pairs for when the reason alone can't classify (i.e.
+#: `script_failure`). **First match wins, so order is load-bearing** — GUIDELINES §5.3.
+#: ponytail: heuristic ceiling; the upgrade path is letting the model set category.
 _CATEGORY_SIGNATURES: list[tuple[Category, str]] = [
     (
         "infrastructure",
@@ -292,10 +288,8 @@ def deterministic_report(
     Returns:
         A valid report. Not yet redacted — callers do that.
     """
-    # No second cut here: `blamed_lines` is already denoised, windowed by matcher
-    # priority and budget-fitted. Re-trimming it to a fixed line count discards the
-    # selection the whole pipeline just made — it decapitated the *first* of two
-    # rust compile errors, which is the one that caused the second.
+    # No second cut: `blamed_lines` is already denoised, windowed and budget-fitted.
+    # Re-trimming discards that selection — see GUIDELINES §7.
     blamed = "\n".join(bundle.blamed_lines)
     excerpt = blamed if bundle.blamed_lines else (attr.terminal_evidence or "")
     is_infra = attr.phase in (Phase.PROVISION, Phase.PREPARE) or attr.reason in (
