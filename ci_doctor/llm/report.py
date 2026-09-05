@@ -224,29 +224,23 @@ def produce_report(
 def _call_and_validate(client: LLMClient, prompt: str) -> Report | None:
     """Call the LLM and validate its reply.
 
-    Every backend is Pydantic-AI-based (`llm/backends.py::PydanticAILLMClient`)
-    and already retries once internally on a schema-invalid reply
-    (`Agent(retries=1)`), so there is no hand-rolled repair-retry loop here —
-    one was tried once and reverted (see git history around `149313e`) because
-    stacking a second retry ceiling on top of the backend's own just multiplies
-    wall time on every real outage. A validation error reaching this function
-    means the backend's own retry already ran out, not that this call should
-    try again.
+    No hand-rolled retry here: every backend already retries once internally
+    on a schema-invalid reply (`Agent(retries=1)`); a second one would just
+    duplicate it (see `149313e`).
 
     Args:
         client: The LLM client.
         prompt: The rendered prompt.
 
     Returns:
-        The validated report, or None when the reply is invalid or the call
-        itself failed — either way, the caller degrades to the deterministic
-        report.
+        The validated report, or None on any failure — the caller degrades to
+        the deterministic report either way.
     """
     try:
         data = client.complete_structured(prompt)
         return Report.model_validate(data)
     except (ValidationError, ValueError, json.JSONDecodeError) as exc:
-        log.info("LLM reply invalid after its own repair retry; using deterministic fallback: %s", exc)
+        log.info("LLM reply invalid; using deterministic fallback: %s", exc)
         return None
     except Exception as exc:  # noqa: BLE001 - network/LLM failure -> deterministic fallback
         log.warning("LLM call failed, using deterministic fallback: %s", exc)
@@ -360,11 +354,9 @@ def _handoff(job: Job, attr: Attribution, excerpt: str) -> str:
 def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle) -> str:
     """Fill the system and user prompt templates.
 
-    Invariant #8: prompt text lives in `llm/prompts/*.txt`, never inline here,
-    so it can be reviewed and edited without touching code. The reply schema
-    is no longer rendered into this text — every backend is Pydantic-AI-based
-    and renders its own schema instructions via `PromptedOutput` when it
-    builds the actual model request.
+    Invariant #8: prompt text lives in `llm/prompts/*.txt`, never inline here.
+    The reply schema is no longer rendered into this text — `PromptedOutput`
+    renders its own schema instructions when it builds the model request.
 
     Args:
         job: The failed job.

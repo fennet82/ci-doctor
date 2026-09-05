@@ -112,36 +112,9 @@ class LLMConfig(_Strict):
     max_retries: int = Field(
         1,
         ge=0,
-        description=(
-            "HTTP-transport retries per request, handed to the underlying SDK client. Kept low on "
-            "purpose: Pydantic AI's own Agent already retries once on a schema-invalid reply, and "
-            "the two multiply if both are high."
-        ),
+        description="HTTP-transport retries per request. Kept low: Pydantic AI's own Agent "
+        "already retries once on a schema-invalid reply, and the two multiply.",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_removed_claude_code(cls, data: object) -> object:
-        """Give a removed backend a clear migration error instead of a generic Literal one.
-
-        Args:
-            data: The raw input before field validation.
-
-        Returns:
-            `data` unchanged, when it doesn't need rejecting.
-
-        Raises:
-            ValueError: If `backend: claude_code` was set — it was removed in favor of
-                `anthropic`, which reaches the same models over the real API instead of
-                shelling out to the local CLI.
-        """
-        if isinstance(data, dict) and data.get("backend") == "claude_code":
-            raise ValueError(
-                "llm.backend 'claude_code' was removed; use 'anthropic' instead — same Claude "
-                "models, via the real Anthropic API instead of the local CLI. Set "
-                "api_key_env to an env var holding an ANTHROPIC_API_KEY."
-            )
-        return data
 
 
 class AnalysisConfig(_Strict):

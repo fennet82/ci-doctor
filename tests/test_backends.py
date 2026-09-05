@@ -1,16 +1,9 @@
 """Backend registry: selection, readiness, and the shared PydanticAILLMClient.
 
-No network, no backend SDK installed — every builder is monkeypatched to a
-pydantic-ai test double (`TestModel`/`FunctionModel`, both pure pydantic-ai-slim
-core, no extra required), so construction, dispatch and the client's own
-behavior are all testable without any of the `openai`/`anthropic`/`litellm`
-extras installed.
-
-`PydanticAILLMClient` is exercised against a tiny stand-in output model, not
-the real `Report` schema — that full schema is exercised end-to-end in
-`tests/test_report.py`. These tests are about the client's mechanics (one
-Agent per client, the retry ceiling, config reaching model_settings), which
-don't depend on which pydantic model the output happens to be.
+No network — every builder is monkeypatched to a pydantic-ai test double
+(`TestModel`/`FunctionModel`, no extra required). `PydanticAILLMClient` is
+exercised against a stub output model; the real `Report` schema is covered
+end-to-end in tests/test_report.py.
 """
 
 import sys
@@ -52,12 +45,7 @@ def _use_stub_report_schema(monkeypatch):
 
 @pytest.mark.parametrize("backend", ["openai", "anthropic", "azure", "litellm"])
 def test_make_client_selects_backend(backend, monkeypatch):
-    """Every known backend builds a PydanticAILLMClient wrapping some Model.
-
-    The real SDK-requiring builder is swapped for one returning a test double,
-    so this exercises `make_client`'s dispatch table without any backend SDK
-    installed.
-    """
+    """Every known backend builds a PydanticAILLMClient, real builder swapped for a test double."""
     monkeypatch.setitem(_MODEL_BUILDERS, backend, lambda cfg, environ: TestModel())
     kwargs = {"backend": backend, "model": "m"}
     if backend == "openai":
@@ -69,23 +57,9 @@ def test_make_client_selects_backend(backend, monkeypatch):
 
 
 def test_unknown_backend_raises():
-    """The factory rejects an unknown backend.
-
-    Config-level Literal validation blocks bad values earlier, so the factory is
-    exercised directly here.
-    """
+    """The factory rejects an unknown backend."""
     with pytest.raises(ValueError, match="unknown llm.backend"):
         make_client(SimpleNamespace(backend="nope"))
-
-
-def test_claude_code_backend_raises_a_migration_error():
-    """The retired claude_code backend points users at its replacement.
-
-    Caught at config-load time (a `model_validator`), not by the factory —
-    a Literal never accepts the value in the first place.
-    """
-    with pytest.raises(ValueError, match="removed; use 'anthropic' instead"):
-        _llm(backend="claude_code")
 
 
 def test_backend_ready_rules():
@@ -149,11 +123,7 @@ def test_one_repair_retry_on_invalid_then_valid_reply():
 
 
 def test_still_invalid_after_the_retry_raises():
-    """A reply that's still invalid after the retry ceiling propagates, not silently degrades.
-
-    `llm/report.py::_call_and_validate` is what turns this into the deterministic
-    fallback — this test only proves the client itself doesn't swallow the failure.
-    """
+    """A reply still invalid after the retry ceiling propagates, not silently degrades."""
     client = PydanticAILLMClient(
         FunctionModel(lambda messages, info: _reply("still not json")), _llm(model="m")
     )
@@ -173,12 +143,7 @@ def test_temperature_and_timeout_reach_the_agent():
 
 
 def test_litellm_model_string_reaches_litellm_model(monkeypatch):
-    """The litellm backend passes litellm's own model-string convention straight through.
-
-    Simulated without installing the real `pydantic-ai-litellm` package (it
-    conflicts with the openai/anthropic extras — see pyproject.toml's
-    `[tool.uv] conflicts` note), by injecting a fake module in its place.
-    """
+    """Litellm's own model-string convention passes straight through (fake module: real one conflicts)."""
     captured = {}
 
     class _FakeLiteLLMModel:
@@ -197,11 +162,8 @@ def test_litellm_model_string_reaches_litellm_model(monkeypatch):
     assert captured["model_name"] == "bedrock/anthropic.claude-v2"
 
 
-# The three builders below need their real SDK installed to construct anything
-# (`openai`/`anthropic` extras) — mutually exclusive with `litellm` (see
-# pyproject.toml), so these opportunistically skip rather than requiring every
-# CI job to install every extra. Mirrors the project's existing stance on the
-# `litellm` extra: "no litellm installed — testable without the optional deps."
+# Real SDKs needed below; mutually exclusive with litellm, so skip rather than
+# require every CI job to install every extra.
 openai_sdk = pytest.importorskip("openai")
 anthropic_sdk = pytest.importorskip("anthropic")
 
@@ -233,12 +195,7 @@ def test_anthropic_model_resolves_key_from_env():
 
 
 def test_azure_model_needs_endpoint_and_a_key():
-    """Azure builds on the endpoint/api_version, not api_base — and needs a key.
-
-    Unlike `openai` (a "no-key" placeholder covers local servers that ignore
-    auth entirely), Azure's provider validates eagerly and raises if it can't
-    resolve one at all — discovered empirically while writing this test.
-    """
+    """Azure builds on the endpoint/api_version, not api_base — and needs a key."""
     from ci_doctor.llm.backends import _azure_model
 
     model = _azure_model(

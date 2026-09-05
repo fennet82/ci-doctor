@@ -2,12 +2,6 @@
 
 Deterministic path, LLM path with recorded responses, degraded fallback, and
 the end-to-end secret round-trip. No network.
-
-The repair retry on a schema-invalid reply now lives inside each backend
-(`llm/backends.py::PydanticAILLMClient`'s `Agent(retries=1)`), not in
-`_call_and_validate` — see tests/test_backends.py for that. `FakeClient` here
-fakes the `LLMClient` port directly, standing in for an already-fully-run
-backend, so an invalid first reply degrades immediately with no second call.
 """
 
 import pytest
@@ -137,14 +131,7 @@ def test_the_llm_cannot_overrule_the_attributed_phase():
 
 
 def test_invalid_reply_degrades_without_a_second_call_here():
-    """An invalid reply degrades directly — no retry at this layer.
-
-    The repair retry now lives inside the backend itself (Pydantic AI's
-    `Agent(retries=1)`); by the time a reply reaches `_call_and_validate`,
-    that ceiling has already run its course. A second hand-rolled attempt
-    here would just duplicate it — the exact bug fixed once already (see
-    git history around `149313e`).
-    """
+    """An invalid reply degrades directly — the retry lives in the backend, not here."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([{"not": "a valid report"}, _GOOD])
     report = produce_report(job, attr, bundle, cfg, client=client)

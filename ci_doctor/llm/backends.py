@@ -1,25 +1,17 @@
 """LLM backend registry.
 
 Every backend builds one `PydanticAILLMClient` wrapping a different
-`pydantic_ai.models.Model`; the config `llm.backend` selects one. Every backend
-uses `PromptedOutput(Report)` (the schema is rendered into the prompt and
-parsed from text, not enforced server-side), so correctness is enforced by
-Pydantic AI's own validation + one retry (`Agent(retries=1)`) — not by the
-backend, and not duplicated by a second hand-rolled retry loop here.
+`pydantic_ai.models.Model`, selected by `llm.backend`. Each uses
+`PromptedOutput(Report)` and one built-in repair retry (`Agent(retries=1)`) —
+no hand-rolled JSON parsing or retry loop here.
 
-Every backend needs its own pip extra — there is no default SDK in the base
-install (unlike the old `openai`-is-always-installed setup). `openai` covers
-anything speaking the OpenAI Chat Completions shape, which is most of the
-field — self-hosted Ollama/vLLM/LM Studio included, via a custom `api_base`.
-`azure` rides the same extra (Azure OpenAI uses the same client under a
-different provider). `anthropic` is its own extra. `litellm` reaches
-everything those three don't — Bedrock, Vertex, Cohere, watsonx, custom
-proxies, litellm's other ~100 providers — via the community
-`pydantic-ai-litellm` bridge, using litellm's own model-string convention
-unchanged (e.g. `model: bedrock/anthropic.claude-v2`). `openai`/`azure` and
-`litellm` are mutually exclusive installs — litellm hard-pins `openai<3.0`,
-which the `openai`/`azure` extra's `openai>=3.8` can never satisfy at once
-(see pyproject.toml's `[tool.uv] conflicts`).
+Every backend needs its own pip extra; there is no default SDK in the base
+install. `openai`/`azure` and `litellm` are mutually exclusive installs —
+litellm pins `openai<3.0`, Pydantic AI's OpenAI integration needs `openai>=3.8`
+(see pyproject.toml's `[tool.uv] conflicts`). `litellm` reaches everything the
+other three don't (Bedrock, Vertex, Cohere, watsonx, ~100 providers) via the
+community `pydantic-ai-litellm` bridge, using litellm's own model-string
+convention (e.g. `model: bedrock/anthropic.claude-v2`).
 
 Every SDK is imported inside the builder that needs it, so importing this
 module costs nothing on a run that never reaches a model.
@@ -40,34 +32,18 @@ if TYPE_CHECKING:
 
 
 def _api_key(cfg: LLMConfig, environ: Mapping[str, str]) -> str | None:
-    """Resolve the configured API key.
-
-    Args:
-        cfg: LLM settings.
-        environ: Environment to read the key from.
-
-    Returns:
-        The resolved key, or None when `api_key_env` is unset — a provider
-        that needs one falls back to its own default env var (e.g.
-        `ANTHROPIC_API_KEY`); a self-hosted server that ignores auth entirely
-        is handled by the `openai` builder's own "no-key" placeholder, since
-        the openai SDK (unlike the others) refuses an empty string.
-    """
+    """Resolve the configured API key, or None to let the provider use its own default env var."""
     return environ.get(cfg.api_key_env) if cfg.api_key_env else None
 
 
 def _openai_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
-    """Any OpenAI-compatible chat-completions endpoint.
-
-    Covers self-hosted Ollama/vLLM/LM Studio/llama.cpp via `api_base`, and any
-    hosted OpenAI-compatible provider (Groq, Mistral, OpenAI itself) the same way.
-    """
+    """Any OpenAI-compatible endpoint — self-hosted (Ollama, vLLM) or hosted."""
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
     kwargs: dict[str, Any] = {
         "base_url": cfg.api_base,
-        "api_key": _api_key(cfg, environ) or "no-key",  # local servers ignore it; the SDK requires non-empty
+        "api_key": _api_key(cfg, environ) or "no-key",  # SDK requires non-empty; local servers ignore it
     }
     if cfg.ca_bundle:
         import httpx
@@ -77,11 +53,7 @@ def _openai_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
 
 
 def _anthropic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
-    """The real Anthropic Messages API.
-
-    Replaces the old `claude_code` CLI backend: same models, direct HTTPS
-    instead of a subprocess, full tool-calling (no `--max-turns` ceiling).
-    """
+    """The Anthropic Messages API directly."""
     from pydantic_ai.models.anthropic import AnthropicModel
     from pydantic_ai.providers.anthropic import AnthropicProvider
 
@@ -94,12 +66,7 @@ def _anthropic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
 
 
 def _azure_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
-    """Azure OpenAI — needs the resource endpoint, not just a base URL.
-
-    Unlike `openai`'s "no-key" placeholder (for local servers that ignore auth
-    entirely), Azure's provider validates eagerly and raises if it can't
-    resolve a key at all — set `api_key_env`, there is no local-server case here.
-    """
+    """Azure OpenAI. Unlike `openai`, no "no-key" fallback: Azure always needs one."""
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.azure import AzureProvider
 
@@ -112,20 +79,12 @@ def _azure_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
 
 
 def _litellm_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
-    """Any provider litellm can reach that the other backends can't.
-
-    Bedrock, Vertex, Cohere, watsonx, custom proxies — litellm's own
-    model-string convention (e.g. "bedrock/anthropic.claude-v2") is passed
-    straight through, unchanged from what a litellm user configures today.
-    """
-    # Unresolved by design: resolving it would mean installing the optional extra.
+    """Anything litellm reaches that the other backends can't."""
     from pydantic_ai_litellm import LiteLLMModel  # ty: ignore[unresolved-import]
 
     return LiteLLMModel(cfg.model, api_key=_api_key(cfg, environ), api_base=cfg.api_base or None)
 
 
-#: One builder per backend. A new backend is one function plus one dict entry
-#: here (and a matching readiness rule below) — not a new `if`/`elif` branch.
 _MODEL_BUILDERS: dict[str, Callable[[LLMConfig, Mapping[str, str]], "Model"]] = {
     "openai": _openai_model,
     "anthropic": _anthropic_model,
@@ -133,7 +92,6 @@ _MODEL_BUILDERS: dict[str, Callable[[LLMConfig, Mapping[str, str]], "Model"]] = 
     "litellm": _litellm_model,
 }
 
-#: What each backend needs before a call is worth attempting.
 _READY_CHECKS: dict[str, Callable[[LLMConfig], bool]] = {
     "openai": lambda cfg: bool(cfg.model and cfg.api_base),
     "anthropic": lambda cfg: bool(cfg.model),
@@ -165,9 +123,6 @@ def make_client(cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> LLM
 def backend_ready(cfg: LLMConfig) -> bool:
     """Check whether a backend can run as configured.
 
-    Checked *before* attempting a call so an unconfigured backend produces the
-    clean deterministic report rather than a failed call and a degraded one.
-
     Args:
         cfg: LLM settings.
 
@@ -181,38 +136,19 @@ def backend_ready(cfg: LLMConfig) -> bool:
 class PydanticAILLMClient(LLMClient):
     """Wraps one `pydantic_ai.models.Model` behind the `LLMClient` port.
 
-    One `Agent` is built lazily and reused for the client's lifetime — one
-    client per run (`llm/report.py::client_for_run`), so this is one
-    connection pool and one schema/instruction setup per run, not per job.
+    One `Agent` is built lazily and reused for the client's lifetime (one
+    client per run, per `llm/report.py::client_for_run`).
     """
 
     def __init__(self, model: "Model", cfg: LLMConfig) -> None:
-        """Store the model and config; no `Agent` is built until a call is made.
-
-        Args:
-            model: The backend-specific `Model`, from one of the builders above.
-            cfg: LLM settings — only `temperature`/`timeout_seconds` are read here.
-        """
+        """Store the model and config; no Agent is built until a call is made."""
         self._model = model
         self.cfg = cfg
         self._agent: Agent[None, Report] | None = None
         self._agent_lock = threading.Lock()
 
     def _agent_for(self) -> "Agent[None, Report]":
-        """Build the `Agent` once, thread-safely.
-
-        A run analyzes its jobs on a thread pool (`analysis.max_parallel_jobs`),
-        so this is reached concurrently; calling `run_sync` concurrently on the
-        already-built `Agent` itself is safe (verified directly against the
-        pinned Pydantic AI version), but construction is still guarded as cheap
-        insurance.
-
-        Returns:
-            The lazily-built `Agent`, using `PromptedOutput` (schema rendered
-            into the prompt, not enforced server-side — matches the target
-            population of self-hosted, unevenly tool-calling-capable endpoints)
-            and one repair retry on a schema-invalid reply.
-        """
+        """Build the Agent once, thread-safely (jobs run on a thread pool)."""
         with self._agent_lock:
             if self._agent is None:
                 from pydantic_ai import Agent
@@ -236,14 +172,10 @@ class PydanticAILLMClient(LLMClient):
             prompt: The rendered, already-redacted prompt.
 
         Returns:
-            The reply, already schema-valid — Pydantic AI's own
-            `PromptedOutput` validation (plus its one retry) ran before this
-            returns. The caller still re-validates (`llm/report.py`), which is
-            then a no-op in the common case, not a second retry layer.
+            The reply, already schema-valid.
 
         Raises:
-            Exception: Any transport, API, or exhausted-retry failure from
-                Pydantic AI or the underlying SDK.
+            Exception: Any transport, API, or exhausted-retry failure.
         """
         agent = self._agent_for()
         result = agent.run_sync(prompt)
