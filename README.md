@@ -40,8 +40,9 @@ the classifier is wrong, that's a bug with a failing test — not a prompt to tu
   so it can't change your pipeline's status or hide the real failure.
 - **Useful with no LLM** — ships a deterministic report out of the box: phase, reason,
   terminal command, evidence excerpt, and templated remediation.
-- **Bring-your-own model** — optional LLM step via `openai` (any OpenAI-compatible endpoint),
-  `litellm` (Bedrock/Vertex/Azure), or the local `claude` CLI, selected by config.
+- **Bring-your-own model** — optional LLM step via `openai` (any OpenAI-compatible endpoint,
+  self-hosted or hosted), `anthropic`, `azure`, or `litellm` (Bedrock, Vertex, Cohere, watsonx,
+  ~100 providers total), selected by config.
 - **GitLab & GitHub** — one provider-neutral core; the GitHub adapter was added with *zero*
   changes to core.
 - **Air-gap friendly** — no telemetry, no update checks, no runtime downloads; ship as a
@@ -81,8 +82,10 @@ git clone https://github.com/fennet82/ci-doctor
 cd ci-doctor
 uv sync                       # or: pip install .
 
-# optional LLM backends:
-uv sync --extra litellm       # or: pip install '.[litellm]'   — only for Bedrock/Vertex/Azure
+# pick exactly one LLM backend extra (openai/azure and litellm are mutually exclusive):
+uv sync --extra openai        # or: pip install '.[openai]'      — Ollama/vLLM/OpenAI-compatible
+uv sync --extra anthropic     # or: pip install '.[anthropic]'   — Anthropic direct
+uv sync --extra litellm       # or: pip install '.[litellm]'     — Bedrock/Vertex/Cohere/~100 more
 ```
 
 Or build the self-contained image:
@@ -129,7 +132,7 @@ github:
 
 llm:
   enabled: true                       # false => deterministic-only report
-  backend: openai                     # openai | litellm | claude_code
+  backend: openai                     # openai | anthropic | azure | litellm
   model: qwen2.5-coder:32b
   api_base: http://openai-compatible-endpoint.internal:8000/v1
 
@@ -137,7 +140,7 @@ analysis:
   max_parallel_jobs: 4                # jobs analyzed at once; 1 to serialize
 ```
 
-Every knob, and the three LLM backends, are documented on the
+Every knob, and the LLM backends, are documented on the
 [configuration page](https://fennet82.github.io/ci-doctor/configuration/). The LLM step is
 optional throughout — disabled, unconfigured or unreachable, ci-doctor emits the
 deterministic report instead of failing.

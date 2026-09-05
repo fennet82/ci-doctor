@@ -1,7 +1,13 @@
 """LLM report tests.
 
-Deterministic path, LLM path with recorded responses, repair retry, degraded
-fallback, and the end-to-end secret round-trip. No network.
+Deterministic path, LLM path with recorded responses, degraded fallback, and
+the end-to-end secret round-trip. No network.
+
+The repair retry on a schema-invalid reply now lives inside each backend
+(`llm/backends.py::PydanticAILLMClient`'s `Agent(retries=1)`), not in
+`_call_and_validate` — see tests/test_backends.py for that. `FakeClient` here
+fakes the `LLMClient` port directly, standing in for an already-fully-run
+backend, so an invalid first reply degrades immediately with no second call.
 """
 
 import pytest
@@ -130,13 +136,20 @@ def test_the_llm_cannot_overrule_the_attributed_phase():
     assert report.summary == _GOOD["summary"]  # only the phase is overruled
 
 
-def test_repair_retry_on_invalid_then_valid():
-    """An invalid reply triggers exactly one repair retry, which then succeeds."""
+def test_invalid_reply_degrades_without_a_second_call_here():
+    """An invalid reply degrades directly — no retry at this layer.
+
+    The repair retry now lives inside the backend itself (Pydantic AI's
+    `Agent(retries=1)`); by the time a reply reaches `_call_and_validate`,
+    that ceiling has already run its course. A second hand-rolled attempt
+    here would just duplicate it — the exact bug fixed once already (see
+    git history around `149313e`).
+    """
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([{"not": "a valid report"}, _GOOD])
     report = produce_report(job, attr, bundle, cfg, client=client)
-    assert report.summary == "unit tests failed on assert"
-    assert client.calls == 2  # one repair retry happened
+    assert client.calls == 1  # no retry issued from report.py itself
+    assert any("deterministic fallback" in f for f in report.contributing_factors)
 
 
 def test_infer_category_from_evidence():

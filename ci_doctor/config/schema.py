@@ -75,21 +75,31 @@ class LLMConfig(_Strict):
     """
 
     enabled: bool = Field(True, description="Set false for a deterministic-only report with no LLM call.")
-    backend: Literal["openai", "litellm", "claude_code"] = Field(
+    backend: Literal["openai", "litellm", "azure", "anthropic"] = Field(
         "openai",
         description=(
-            "openai: any OpenAI-compatible endpoint (needs api_base). litellm: providers the "
-            "OpenAI shape cannot reach — Bedrock, Vertex, Azure. claude_code: the local `claude` CLI."
+            "openai: any OpenAI-compatible endpoint (needs api_base) — self-hosted Ollama/vLLM/"
+            "LM Studio included. anthropic: the Anthropic Messages API directly. azure: Azure "
+            "OpenAI (needs azure_endpoint). litellm: any of litellm's ~100 providers (Bedrock, "
+            "Vertex, Cohere, watsonx, custom proxies, ...) via litellm's own model-string "
+            'convention, e.g. model: "bedrock/anthropic.claude-v2".'
         ),
     )
     model: str | None = Field(None, description='Model identifier, e.g. "qwen2.5-coder:32b".')
     api_base: str | None = Field(None, description="Base URL of the OpenAI-compatible / litellm endpoint.")
     api_key_env: str | None = Field(
         None,
-        description="Name of the env var holding the LLM API key. Often unset — local servers need no key.",
+        description="Name of the env var holding the LLM API key. Often unset — local servers need no key, "
+        "and a hosted backend without this set falls back to its own default env var (e.g. ANTHROPIC_API_KEY).",
     )
     ca_bundle: str | None = Field(
         None, description="CA bundle for the LLM endpoint, independent of the CI provider's."
+    )
+    azure_endpoint: str | None = Field(
+        None, description="Azure OpenAI resource endpoint URL. Required for the azure backend."
+    )
+    azure_api_version: str | None = Field(
+        None, description="Azure OpenAI API version, e.g. 2024-10-21. Required for the azure backend."
     )
     max_input_tokens: int = Field(
         12000,
@@ -103,10 +113,35 @@ class LLMConfig(_Strict):
         1,
         ge=0,
         description=(
-            "HTTP-level retries per request, handed to the SDK. Kept low on purpose: the "
-            "repair retry in llm/report.py already retries, and the two multiply."
+            "HTTP-transport retries per request, handed to the underlying SDK client. Kept low on "
+            "purpose: Pydantic AI's own Agent already retries once on a schema-invalid reply, and "
+            "the two multiply if both are high."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_claude_code(cls, data: object) -> object:
+        """Give a removed backend a clear migration error instead of a generic Literal one.
+
+        Args:
+            data: The raw input before field validation.
+
+        Returns:
+            `data` unchanged, when it doesn't need rejecting.
+
+        Raises:
+            ValueError: If `backend: claude_code` was set — it was removed in favor of
+                `anthropic`, which reaches the same models over the real API instead of
+                shelling out to the local CLI.
+        """
+        if isinstance(data, dict) and data.get("backend") == "claude_code":
+            raise ValueError(
+                "llm.backend 'claude_code' was removed; use 'anthropic' instead — same Claude "
+                "models, via the real Anthropic API instead of the local CLI. Set "
+                "api_key_env to an env var holding an ANTHROPIC_API_KEY."
+            )
+        return data
 
 
 class AnalysisConfig(_Strict):

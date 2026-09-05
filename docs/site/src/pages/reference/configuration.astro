@@ -47,15 +47,17 @@ github:                          # used when github is the ci or the scm
 
 llm:
   enabled: true                  # false => deterministic-only report
-  backend: openai                # openai | litellm | claude_code
+  backend: openai                # openai | anthropic | azure | litellm
   model: null                    # e.g. "qwen2.5-coder:32b" or "claude-opus-4-8"
   api_base: null                 # OpenAI-compatible / litellm base URL
   api_key_env: null              # optional; local servers often need none
   ca_bundle: null                # LLM endpoint's own CA, independent of the provider's
+  azure_endpoint: null           # required for backend: azure
+  azure_api_version: null        # required for backend: azure
   max_input_tokens: 12000
-  temperature: 0.1               # ignored by claude_code: the CLI has no temperature flag
+  temperature: 0.1
   timeout_seconds: 120
-  max_retries: 1                 # HTTP retries per request; multiplies with the repair retry
+  max_retries: 1                 # HTTP-transport retries; Pydantic AI's own Agent retries once more on an invalid reply
 
 analysis:
   include_allowed_failures: false   # allow_failure jobs are noise by default
@@ -146,7 +148,8 @@ redaction:
 
     <h2>LLM backends</h2>
     <p>
-        The LLM step is bring-your-own. Pick one with <code>llm.backend</code>:
+        The LLM step is bring-your-own, via <a href="https://ai.pydantic.dev/">Pydantic
+        AI</a>. Pick one with <code>llm.backend</code>:
     </p>
     <table>
         <thead
@@ -157,54 +160,62 @@ redaction:
             <tr
                 ><td><code>openai</code> (default)</td><td
                     >Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp,
-                    internal gateway)</td
-                ><td><code>model</code> + <code>api_base</code></td></tr
-            >
-            <tr
-                ><td><code>litellm</code></td><td
-                    >Providers the OpenAI shape cannot reach — Bedrock (SigV4),
-                    Vertex (GCP auth), Azure. Via <a
-                        href="https://docs.litellm.ai/">litellm</a
-                    ></td
+                    internal gateway) or OpenAI itself</td
                 ><td
-                    ><code>model</code>; <code
-                        >pip install ci-doctorr[litellm]</code
+                    ><code>model</code> + <code>api_base</code>; <code
+                        >pip install ci-doctorr[openai]</code
                     ></td
                 ></tr
             >
             <tr
-                ><td><code>claude_code</code></td><td
-                    >The local <code>claude</code> CLI, headless (<code
-                        >claude -p</code
-                    >)</td
+                ><td><code>anthropic</code></td><td
+                    >The Anthropic Messages API directly</td
                 ><td
-                    >the <code>claude</code> binary on PATH; uses its own auth</td
+                    ><code>model</code> + <code>api_key_env</code>; <code
+                        >pip install ci-doctorr[anthropic]</code
+                    ></td
+                ></tr
+            >
+            <tr
+                ><td><code>azure</code></td><td
+                    >Azure OpenAI</td
+                ><td
+                    ><code>model</code>, <code>azure_endpoint</code>, <code
+                        >api_key_env</code
+                    >; <code>pip install ci-doctorr[openai]</code></td
+                ></tr
+            >
+            <tr
+                ><td><code>litellm</code></td><td
+                    >Whatever else <a href="https://docs.litellm.ai/">litellm</a>
+                    reaches — Bedrock, Vertex, Cohere, watsonx, custom proxies, ~100
+                    providers total</td
+                ><td
+                    ><code>model</code> in litellm's own
+                    <code>provider/model</code> form; <code
+                        >pip install ci-doctorr[litellm]</code
+                    ></td
                 ></tr
             >
         </tbody>
     </table>
     <div class="note">
-        <strong>Reach for <code>openai</code> first.</strong> It is the only backend
-        in the base install (no extra deps, no runtime downloads), and the OpenAI
-        Chat Completions shape is what Ollama, vLLM, llama.cpp, Together, Groq, DeepSeek,
-        Mistral and most others already speak — including Gemini and Claude via their
-        compatibility endpoints. Use
-        <code>litellm</code> only for the clouds that need their own auth. It may
-        pull
-        <code>tiktoken</code>, which fetches vocab at runtime, so it is unfit
-        for a strict air gap. When the LLM is disabled or unavailable, ci-doctor
-        emits the deterministic report instead of failing.
+        <strong>Reach for <code>openai</code> first.</strong> The OpenAI Chat
+        Completions shape is what Ollama, vLLM, llama.cpp, Together, Groq, DeepSeek,
+        Mistral and most others already speak. There is no default SDK in the base
+        install any more — every backend needs its own extra, picked for exactly the
+        provider you're using.
     </div>
     <div class="note">
-        <strong><code>claude_code</code> runs the CLI isolated.</strong> ci-doctor
-        invokes it with no tools, no MCP servers, no inherited settings or
-        <code>CLAUDE.md</code>, and <code>--max-turns 1</code>. That keeps the answer
-        reproducible across machines, keeps your own Claude Code setup out of every
-        prompt (measured: 31s per job without the flags, 19s with them), and means a
-        subprocess whose only job is to read a log cannot run commands or edit the
-        repository it is analyzing. One consequence:
-        <code>llm.temperature</code> has no effect on this backend, because
-        <code>claude -p</code> exposes no temperature flag.
+        <strong><code>openai</code>/<code>azure</code> and <code>litellm</code>
+        are mutually exclusive installs, not a menu to combine.</strong> litellm
+        hard-pins <code>openai&lt;3.0</code>, while Pydantic AI's own OpenAI
+        integration needs <code>openai&gt;=3.8</code> — the two cannot be installed
+        in one environment. Pick whichever track covers your provider;
+        <code>anthropic</code> is unaffected either way. <code>litellm</code> may
+        also pull <code>tiktoken</code>, which fetches vocab at runtime, so it is
+        unfit for a strict air gap. When the LLM is disabled or unavailable,
+        ci-doctor emits the deterministic report instead of failing.
     </div>
 
     <h2>Full reference</h2>

@@ -15,7 +15,6 @@ import re
 from collections.abc import Mapping
 from importlib import resources
 from string import Template
-from typing import Any
 
 from pydantic import ValidationError
 
@@ -197,8 +196,7 @@ def produce_report(
             log.info("LLM backend %s unavailable (%s); deterministic report", cfg.llm.backend, exc)
             return redact_report(deterministic_report(job, attr, bundle), cfg.redaction, environ)
 
-    schema = Report.model_json_schema()
-    prompt = redact_text(_render_prompt(job, attr, bundle, schema), cfg.redaction, environ)
+    prompt = redact_text(_render_prompt(job, attr, bundle), cfg.redaction, environ)
     log.info(
         "job %s: calling LLM backend=%s model=%s (may take a while)", job.name, cfg.llm.backend, cfg.llm.model
     )
@@ -224,29 +222,35 @@ def produce_report(
 
 
 def _call_and_validate(client: LLMClient, prompt: str) -> Report | None:
-    """Call the LLM and validate its reply, retrying once with a repair hint.
+    """Call the LLM and validate its reply.
+
+    Every backend is Pydantic-AI-based (`llm/backends.py::PydanticAILLMClient`)
+    and already retries once internally on a schema-invalid reply
+    (`Agent(retries=1)`), so there is no hand-rolled repair-retry loop here —
+    one was tried once and reverted (see git history around `149313e`) because
+    stacking a second retry ceiling on top of the backend's own just multiplies
+    wall time on every real outage. A validation error reaching this function
+    means the backend's own retry already ran out, not that this call should
+    try again.
 
     Args:
         client: The LLM client.
-        prompt: The rendered prompt, the reply schema already embedded in it.
+        prompt: The rendered prompt.
 
     Returns:
-        The validated report, or None when the reply is still invalid after the
-        retry or the call itself failed. A schema violation is worth retrying (the
-        model can correct itself); a transport failure is not.
+        The validated report, or None when the reply is invalid or the call
+        itself failed — either way, the caller degrades to the deterministic
+        report.
     """
-    hint = ""
-    for _ in range(2):  # one call + one repair retry
-        try:
-            data = client.complete_structured(prompt + hint)
-            return Report.model_validate(data)
-        except (ValidationError, ValueError, json.JSONDecodeError) as exc:
-            log.debug("LLM reply invalid, repair retry: %s", exc)
-            hint = f"\n\nYour previous reply was invalid ({exc}). Reply with ONLY a JSON object matching the schema."
-        except Exception as exc:  # noqa: BLE001 - network/LLM failure -> deterministic fallback
-            log.warning("LLM call failed, using deterministic fallback: %s", exc)
-            return None
-    return None
+    try:
+        data = client.complete_structured(prompt)
+        return Report.model_validate(data)
+    except (ValidationError, ValueError, json.JSONDecodeError) as exc:
+        log.info("LLM reply invalid after its own repair retry; using deterministic fallback: %s", exc)
+        return None
+    except Exception as exc:  # noqa: BLE001 - network/LLM failure -> deterministic fallback
+        log.warning("LLM call failed, using deterministic fallback: %s", exc)
+        return None
 
 
 def _capped(text: str, limit: int = 2000) -> str:
@@ -353,17 +357,19 @@ def _handoff(job: Job, attr: Attribution, excerpt: str) -> str:
     )
 
 
-def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: dict[str, Any]) -> str:
+def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle) -> str:
     """Fill the system and user prompt templates.
 
     Invariant #8: prompt text lives in `llm/prompts/*.txt`, never inline here,
-    so it can be reviewed and edited without touching code.
+    so it can be reviewed and edited without touching code. The reply schema
+    is no longer rendered into this text — every backend is Pydantic-AI-based
+    and renders its own schema instructions via `PromptedOutput` when it
+    builds the actual model request.
 
     Args:
         job: The failed job.
         attr: The classifier's verdict, handed to the model as *settled*.
         bundle: The budgeted evidence.
-        schema: JSON Schema of the expected reply.
 
     Returns:
         The combined prompt. Still unredacted — the caller scrubs it before it
@@ -373,7 +379,6 @@ def _render_prompt(job: Job, attr: Attribution, bundle: EvidenceBundle, schema: 
         phase=attr.phase,
         rule_id=attr.rule_id,
         confidence=attr.confidence,
-        schema=json.dumps(schema),
     )
     user = Template(_load("analyze.user.txt")).safe_substitute(
         job=job.name,
