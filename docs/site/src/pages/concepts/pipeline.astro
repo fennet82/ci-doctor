@@ -57,8 +57,8 @@ const stages = [
         n: 8,
         name: "Explain",
         mod: "llm/",
-        what: "One optional model call, given only the budgeted evidence. Answers why, never where.",
-        cfg: "llm",
+        what: "One optional model call per job, given only that job's budgeted evidence. Answers why, never where. A multi-job run shares one client across jobs and fans them out over analysis.max_parallel_jobs workers.",
+        cfg: "llm, analysis.max_parallel_jobs",
     },
     {
         n: 9,
@@ -83,9 +83,10 @@ const stages = [
 >
     <h1>The pipeline</h1>
     <p class="lead">
-        One pass, ten stages, no loops. Each stage narrows the log; the last
-        four are the only ones that ever see fewer lines than the job actually
-        printed.
+        One pass, ten stages, no loops — per job. A run with several failed
+        jobs takes each one through all ten independently, up to
+        <code>analysis.max_parallel_jobs</code> at once; the last four are the
+        only stages that ever see fewer lines than the job actually printed.
     </p>
 
     <ol class="pipeline">

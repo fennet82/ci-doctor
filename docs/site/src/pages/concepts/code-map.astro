@@ -11,8 +11,13 @@ const packages = [
         files: [
             {
                 path: "cli.py",
-                entry: "_process()",
-                role: "The only place the pieces are joined: Typer commands, config loading, logging, and the `exit 0` guarantee. Segment → assign phases → attribute → build bundle → report.",
+                entry: "analyze()",
+                role: "Typer commands, config loading, logging, and the `exit 0` guarantee. Delegates the actual run to `pipeline.py` and only renders and delivers what comes back.",
+            },
+            {
+                path: "pipeline.py",
+                entry: "analyze_run(), process_job()",
+                role: "The one pass per job — segment → assign phases → attribute → build bundle → report — plus the run-level shell around it: fetching jobs, and fanning independent jobs out across `analysis.max_parallel_jobs` workers on one shared LLM client.",
             },
         ],
     },
