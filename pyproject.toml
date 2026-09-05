@@ -45,6 +45,7 @@ Changelog = "https://github.com/fennet82/ci-doctor/blob/master/CHANGELOG.md"
 # mutually exclusive install tracks, not a menu to combine.
 openai = ["pydantic-ai-slim[openai]>=2.40"]
 anthropic = ["pydantic-ai-slim[anthropic]>=2.40"]
+bedrock = ["pydantic-ai-slim[bedrock]>=2.40"]
 litellm = ["litellm>=1.40", "pydantic-ai-litellm>=0.2.8"]
 
 [tool.uv]

@@ -9,9 +9,9 @@ Every backend needs its own pip extra; there is no default SDK in the base
 install. `openai`/`azure` and `litellm` are mutually exclusive installs —
 litellm pins `openai<3.0`, Pydantic AI's OpenAI integration needs `openai>=3.8`
 (see pyproject.toml's `[tool.uv] conflicts`). `litellm` reaches everything the
-other three don't (Bedrock, Vertex, Cohere, watsonx, ~100 providers) via the
-community `pydantic-ai-litellm` bridge, using litellm's own model-string
-convention (e.g. `model: bedrock/anthropic.claude-v2`).
+other four don't (Vertex, Cohere, watsonx, ~100 providers) via the community
+`pydantic-ai-litellm` bridge, using litellm's own model-string convention
+(e.g. `model: vertex_ai/gemini-1.5-pro`).
 
 Every SDK is imported inside the builder that needs it, so importing this
 module costs nothing on a run that never reaches a model.
@@ -36,11 +36,19 @@ def _api_key(cfg: LLMConfig, environ: Mapping[str, str]) -> str | None:
     return environ.get(cfg.api_key_env) if cfg.api_key_env else None
 
 
+def _require_model(cfg: LLMConfig) -> str:
+    """Narrow `cfg.model` to `str` — `backend_ready` checks this in practice, but an injected client skips it."""
+    if not cfg.model:
+        raise ValueError(f"llm.model is required for the {cfg.backend} backend")
+    return cfg.model
+
+
 def _openai_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     """Any OpenAI-compatible endpoint — self-hosted (Ollama, vLLM) or hosted."""
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
+    model_name = _require_model(cfg)
     kwargs: dict[str, Any] = {
         "base_url": cfg.api_base,
         "api_key": _api_key(cfg, environ) or "no-key",  # SDK requires non-empty; local servers ignore it
@@ -49,7 +57,7 @@ def _openai_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
         import httpx
 
         kwargs["http_client"] = httpx.AsyncClient(verify=cfg.ca_bundle)
-    return OpenAIChatModel(cfg.model, provider=OpenAIProvider(**kwargs))
+    return OpenAIChatModel(model_name, provider=OpenAIProvider(**kwargs))
 
 
 def _anthropic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
@@ -57,12 +65,13 @@ def _anthropic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     from pydantic_ai.models.anthropic import AnthropicModel
     from pydantic_ai.providers.anthropic import AnthropicProvider
 
+    model_name = _require_model(cfg)
     kwargs: dict[str, Any] = {"api_key": _api_key(cfg, environ)}
     if cfg.ca_bundle:
         import httpx
 
         kwargs["http_client"] = httpx.AsyncClient(verify=cfg.ca_bundle)
-    return AnthropicModel(cfg.model, provider=AnthropicProvider(**kwargs))
+    return AnthropicModel(model_name, provider=AnthropicProvider(**kwargs))
 
 
 def _azure_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
@@ -70,25 +79,37 @@ def _azure_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.azure import AzureProvider
 
+    model_name = _require_model(cfg)
     provider = AzureProvider(
         azure_endpoint=cfg.azure_endpoint,
         api_version=cfg.azure_api_version,
         api_key=_api_key(cfg, environ),
     )
-    return OpenAIChatModel(cfg.model, provider=provider)
+    return OpenAIChatModel(model_name, provider=provider)
+
+
+def _bedrock_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":  # noqa: ARG001 - AWS creds come from the environment/IAM, not `environ`
+    """Amazon Bedrock. AWS IAM auth (env vars, profile, or instance role) — not an API key."""
+    from pydantic_ai.models.bedrock import BedrockConverseModel
+    from pydantic_ai.providers.bedrock import BedrockProvider
+
+    model_name = _require_model(cfg)
+    return BedrockConverseModel(model_name, provider=BedrockProvider(region_name=cfg.aws_region))
 
 
 def _litellm_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     """Anything litellm reaches that the other backends can't."""
     from pydantic_ai_litellm import LiteLLMModel  # ty: ignore[unresolved-import]
 
-    return LiteLLMModel(cfg.model, api_key=_api_key(cfg, environ), api_base=cfg.api_base or None)
+    model_name = _require_model(cfg)
+    return LiteLLMModel(model_name, api_key=_api_key(cfg, environ), api_base=cfg.api_base or None)
 
 
 _MODEL_BUILDERS: dict[str, Callable[[LLMConfig, Mapping[str, str]], "Model"]] = {
     "openai": _openai_model,
     "anthropic": _anthropic_model,
     "azure": _azure_model,
+    "bedrock": _bedrock_model,
     "litellm": _litellm_model,
 }
 
@@ -96,6 +117,7 @@ _READY_CHECKS: dict[str, Callable[[LLMConfig], bool]] = {
     "openai": lambda cfg: bool(cfg.model and cfg.api_base),
     "anthropic": lambda cfg: bool(cfg.model),
     "azure": lambda cfg: bool(cfg.model and cfg.azure_endpoint),
+    "bedrock": lambda cfg: bool(cfg.model),
     "litellm": lambda cfg: bool(cfg.model),
 }
 

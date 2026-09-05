@@ -47,13 +47,14 @@ github:                          # used when github is the ci or the scm
 
 llm:
   enabled: true                  # false => deterministic-only report
-  backend: openai                # openai | anthropic | azure | litellm
+  backend: openai                # openai | anthropic | azure | bedrock | litellm
   model: null                    # e.g. "qwen2.5-coder:32b" or "claude-opus-4-8"
   api_base: null                 # OpenAI-compatible / litellm base URL
   api_key_env: null              # optional; local servers often need none
   ca_bundle: null                # LLM endpoint's own CA, independent of the provider's
   azure_endpoint: null           # required for backend: azure
   azure_api_version: null        # required for backend: azure
+  aws_region: null               # backend: bedrock; falls back to AWS_DEFAULT_REGION/AWS_REGION
   max_input_tokens: 12000
   temperature: 0.1
   timeout_seconds: 120
@@ -186,9 +187,20 @@ redaction:
                 ></tr
             >
             <tr
+                ><td><code>bedrock</code></td><td
+                    >Amazon Bedrock, AWS IAM auth (env vars, profile, or instance
+                    role) — not an API key</td
+                ><td
+                    ><code>model</code>; <code>aws_region</code> or
+                    <code>AWS_DEFAULT_REGION</code>; <code
+                        >pip install ci-doctorr[bedrock]</code
+                    ></td
+                ></tr
+            >
+            <tr
                 ><td><code>litellm</code></td><td
                     >Whatever else <a href="https://docs.litellm.ai/">litellm</a>
-                    reaches — Bedrock, Vertex, Cohere, watsonx, custom proxies, ~100
+                    reaches — Vertex, Cohere, watsonx, custom proxies, ~100
                     providers total</td
                 ><td
                     ><code>model</code> in litellm's own
@@ -212,10 +224,20 @@ redaction:
         hard-pins <code>openai&lt;3.0</code>, while Pydantic AI's own OpenAI
         integration needs <code>openai&gt;=3.8</code> — the two cannot be installed
         in one environment. Pick whichever track covers your provider;
-        <code>anthropic</code> is unaffected either way. <code>litellm</code> may
+        <code>anthropic</code> and <code>bedrock</code> are unaffected either way.
+        <code>litellm</code> may
         also pull <code>tiktoken</code>, which fetches vocab at runtime, so it is
         unfit for a strict air gap. When the LLM is disabled or unavailable,
         ci-doctor emits the deterministic report instead of failing.
+    </div>
+    <div class="note">
+        <strong><code>bedrock</code> with no resolvable AWS credentials can probe
+        the network at startup.</strong> Unlike the other backends, building the
+        client eagerly resolves AWS credentials (env vars, profile, or instance
+        metadata) — with none available anywhere, that resolution itself makes a
+        request rather than failing instantly. Set <code>AWS_ACCESS_KEY_ID</code>/<code
+            >AWS_SECRET_ACCESS_KEY</code
+        > (or run with an instance role) so it never reaches that path.
     </div>
 
     <h2>Full reference</h2>

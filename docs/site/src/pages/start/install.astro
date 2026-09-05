@@ -21,7 +21,10 @@ pip install "ci-doctorr[openai]"
 # anthropic backend (the Anthropic Messages API directly)
 pip install "ci-doctorr[anthropic]"
 
-# litellm backend (everything else — Bedrock, Vertex, Cohere, watsonx, ~100 providers)
+# bedrock backend (Amazon Bedrock, AWS IAM auth)
+pip install "ci-doctorr[bedrock]"
+
+# litellm backend (everything else — Vertex, Cohere, watsonx, ~100 providers)
 # mutually exclusive with [openai]/[azure] — see Configuration for why
 pip install "ci-doctorr[litellm]"`;
 ---

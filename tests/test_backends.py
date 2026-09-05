@@ -43,7 +43,7 @@ def _use_stub_report_schema(monkeypatch):
     monkeypatch.setattr("ci_doctor.llm.backends.Report", _StubReport)
 
 
-@pytest.mark.parametrize("backend", ["openai", "anthropic", "azure", "litellm"])
+@pytest.mark.parametrize("backend", ["openai", "anthropic", "azure", "bedrock", "litellm"])
 def test_make_client_selects_backend(backend, monkeypatch):
     """Every known backend builds a PydanticAILLMClient, real builder swapped for a test double."""
     monkeypatch.setitem(_MODEL_BUILDERS, backend, lambda cfg, environ: TestModel())
@@ -72,6 +72,8 @@ def test_backend_ready_rules():
         backend_ready(_llm(backend="azure", model="m", azure_endpoint="https://x.openai.azure.com")) is True
     )
     assert backend_ready(_llm(backend="azure", model="m")) is False  # needs azure_endpoint
+    assert backend_ready(_llm(backend="bedrock", model="m")) is True  # region/creds come from AWS env
+    assert backend_ready(_llm(backend="bedrock")) is False  # needs model
     assert backend_ready(_llm(backend="litellm", model="m")) is True
     assert backend_ready(_llm(backend="litellm")) is False  # needs model
 
@@ -158,8 +160,8 @@ def test_litellm_model_string_reaches_litellm_model(monkeypatch):
 
     from ci_doctor.llm.backends import _litellm_model
 
-    _litellm_model(_llm(backend="litellm", model="bedrock/anthropic.claude-v2"), {})
-    assert captured["model_name"] == "bedrock/anthropic.claude-v2"
+    _litellm_model(_llm(backend="litellm", model="vertex_ai/gemini-1.5-pro"), {})
+    assert captured["model_name"] == "vertex_ai/gemini-1.5-pro"
 
 
 # Real SDKs needed below; mutually exclusive with litellm, so skip rather than
@@ -208,3 +210,35 @@ def test_azure_model_needs_endpoint_and_a_key():
         {"AZURE_KEY": "k"},
     )
     assert model.model_name == "gpt-x"
+
+
+boto3 = pytest.importorskip("boto3")
+
+
+@pytest.fixture(autouse=True)
+def _fake_aws_creds(monkeypatch):
+    """Give boto3 something to find via env vars.
+
+    With no resolvable credentials, boto3 falls through to a real network
+    probe (EC2 instance metadata) — which the socket-blocking test guard
+    correctly rejects. Fake env-var creds are enough to stop it there;
+    construction never actually calls Bedrock.
+    """
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "fake")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "fake")
+
+
+def test_bedrock_model_needs_only_region_no_api_key():
+    """Bedrock's auth is AWS IAM — region_name is required, no api_key involved."""
+    from ci_doctor.llm.backends import _bedrock_model
+
+    model = _bedrock_model(_llm(model="anthropic.claude-opus-4-6-v1:0", aws_region="us-east-1"), {})
+    assert model.model_name == "anthropic.claude-opus-4-6-v1:0"
+
+
+def test_bedrock_model_falls_back_to_aws_region_env_var(monkeypatch):
+    """No aws_region configured -> falls back to AWS_DEFAULT_REGION, not raise."""
+    from ci_doctor.llm.backends import _bedrock_model
+
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
+    _bedrock_model(_llm(model="anthropic.claude-opus-4-6-v1:0"), {})

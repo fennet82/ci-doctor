@@ -75,14 +75,15 @@ class LLMConfig(_Strict):
     """
 
     enabled: bool = Field(True, description="Set false for a deterministic-only report with no LLM call.")
-    backend: Literal["openai", "litellm", "azure", "anthropic"] = Field(
+    backend: Literal["openai", "litellm", "azure", "anthropic", "bedrock"] = Field(
         "openai",
         description=(
             "openai: any OpenAI-compatible endpoint (needs api_base) — self-hosted Ollama/vLLM/"
             "LM Studio included. anthropic: the Anthropic Messages API directly. azure: Azure "
-            "OpenAI (needs azure_endpoint). litellm: any of litellm's ~100 providers (Bedrock, "
-            "Vertex, Cohere, watsonx, custom proxies, ...) via litellm's own model-string "
-            'convention, e.g. model: "bedrock/anthropic.claude-v2".'
+            "OpenAI (needs azure_endpoint). bedrock: Amazon Bedrock, AWS IAM auth (env vars, "
+            "profile, or instance role) — not an API key. litellm: any other provider litellm "
+            "reaches (Vertex, Cohere, watsonx, custom proxies, ...) via its own model-string "
+            'convention, e.g. model: "vertex_ai/gemini-1.5-pro".'
         ),
     )
     model: str | None = Field(None, description='Model identifier, e.g. "qwen2.5-coder:32b".')
@@ -100,6 +101,11 @@ class LLMConfig(_Strict):
     )
     azure_api_version: str | None = Field(
         None, description="Azure OpenAI API version, e.g. 2024-10-21. Required for the azure backend."
+    )
+    aws_region: str | None = Field(
+        None,
+        description="AWS region for the bedrock backend. Falls back to AWS_DEFAULT_REGION/AWS_REGION "
+        "if unset; one of the two must resolve to something.",
     )
     max_input_tokens: int = Field(
         12000,
