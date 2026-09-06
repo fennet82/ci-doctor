@@ -126,7 +126,7 @@ const packages = [
             {
                 path: "report.py",
                 entry: "produce_report()",
-                role: "Builds the report. With no model configured this is the whole output — a deterministic report, not a stub — and the failure-category signatures are computed here either way.",
+                role: "Builds the report. With no model configured this is the whole output — a deterministic report, not a stub. It sets the category only when the provider reason settles it; a script failure's category is the model's job.",
             },
             {
                 path: "backends.py",
