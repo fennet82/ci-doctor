@@ -75,21 +75,37 @@ class LLMConfig(_Strict):
     """
 
     enabled: bool = Field(True, description="Set false for a deterministic-only report with no LLM call.")
-    backend: Literal["openai", "litellm", "claude_code"] = Field(
+    backend: Literal["openai", "litellm", "azure", "anthropic", "bedrock"] = Field(
         "openai",
         description=(
-            "openai: any OpenAI-compatible endpoint (needs api_base). litellm: providers the "
-            "OpenAI shape cannot reach — Bedrock, Vertex, Azure. claude_code: the local `claude` CLI."
+            "openai: any OpenAI-compatible endpoint (needs api_base) — self-hosted Ollama/vLLM/"
+            "LM Studio included. anthropic: the Anthropic Messages API directly. azure: Azure "
+            "OpenAI (needs azure_endpoint). bedrock: Amazon Bedrock, AWS IAM auth (env vars, "
+            "profile, or instance role) — not an API key. litellm: any other provider litellm "
+            "reaches (Vertex, Cohere, watsonx, custom proxies, ...) via its own model-string "
+            'convention, e.g. model: "vertex_ai/gemini-1.5-pro".'
         ),
     )
     model: str | None = Field(None, description='Model identifier, e.g. "qwen2.5-coder:32b".')
     api_base: str | None = Field(None, description="Base URL of the OpenAI-compatible / litellm endpoint.")
     api_key_env: str | None = Field(
         None,
-        description="Name of the env var holding the LLM API key. Often unset — local servers need no key.",
+        description="Name of the env var holding the LLM API key. Often unset — local servers need no key, "
+        "and a hosted backend without this set falls back to its own default env var (e.g. ANTHROPIC_API_KEY).",
     )
     ca_bundle: str | None = Field(
         None, description="CA bundle for the LLM endpoint, independent of the CI provider's."
+    )
+    azure_endpoint: str | None = Field(
+        None, description="Azure OpenAI resource endpoint URL. Required for the azure backend."
+    )
+    azure_api_version: str | None = Field(
+        None, description="Azure OpenAI API version, e.g. 2024-10-21. Required for the azure backend."
+    )
+    aws_region: str | None = Field(
+        None,
+        description="AWS region for the bedrock backend. Falls back to AWS_DEFAULT_REGION/AWS_REGION "
+        "if unset; one of the two must resolve to something.",
     )
     max_input_tokens: int = Field(
         12000,
@@ -102,10 +118,8 @@ class LLMConfig(_Strict):
     max_retries: int = Field(
         1,
         ge=0,
-        description=(
-            "HTTP-level retries per request, handed to the SDK. Kept low on purpose: the "
-            "repair retry in llm/report.py already retries, and the two multiply."
-        ),
+        description="HTTP-transport retries per request. Kept low: Pydantic AI's own Agent "
+        "already retries once on a schema-invalid reply, and the two multiply.",
     )
 
 

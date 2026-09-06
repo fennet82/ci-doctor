@@ -12,7 +12,7 @@ dependencies = [
     "pydantic>=2.5",
     "pyyaml>=6",
     "python-gitlab>=8.4.0",
-    "openai>=2.48.0",
+    "pydantic-ai-slim>=2.40",  # core Agent only; a model SDK comes from a backend extra below
     "pygithub>=2.9.1",
     "requests>=2.32",  # imported directly to fetch GitHub's job-log redirect
     "httpx>=0.27",  # imported directly for the openai backend's ca_bundle client
@@ -37,10 +37,19 @@ Issues = "https://github.com/fennet82/ci-doctor/issues"
 Changelog = "https://github.com/fennet82/ci-doctor/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
-# Optional LLM backends (base install stays lean/air-gap-clean). openai is included
-# in the base deps; claude_code needs only the `claude` CLI on PATH.
-litellm = ["litellm>=1.40"]
-all = ["litellm>=1.40"]
+# Optional LLM backends (base install stays lean/air-gap-clean; pick exactly one).
+# openai and azure both ride the openai SDK, so one extra covers both backends.
+# There is no "all": litellm hard-pins openai<3.0 while pydantic-ai's own OpenAI
+# integration requires openai>=3.8 — the two cannot be installed together, ever,
+# in one environment. `backend: openai`/`azure` and `backend: litellm` are
+# mutually exclusive install tracks, not a menu to combine.
+openai = ["pydantic-ai-slim[openai]>=2.40"]
+anthropic = ["pydantic-ai-slim[anthropic]>=2.40"]
+bedrock = ["pydantic-ai-slim[bedrock]>=2.40"]
+litellm = ["litellm>=1.40", "pydantic-ai-litellm>=0.2.8"]
+
+[tool.uv]
+conflicts = [[{ extra = "openai" }, { extra = "litellm" }]]
 
 [project.scripts]
 ci-doctor = "ci_doctor.cli:main"

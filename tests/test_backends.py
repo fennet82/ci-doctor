@@ -1,23 +1,35 @@
-"""Backend registry: selection, readiness, and the claude_code CLI path.
+"""Backend registry: selection, readiness, and the shared PydanticAILLMClient.
 
-No network, no litellm installed — clients are lazy-importing, so
-construction and selection are testable without the optional deps.
+No network — every builder is monkeypatched to a pydantic-ai test double
+(`TestModel`/`FunctionModel`, no extra required). `PydanticAILLMClient` is
+exercised against a stub output model; the real `Report` schema is covered
+end-to-end in tests/test_report.py.
 """
 
-import json
-import subprocess
+import sys
+import types
 from types import SimpleNamespace
 
 import pytest
+from pydantic import BaseModel
+from pydantic_ai.messages import ModelResponse, TextPart
+from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.models.test import TestModel
 
 from ci_doctor.config.loader import load_config
 from ci_doctor.llm.backends import (
-    ClaudeCodeClient,
-    LiteLLMClient,
-    OpenAILLMClient,
+    _MODEL_BUILDERS,
+    PydanticAILLMClient,
     backend_ready,
     make_client,
 )
+
+
+class _StubReport(BaseModel):
+    """A minimal output model, standing in for the real `Report` schema."""
+
+    summary: str
+    score: int
 
 
 def _llm(**over):
@@ -25,204 +37,208 @@ def _llm(**over):
     return load_config(environ={}, overrides={"llm": over}).llm
 
 
-@pytest.mark.parametrize(
-    "backend,cls",
-    [
-        ("openai", OpenAILLMClient),
-        ("litellm", LiteLLMClient),
-        ("claude_code", ClaudeCodeClient),
-    ],
-)
-def test_make_client_selects_backend(backend, cls):
-    """Each backend name builds its own client class."""
-    assert isinstance(make_client(_llm(backend=backend)), cls)
+@pytest.fixture(autouse=True)
+def _use_stub_report_schema(monkeypatch):
+    """Every PydanticAILLMClient in this file validates against `_StubReport`, not `Report`."""
+    monkeypatch.setattr("ci_doctor.llm.backends.Report", _StubReport)
+
+
+@pytest.mark.parametrize("backend", ["openai", "anthropic", "azure", "bedrock", "litellm"])
+def test_make_client_selects_backend(backend, monkeypatch):
+    """Every known backend builds a PydanticAILLMClient, real builder swapped for a test double."""
+    monkeypatch.setitem(_MODEL_BUILDERS, backend, lambda cfg, environ: TestModel())
+    kwargs = {"backend": backend, "model": "m"}
+    if backend == "openai":
+        kwargs["api_base"] = "http://stub"
+    if backend == "azure":
+        kwargs["azure_endpoint"] = "https://stub.openai.azure.com"
+    client = make_client(_llm(**kwargs))
+    assert isinstance(client, PydanticAILLMClient)
 
 
 def test_unknown_backend_raises():
-    """The factory rejects an unknown backend.
-
-    Config-level Literal validation blocks bad values earlier, so the factory is
-    exercised directly here.
-    """
-    from types import SimpleNamespace
-
+    """The factory rejects an unknown backend."""
     with pytest.raises(ValueError, match="unknown llm.backend"):
         make_client(SimpleNamespace(backend="nope"))
 
 
-def test_backend_ready_rules(monkeypatch):
+def test_backend_ready_rules():
     """Each backend reports ready only when it has everything it needs."""
     assert backend_ready(_llm(backend="openai", model="m", api_base="http://x")) is True
     assert backend_ready(_llm(backend="openai", model="m")) is False  # needs api_base
+    assert backend_ready(_llm(backend="anthropic", model="m")) is True
+    assert backend_ready(_llm(backend="anthropic")) is False  # needs model
+    assert (
+        backend_ready(_llm(backend="azure", model="m", azure_endpoint="https://x.openai.azure.com")) is True
+    )
+    assert backend_ready(_llm(backend="azure", model="m")) is False  # needs azure_endpoint
+    assert backend_ready(_llm(backend="bedrock", model="m")) is True  # region/creds come from AWS env
+    assert backend_ready(_llm(backend="bedrock")) is False  # needs model
     assert backend_ready(_llm(backend="litellm", model="m")) is True
     assert backend_ready(_llm(backend="litellm")) is False  # needs model
 
-    monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
-    assert backend_ready(_llm(backend="claude_code")) is True
-    monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: None)
-    assert backend_ready(_llm(backend="claude_code")) is False
+
+def _reply(json_text: str) -> ModelResponse:
+    """A pydantic-ai ModelResponse carrying one text part."""
+    return ModelResponse(parts=[TextPart(content=json_text)])
 
 
-def test_claude_code_client_parses_cli_envelope(monkeypatch):
-    """The CLI's JSON envelope is unwrapped to the model's own JSON reply."""
-    monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
-    report = {"summary": "x", "failure_phase": "script"}  # inner JSON the model returned
-
-    def fake_run(cmd, **kwargs):
-        """Stand in for subprocess.run, returning a successful CLI envelope."""
-        assert kwargs["input"], "prompt must be piped on stdin"
-        envelope = json.dumps({"result": json.dumps(report), "session_id": "abc"})
-        return subprocess.CompletedProcess(cmd, 0, stdout=envelope, stderr="")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    out = ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("prompt")
-    assert out == report
+def test_complete_structured_returns_a_validated_dict():
+    """One call, no repair needed: the reply is parsed and returned as a dict."""
+    model = FunctionModel(lambda messages, info: _reply('{"summary": "ok", "score": 1}'))
+    client = PydanticAILLMClient(model, _llm(model="m"))
+    out = client.complete_structured("prompt")
+    assert out == {"summary": "ok", "score": 1}
 
 
-def test_claude_code_client_raises_on_cli_failure(monkeypatch):
-    """A non-zero CLI exit raises, so the caller can fall back deterministically."""
-    monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, stdout="", stderr="boom"),
+def test_agent_is_built_once_and_reused():
+    """One Agent per client, not one per call — same reuse discipline as before."""
+    calls = {"n": 0}
+
+    def fake_llm(messages, info):
+        calls["n"] += 1
+        return _reply('{"summary": "ok", "score": 1}')
+
+    client = PydanticAILLMClient(FunctionModel(fake_llm), _llm(model="m"))
+    agent_first = client._agent_for()
+    client.complete_structured("first")
+    client.complete_structured("second")
+    agent_second = client._agent_for()
+    assert agent_first is agent_second
+    assert calls["n"] == 2  # one call per job, not one extra for re-building the Agent
+
+
+def test_one_repair_retry_on_invalid_then_valid_reply():
+    """PromptedOutput + Agent(retries=1) retries exactly once on a schema-invalid reply."""
+    calls = {"n": 0}
+
+    def fake_llm(messages, info):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _reply("not json at all")
+        return _reply('{"summary": "ok", "score": 1}')
+
+    client = PydanticAILLMClient(FunctionModel(fake_llm), _llm(model="m"))
+    out = client.complete_structured("prompt")
+    assert out == {"summary": "ok", "score": 1}
+    assert calls["n"] == 2  # one call + Pydantic AI's own one repair retry, no more
+
+
+def test_still_invalid_after_the_retry_raises():
+    """A reply still invalid after the retry ceiling propagates, not silently degrades."""
+    client = PydanticAILLMClient(
+        FunctionModel(lambda messages, info: _reply("still not json")), _llm(model="m")
     )
-    with pytest.raises(RuntimeError, match="claude CLI failed"):
-        ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("p")
-
-
-def _reply(content):
-    """A minimal stand-in for the SDK's ChatCompletion response object."""
-    message = SimpleNamespace(content=content)
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
-
-
-def _bad_request():
-    """A real openai.BadRequestError, built offline — no socket is opened."""
-    import httpx
-    from openai import BadRequestError
-
-    request = httpx.Request("POST", "http://stub/v1/chat/completions")
-    return BadRequestError(
-        "response_format is unsupported",
-        response=httpx.Response(400, request=request),
-        body=None,
-    )
-
-
-class _FakeCompletions:
-    """Scripted `chat.completions`, recording the kwargs of every call."""
-
-    def __init__(self, script):
-        self.script = list(script)
-        self.calls = []
-
-    def create(self, **kwargs):
-        """Record the call and replay the next scripted outcome."""
-        self.calls.append(kwargs)
-        outcome = self.script[min(len(self.calls) - 1, len(self.script) - 1)]
-        if isinstance(outcome, Exception):
-            raise outcome
-        return outcome
-
-
-def _wire(client, script):
-    """Give an OpenAILLMClient a scripted SDK client, bypassing the network."""
-    completions = _FakeCompletions(script)
-    sdk = SimpleNamespace(chat=SimpleNamespace(completions=completions))
-    client._client = lambda: sdk
-    return completions
-
-
-def test_a_transport_failure_is_not_retried_without_response_format():
-    """Only a 400 means "this server rejects response_format" — everything else must propagate.
-
-    A bare `except Exception` here re-issues the identical request that just burned
-    the full timeout, doubling the wall time of every outage.
-    """
-    client = OpenAILLMClient(_llm(model="m", api_base="http://stub"))
-    completions = _wire(client, [TimeoutError("read timed out")])
-    with pytest.raises(TimeoutError):
+    with pytest.raises(Exception):  # noqa: B017 - pydantic-ai's own exhausted-retries error type
         client.complete_structured("prompt")
-    assert len(completions.calls) == 1
 
 
-def test_a_400_retries_once_without_response_format():
-    """A server that rejects response_format gets one retry without it."""
-    client = OpenAILLMClient(_llm(model="m", api_base="http://stub"))
-    completions = _wire(client, [_bad_request(), _reply('{"ok": true}')])
-    assert client.complete_structured("prompt") == {"ok": True}
-    assert len(completions.calls) == 2
-    assert "response_format" in completions.calls[0]
-    assert "response_format" not in completions.calls[1]
+def test_temperature_and_timeout_reach_the_agent():
+    """Config values reach the Agent's model_settings, not left at framework defaults."""
+    client = PydanticAILLMClient(
+        FunctionModel(lambda messages, info: _reply('{"summary": "ok", "score": 1}')),
+        _llm(model="m", temperature=0.7, timeout_seconds=42),
+    )
+    agent = client._agent_for()
+    assert agent.model_settings["temperature"] == 0.7
+    assert agent.model_settings["timeout"] == 42
 
 
-def test_a_rejected_response_format_is_remembered():
-    """The failed probe costs one request per run, not one per job."""
-    client = OpenAILLMClient(_llm(model="m", api_base="http://stub"))
-    completions = _wire(client, [_bad_request(), _reply('{"ok": true}')])
-    client.complete_structured("first")
-    client.complete_structured("second")
-    assert len(completions.calls) == 3  # probe + retry, then one call for the second job
-    assert "response_format" not in completions.calls[2]
+def test_litellm_model_string_reaches_litellm_model(monkeypatch):
+    """Litellm's own model-string convention passes straight through (fake module: real one conflicts)."""
+    captured = {}
+
+    class _FakeLiteLLMModel:
+        def __init__(self, model_name, *, api_key=None, api_base=None):
+            captured["model_name"] = model_name
+            captured["api_key"] = api_key
+            captured["api_base"] = api_base
+
+    fake_module = types.ModuleType("pydantic_ai_litellm")
+    fake_module.LiteLLMModel = _FakeLiteLLMModel
+    monkeypatch.setitem(sys.modules, "pydantic_ai_litellm", fake_module)
+
+    from ci_doctor.llm.backends import _litellm_model
+
+    _litellm_model(_llm(backend="litellm", model="vertex_ai/gemini-1.5-pro"), {})
+    assert captured["model_name"] == "vertex_ai/gemini-1.5-pro"
 
 
-def test_the_sdk_client_is_built_once_and_reused(monkeypatch):
-    """One connection pool per client, not one per call."""
-    built = []
-
-    def fake_openai(**kwargs):
-        built.append(kwargs)
-        completions = _FakeCompletions([_reply('{"ok": true}')])
-        return SimpleNamespace(chat=SimpleNamespace(completions=completions))
-
-    monkeypatch.setattr("openai.OpenAI", fake_openai)
-    client = OpenAILLMClient(_llm(model="m", api_base="http://stub"))
-    client.complete_structured("first")
-    client.complete_structured("second")
-    assert len(built) == 1
+# Real SDKs needed below; mutually exclusive with litellm, so skip rather than
+# require every CI job to install every extra.
+openai_sdk = pytest.importorskip("openai")
+anthropic_sdk = pytest.importorskip("anthropic")
 
 
-def test_max_retries_reaches_the_sdk(monkeypatch):
-    """The SDK's own retry count is set from config, not left at its default of 2."""
-    built = []
+def test_openai_model_uses_api_base_and_resolved_key(monkeypatch):
+    """A configured api_key_env reaches the provider; api_base is passed through."""
+    from ci_doctor.llm.backends import _openai_model
 
-    def fake_openai(**kwargs):
-        built.append(kwargs)
-        return SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions([_reply('{"ok": true}')])))
-
-    monkeypatch.setattr("openai.OpenAI", fake_openai)
-    client = OpenAILLMClient(_llm(model="m", api_base="http://stub", max_retries=0))
-    client.complete_structured("prompt")
-    assert built[0]["max_retries"] == 0
+    model = _openai_model(
+        _llm(model="m", api_base="http://stub", api_key_env="MY_KEY"), {"MY_KEY": "secret-key"}
+    )
+    assert model.model_name == "m"
 
 
-def test_claude_code_cli_runs_isolated(monkeypatch):
-    """The analyzer subprocess gets no tools, no MCP servers and no inherited settings.
+def test_openai_model_falls_back_to_no_key_placeholder():
+    """No api_key_env configured -> the SDK gets a non-empty placeholder, not None."""
+    from ci_doctor.llm.backends import _openai_model
 
-    Without these the CLI loads the developer's own Claude Code environment on every
-    call — measurably slower, and it hands a log-analysis subprocess write access to
-    the repository it is analyzing (invariant #10 is read-only).
+    # Would raise if the client ever required a real, non-empty string and got None.
+    _openai_model(_llm(model="m", api_base="http://stub"), {})
+
+
+def test_anthropic_model_resolves_key_from_env():
+    """Anthropic reads its key the same way openai does — via api_key_env."""
+    from ci_doctor.llm.backends import _anthropic_model
+
+    model = _anthropic_model(_llm(model="claude-x", api_key_env="ANTHROPIC_KEY"), {"ANTHROPIC_KEY": "k"})
+    assert model.model_name == "claude-x"
+
+
+def test_azure_model_needs_endpoint_and_a_key():
+    """Azure builds on the endpoint/api_version, not api_base — and needs a key."""
+    from ci_doctor.llm.backends import _azure_model
+
+    model = _azure_model(
+        _llm(
+            model="gpt-x",
+            azure_endpoint="https://x.openai.azure.com",
+            azure_api_version="2024-10-21",
+            api_key_env="AZURE_KEY",
+        ),
+        {"AZURE_KEY": "k"},
+    )
+    assert model.model_name == "gpt-x"
+
+
+boto3 = pytest.importorskip("boto3")
+
+
+@pytest.fixture(autouse=True)
+def _fake_aws_creds(monkeypatch):
+    """Give boto3 something to find via env vars.
+
+    With no resolvable credentials, boto3 falls through to a real network
+    probe (EC2 instance metadata) — which the socket-blocking test guard
+    correctly rejects. Fake env-var creds are enough to stop it there;
+    construction never actually calls Bedrock.
     """
-    monkeypatch.setattr("ci_doctor.llm.backends.shutil.which", lambda _: "/usr/bin/claude")
-    seen = {}
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "fake")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "fake")
 
-    def fake_run(cmd, **kwargs):
-        """Capture the argv the backend built."""
-        seen["cmd"] = cmd
-        envelope = json.dumps({"result": json.dumps({"ok": True})})
-        return subprocess.CompletedProcess(cmd, 0, stdout=envelope, stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    ClaudeCodeClient(_llm(backend="claude_code")).complete_structured("p")
+def test_bedrock_model_needs_only_region_no_api_key():
+    """Bedrock's auth is AWS IAM — region_name is required, no api_key involved."""
+    from ci_doctor.llm.backends import _bedrock_model
 
-    cmd = seen["cmd"]
-    assert cmd[1:4] == ["-p", "--output-format", "json"]
-    assert "--max-turns" in cmd and cmd[cmd.index("--max-turns") + 1] == "1"
-    assert cmd[cmd.index("--disallowedTools") + 1] == "*"
-    assert "--strict-mcp-config" in cmd
-    assert json.loads(cmd[cmd.index("--mcp-config") + 1]) == {"mcpServers": {}}
-    assert cmd[cmd.index("--setting-sources") + 1] == ""
-    assert "--no-session-persistence" in cmd
-    # --bare is deliberately absent: it authenticates only via ANTHROPIC_API_KEY.
-    assert "--bare" not in cmd
+    model = _bedrock_model(_llm(model="anthropic.claude-opus-4-6-v1:0", aws_region="us-east-1"), {})
+    assert model.model_name == "anthropic.claude-opus-4-6-v1:0"
+
+
+def test_bedrock_model_falls_back_to_aws_region_env_var(monkeypatch):
+    """No aws_region configured -> falls back to AWS_DEFAULT_REGION, not raise."""
+    from ci_doctor.llm.backends import _bedrock_model
+
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
+    _bedrock_model(_llm(model="anthropic.claude-opus-4-6-v1:0"), {})

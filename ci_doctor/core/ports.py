@@ -87,11 +87,12 @@ class LogSegmenter(ABC):
 
 
 class LLMClient(ABC):
-    """A backend that answers with JSON matching the schema embedded in the prompt.
+    """A backend that answers with JSON matching the reply schema.
 
-    Every backend is prompt-and-parse: the reply schema is rendered into the
-    prompt text by `llm/report.py`, not passed as an argument, because none of
-    the endpoints we target enforce one server-side.
+    Prompt-and-parse: correctness is enforced by validation, not by the
+    endpoint, since none of the endpoints we target enforce a schema
+    server-side (`llm/backends.py::PydanticAILLMClient` realizes this via
+    Pydantic AI's `PromptedOutput`).
     """
 
     @abstractmethod
@@ -99,7 +100,7 @@ class LLMClient(ABC):
         """Run one completion and parse the response as JSON.
 
         Args:
-            prompt: The fully rendered prompt, schema included.
+            prompt: The fully rendered prompt.
 
         Returns:
             The parsed response. Callers validate it — a backend may return

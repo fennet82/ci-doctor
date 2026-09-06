@@ -108,8 +108,10 @@ export CI_DOCTOR_GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxx"
             >llm.model</code
         >/<code>llm.api_base</code> unset). To enable the explanation step, point
         it at any <strong>OpenAI-compatible</strong> endpoint: Ollama, vLLM, llama.cpp
-        server, LocalAI, or an internal gateway. An API key is optional. Other backends
-        — litellm, Anthropic, the local <code>claude</code> CLI — are on
+        server, LocalAI, or an internal gateway (needs <code
+            >pip install ci-doctorr[openai]</code
+        >). An API key is optional. Other backends — Anthropic, Azure, Bedrock,
+        litellm's ~100 providers — are on
         <a href={url("/reference/configuration/")}>Configuration</a>.
     </p>
 
