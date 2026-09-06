@@ -14,13 +14,13 @@ from ci_doctor.core.attribution import attribute
 from ci_doctor.core.extract import _windows_for, extract
 from ci_doctor.core.models import FailureReason, Job
 from ci_doctor.core.phases import assign_phases
-from ci_doctor.llm.report import _infer_category, deterministic_report
+from ci_doctor.llm.report import deterministic_report
 from tests import support
 
 CFG = load_config(environ={})
 MATCHERS = {m.id: m for m in CFG.extraction.matchers}
 
-# (fixture stem, matcher ids it must trigger, causal line, deterministic category)
+# (fixture stem, matcher ids it must trigger, causal line, failure kind — reference only)
 CASES = [
     ("rust_test_failure", ["rust_test", "rust_panic"], "assertion `left == right` failed", "test"),
     ("rust_compile_error", ["rust_compile"], "expected `Decimal`, found `Option<Decimal>`", "build"),
@@ -140,14 +140,6 @@ def test_every_diagnostic_in_a_multi_error_build_reaches_the_report():
         assert code in excerpt, f"{code!r} missing — only part of the build's errors reached the report"
 
 
-@pytest.mark.parametrize("provider,stem,matcher_ids,causal,category", PARAMS, ids=IDS)
-def test_deterministic_category(provider, stem, matcher_ids, causal, category):
-    """Each fixture classifies to its expected category with no LLM involved."""
-    job, attr, bundle = _analyze(provider, stem)
-    report = deterministic_report(job, attr, bundle)
-    assert report.category == category
-
-
 # Every failed job ends with the runner saying so, in the runner's own words. A
 # pack that fires on *that* line has coverage on paper for every fixture in the
 # suite while proving nothing about the tool it claims to match — which is how
@@ -199,32 +191,3 @@ def test_generic_error_catches_a_tool_with_no_pack(provider):
     lines = support.log_lines(provider, "warning_only_fetch")
     out = extract(lines, [MATCHERS["generic_error"]], tail_lines=0)
     assert any("custom tool reported a fatal problem" in line for line in out)
-
-
-# `runtime` is checked last on purpose: a traceback also appears in a pytest
-# failure and in a missing-import crash, and those answers are more actionable.
-@pytest.mark.parametrize(
-    "expected,text",
-    [
-        ("test", "=== FAILURES ===\nTraceback (most recent call last):\nAssertionError: assert 1 == 2"),
-        ("dependency", "Traceback (most recent call last):\nModuleNotFoundError: No module named 'requests'"),
-        ("runtime", "Traceback (most recent call last):\nZeroDivisionError: division by zero"),
-        # node:internal/ frames show up in every JS stack, including a jest failure
-        # and a missing-module crash — neither of which is a "runtime" answer.
-        (
-            "test",
-            "● Cart > applies discount\nexpect(received).toBe(expected)\n    at Module._compile (node:internal/modules/cjs/loader:1356:14)",
-        ),
-        (
-            "dependency",
-            "Error [ERR_MODULE_NOT_FOUND]: Cannot find module\n    at node:internal/modules/esm/resolve:264:11\nNode.js v20.11.1",
-        ),
-        (
-            "runtime",
-            "Error: missing DATABASE_URL\n    at node:internal/main/run_main_module:28:49\nNode.js v20.11.1",
-        ),
-    ],
-)
-def test_runtime_never_outranks_a_more_actionable_category(expected, text):
-    """Pins the signature ordering: a traceback alone never wins over test/dependency."""
-    assert _infer_category(FailureReason.SCRIPT_FAILURE, text) == expected

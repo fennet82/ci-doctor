@@ -139,50 +139,30 @@ def test_invalid_reply_degrades_without_a_second_call_here():
     assert any("deterministic fallback" in f for f in report.contributing_factors)
 
 
-def test_infer_category_from_evidence():
-    """The reason decides when it can; otherwise the evidence signatures do."""
+def test_infer_category_from_reason():
+    """The provider reason settles some categories; a script failure is left to the model."""
     from ci_doctor.llm.report import _infer_category
 
-    # reason map wins when it can classify
-    assert _infer_category(FailureReason.RUNNER_SYSTEM, "") == "infrastructure"
-    assert _infer_category(FailureReason.TIMEOUT, "") == "timeout"
-    assert _infer_category(FailureReason.MISSING_DEPENDENCY, "") == "dependency"
-    # script_failure -> guess from the evidence
-    assert (
-        _infer_category(
-            FailureReason.SCRIPT_FAILURE, "==== FAILURES ====\nE assert 1 == 2\nFAILED tests/x.py"
-        )
-        == "test"
-    )
-    assert (
-        _infer_category(FailureReason.SCRIPT_FAILURE, "a.ts:1 error TS2345: bad\nnpm ERR! build failed")
-        == "build"
-    )
-    assert (
-        _infer_category(FailureReason.SCRIPT_FAILURE, "ERROR: Job failed: execution took longer than 1h")
-        == "timeout"
-    )
-    assert _infer_category(FailureReason.SCRIPT_FAILURE, "exit code 137\nKilled") == "infrastructure"
-    assert _infer_category(FailureReason.SCRIPT_FAILURE, "nothing recognizable here") == "unknown"
-
-
-_CATEGORY_FIXTURES = {
-    "npm_build_failure": "build",
-    "pytest_failure_verbose": "test",
-    "go_test_failure": "test",
-}
-_CATEGORY_PARAMS = [(p, c, _CATEGORY_FIXTURES[c]) for p, c in support.pairs_for(_CATEGORY_FIXTURES)]
+    assert _infer_category(FailureReason.RUNNER_SYSTEM) == "infrastructure"
+    assert _infer_category(FailureReason.NO_RUNNER) == "infrastructure"
+    assert _infer_category(FailureReason.TIMEOUT) == "timeout"
+    assert _infer_category(FailureReason.MISSING_DEPENDENCY) == "dependency"
+    # script_failure / unknown carry no deterministic category — the model decides.
+    assert _infer_category(FailureReason.SCRIPT_FAILURE) == "unknown"
+    assert _infer_category(FailureReason.UNKNOWN) == "unknown"
 
 
 @pytest.mark.parametrize(
-    "provider,fixture,expected", _CATEGORY_PARAMS, ids=[f"{p}-{c}" for p, c, _ in _CATEGORY_PARAMS]
+    "provider,fixture",
+    support.pairs_for(["npm_build_failure", "pytest_failure_verbose", "go_test_failure"]),
+    ids=lambda v: v if isinstance(v, str) else "",
 )
-def test_deterministic_category_from_fixture(provider, fixture, expected):
-    """Offline replay, with no metadata and no LLM, still classifies correctly."""
+def test_deterministic_report_leaves_script_category_to_the_model(provider, fixture):
+    """With no LLM, a script failure's category is 'unknown' — never guessed from the log."""
     log = support.read_log(provider, fixture)
     job, attr, bundle, cfg = _pipeline(log, reason=FailureReason.UNKNOWN, provider=provider)
     report = produce_report(job, attr, bundle, cfg)  # deterministic
-    assert report.category == expected
+    assert report.category == "unknown"
 
 
 def test_litellm_backend_needs_no_api_base():

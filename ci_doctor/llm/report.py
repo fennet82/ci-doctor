@@ -11,7 +11,6 @@ never change the pipeline outcome.
 
 import json
 import logging
-import re
 from collections.abc import Mapping
 from importlib import resources
 from string import Template
@@ -37,8 +36,9 @@ _REMEDIATION = {
     FailureReason.UNMET_PREREQUISITES: "Verify job prerequisites (environments, approvals, variables) are satisfied.",
     FailureReason.SCRIPT_FAILURE: "Inspect the terminal command output in the excerpt and fix the failing command.",
 }
-#: Reasons that determine the category outright, no log inspection needed.
-#: `script_failure` is deliberately absent — it needs the evidence signatures below.
+#: Categories the provider reason settles on its own. A reason not here (notably
+#: `script_failure`) leaves the category to the model — the deterministic report
+#: does not guess an ecosystem from the log, which is the model's job.
 _CATEGORY: dict[FailureReason, Category] = {
     FailureReason.NO_RUNNER: "infrastructure",
     FailureReason.RUNNER_SYSTEM: "infrastructure",
@@ -46,79 +46,16 @@ _CATEGORY: dict[FailureReason, Category] = {
     FailureReason.MISSING_DEPENDENCY: "dependency",
 }
 
-#: ``(category, regex)`` pairs for when the reason alone can't classify (i.e.
-#: `script_failure`). **First match wins, so order is load-bearing** — GUIDELINES §5.3.
-#: ponytail: heuristic ceiling; the upgrade path is letting the model set category.
-_CATEGORY_SIGNATURES: list[tuple[Category, str]] = [
-    (
-        "infrastructure",
-        r"exit code 137|\bKilled\b|Out of memory|no space left on device|cannot allocate memory",
-    ),
-    # "timed out retrying" is Cypress's assertion-retry wording — a test failure,
-    # not a job timeout, so it must not be claimed here.
-    ("timeout", r"(?i)execution took longer than|timed out(?! retrying)|timeout exceeded|deadline exceeded"),
-    (
-        "permissions",
-        r"(?i)permission denied|403 forbidden|unauthorized|access denied|denied: requested access",
-    ),
-    ("config", r"on .+\.tf line \d+"),
-    # Unambiguous build/compile markers, checked before the broad `test` signature
-    # below — its \bFAILED\b would otherwise claim "Build FAILED." (dotnet),
-    # "Task :app:compileJava FAILED" (gradle) and "FAILED: Build did NOT complete" (bazel).
-    (
-        "build",
-        r"Build did NOT complete|Build FAILED|error (CS|MSB|AD)\d+|error\[E\d+\]|could not compile|\* What went wrong:",
-    ),
-    (
-        "test",
-        r"=+ FAILURES =+|--- FAIL\b|^FAIL\b|Tests run:.*Failures: [1-9]|●\s|AssertionError|\bFAILED\b|\bassert(ion)?\b.*(error|failed|==)|pytest"
-        r"|test result: FAILED|^\d+ examples?, [1-9]\d* failures?|There (was|were) \d+ (failure|error)|^FAILURES!"
-        r"|\[FAIL\]|Failed!\s+-\s+Failed:|^\s*\d+\) (Failure|Error):|CypressError|^\s*\d+\) .+ › "
-        r"|expect\(received\)|^\s*\d+ fail\b",
-    ),
-    (
-        "dependency",
-        r"(?i)ModuleNotFoundError|cannot find module|could not resolve|no matching distribution|unresolved (import|dependency)|could not find a version"
-        r"|your requirements could not be resolved|could not find gem|Bundler::(GemNotFound|VersionConflict)"
-        r"|no matching package named|error NU\d+"
-        r"|ERR_PNPM_\w+|couldn't find package|YN0082|no candidates found|no version matching|ERR_MODULE_NOT_FOUND",
-    ),
-    (
-        "build",
-        r"error TS\d+|BUILD FAILURE|make(\[\d+\])?: \*\*\*|\bcmake\b|compilation (terminated|failed)|cannot find symbol|undefined reference|npm ERR!|failed to solve|\blinker\b|\btsc\b"
-        r"|PHP Parse error|collect2: error|✖ \d+ problems?|Found \d+ errors? in \d+ files?",
-    ),
-    # The app itself crashed. Deliberately LAST: a traceback also shows up in a
-    # pytest failure (test) and in a ModuleNotFoundError crash (dependency), and
-    # both of those are the more actionable answer.
-    (
-        "runtime",
-        r"Traceback \(most recent call last\):|^panic: |^fatal error: |rake aborted!|PHP Fatal error"
-        r"|Exception in thread |Uncaught \w*(Error|Exception)|Segmentation fault|core dumped"
-        r"|node:internal/|^Node\.js v\d+",
-    ),
-]
 
+def _infer_category(reason: FailureReason) -> Category:
+    """Categorise from the provider reason alone; "unknown" when it can't decide.
 
-def _infer_category(reason: FailureReason, text: str) -> Category:
-    """Classify a failure without asking a model.
-
-    Args:
-        reason: The normalised provider reason.
-        text: The blamed evidence plus the terminal line.
-
-    Returns:
-        A category from :data:`~ci_doctor.llm.schema.Category`, or "unknown" when
-        nothing matched. The reason wins when it can decide alone; otherwise the
-        first matching signature does.
+    Deliberately does not read the log: classifying a script failure as test/build/
+    runtime means matching tool-specific regexes (pytest, tsc, go…) that duplicate the
+    matcher catalogue and belong to the model. Without an LLM the category is honestly
+    "unknown" — the phase still says where it broke.
     """
-    mapped = _CATEGORY.get(reason)
-    if mapped:
-        return mapped
-    for category, pattern in _CATEGORY_SIGNATURES:
-        if re.search(pattern, text, re.MULTILINE):
-            return category
-    return "unknown"
+    return _CATEGORY.get(reason, "unknown")
 
 
 def client_for_run(cfg: Config, environ: Mapping[str, str] | None = None) -> LLMClient | None:
@@ -302,7 +239,7 @@ def deterministic_report(
     if degraded:
         factors.append("ci-doctor could not reach the LLM; this is the deterministic fallback report.")
 
-    category = _infer_category(attr.reason, f"{blamed}\n{attr.terminal_evidence or ''}")
+    category = _infer_category(attr.reason)
     return Report(
         summary=f"{job.name} failed in the {attr.phase} phase ({attr.reason})."[:140],
         failure_phase=attr.phase,

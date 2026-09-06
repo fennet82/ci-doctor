@@ -230,19 +230,15 @@ pins that.
 New language pack → `defaults.yml`, always. Touch `_ERROR_RE` only when a **runner**
 has a failure marker we cannot see.
 
-### 5.3 Add a deterministic category signature
+### 5.3 The failure category
 
-`_CATEGORY_SIGNATURES` in `llm/report.py` is an **ordered, first-match-wins** list.
-Order is the whole game:
-
-- `infrastructure` / `timeout` / `permissions` first — an OOM'd build is infra, not build.
-- Narrow, unambiguous build markers before `test` — the broad `\bFAILED\b` test
-  signature would otherwise claim `Build FAILED.`.
-- `runtime` **last** — a traceback also appears in a pytest failure (`test`) and a
-  missing-import crash (`dependency`), and both are more actionable answers.
-
-Any new signature that could collide gets a case in
-`test_runtime_never_outranks_a_more_actionable_category`.
+`_CATEGORY` in `llm/report.py` maps a provider **reason** to a category when the reason
+settles it (`no_runner`/`runner_system` → infrastructure, `timeout`, `missing_dependency`).
+A `script_failure` has no deterministic category: classifying it as test/build/runtime
+would mean matching tool-specific regexes (pytest, tsc, go…) that duplicate the matcher
+catalogue and belong to the model. So without an LLM the category is honestly `unknown`
+— the deterministic pipeline still decides the **phase** (where it broke); the model
+decides the category (what kind). Do not reintroduce log-signature category guessing here.
 
 ### 5.4 Add a provider
 
@@ -307,8 +303,6 @@ Real bugs, kept here so they don't recur:
   `NullHighlighter()`.
 - **A `Panel` `subtitle=` is drawn inside the bottom border** and is cropped to the box
   width. Long text belongs in the body, not the border.
-- **Category order is load-bearing.** See §5.3. Adding a signature at the wrong
-  position silently mislabels whole ecosystems.
 - **A matcher that matches nothing fails silently** — the tail window still returns
   output, so the test looks fine. Assert on `_windows_for(...)` being non-empty.
 - **The report is the last place evidence can be lost, and it was losing it.**
