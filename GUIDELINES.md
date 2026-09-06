@@ -31,12 +31,14 @@ ci_doctor/
   core/             provider-neutral: models, ports, attribution (pure), denoise,
                     extract, budget, redact, analyze
   llm/              Report schema, prompt templates, backends
+  memory/           vector-store backends for run history (VectorStore port impls)
   render/           terminal (rich), markdown
   providers/
     registry.py     vendor name -> adapter / segmenter, imported on demand
     gitlab/         python-gitlab adapter + segmenter + reasons
     github/         PyGithub adapter + segmenter + reasons
 tests/              fixtures + golden-file attribution suite
+e2e/                opt-in vector-store suite against docker — `mise run test:e2e`
 docs/site/          Astro documentation site — see docs/site/GUIDELINES.md before editing
 examples/           .gitlab-ci.yml + GitHub Actions workflows
 ```
@@ -50,6 +52,7 @@ examples/           .gitlab-ci.yml + GitHub Actions workflows
 | Blame/classification logic | `core/attribution.py` | Pure function. No I/O, network, or clock. |
 | Evidence selection | `core/{denoise,extract,budget}.py` | Config-driven where possible. |
 | An LLM backend | `llm/backends.py` | Lazy-import the SDK inside the client. |
+| A vector store (run memory) | `memory/backends.py` | Implements `VectorStore`. Lazy-import the SDK; ship it as an optional extra. |
 | A new command | `cli.py` (surface) + `pipeline.py` (work) | Anything a non-terminal caller would also want belongs in `pipeline.py`. |
 | Output format | `render/` | Implements the `Renderer` port. |
 | A matcher / language pack | `config/defaults.yml` | **Data, not code.** See §5.1. |

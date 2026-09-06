@@ -141,6 +141,17 @@ const packages = [
         ],
     },
     {
+        dir: "memory/",
+        blurb: "Vector-store backends for run history. Scaffolding: off by default, no consumer yet.",
+        files: [
+            {
+                path: "backends.py",
+                entry: "make_store()",
+                role: "`pinecone`, `qdrant`, `milvus`, `weaviate`, `pgvector`, each implementing the `VectorStore` port and lazy-importing its SDK (an optional extra). The port speaks raw vectors; embedding is the caller's job.",
+            },
+        ],
+    },
+    {
         dir: "render/",
         blurb: "Presentation only — no decisions live here.",
         files: [

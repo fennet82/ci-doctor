@@ -199,6 +199,129 @@ class RedactionConfig(_Strict):
     )
 
 
+class MemoryConfig(_Strict):
+    """Optional vector store for remembering past runs.
+
+    Off by default and inert until a consumer uses it, so it cannot affect a
+    normal run. Each backend's SDK is an optional extra (``ci-doctorr[qdrant]``),
+    lazy-imported only when selected. Backend-specific settings live in a nested
+    object per backend (``memory.pinecone``, ``memory.pgvector``, …).
+    """
+
+    class Pinecone(_Strict):
+        """Pinecone (managed cloud) connection."""
+
+        api_key_env: str | None = Field(
+            None, description="Env var name holding the Pinecone API key. The key is never a config value."
+        )
+        cloud: str = Field("aws", description="Serverless cloud for a created index — aws, gcp or azure.")
+        region: str = Field("us-east-1", description="Serverless region for a created index, e.g. us-east-1.")
+
+    class Qdrant(_Strict):
+        """Qdrant connection."""
+
+        url: str | None = Field(None, description="Qdrant endpoint URL, e.g. http://localhost:6333.")
+        api_key_env: str | None = Field(
+            None, description="Env var name holding the Qdrant API key (cloud only). Never a config value."
+        )
+
+    class Milvus(_Strict):
+        """Milvus / Zilliz connection."""
+
+        url: str | None = Field(None, description="Milvus URI, e.g. http://localhost:19530.")
+        api_key_env: str | None = Field(
+            None, description="Env var name holding the Milvus token. The token is never a config value."
+        )
+
+    class Weaviate(_Strict):
+        """Weaviate connection."""
+
+        url: str | None = Field(None, description="Weaviate HTTP URL, e.g. http://localhost:8080.")
+        api_key_env: str | None = Field(
+            None, description="Env var name holding the Weaviate API key. The key is never a config value."
+        )
+        grpc_host: str | None = Field(
+            None, description="gRPC host if it differs from the URL host. Weaviate serves gRPC separately."
+        )
+        grpc_port: int = Field(50051, description="gRPC port. Weaviate serves gRPC separately from HTTP.")
+
+    class PgVector(_Strict):
+        """Postgres + pgvector connection."""
+
+        dsn_env: str | None = Field(
+            None, description="Env var name holding the Postgres DSN. The DSN is never a config value."
+        )
+        dsn_file: str | None = Field(
+            None, description="Path to a file holding the Postgres DSN. Wins over dsn_env."
+        )
+
+    enabled: bool = Field(
+        False,
+        description="Enable the vector store. Off by default; does nothing until a consumer reads or writes it.",
+    )
+    backend: Literal["pinecone", "qdrant", "milvus", "weaviate", "pgvector"] | None = Field(
+        None,
+        description=(
+            "Vector store: pinecone | qdrant | milvus | weaviate | pgvector. Required when enabled — "
+            "there is no default, and each is an optional extra, e.g. ci-doctorr[qdrant]."
+        ),
+    )
+    collection: str = Field(
+        "ci_doctor_runs", description="Collection / index / table name the vectors live in."
+    )
+    dimension: int = Field(
+        1536,
+        ge=1,
+        description="Embedding dimension. Must match the model that produced the vectors; most backends fix it at creation.",
+    )
+    timeout_seconds: int = Field(30, description="Per-request timeout for vector store calls.")
+    ca_bundle: str | None = Field(
+        None,
+        description=(
+            "Path to a CA bundle for the store's TLS endpoint. Wired for pinecone, qdrant and "
+            "milvus; weaviate honours the standard SSL_CERT_FILE env var, and pgvector takes TLS "
+            "options in its DSN (sslmode/sslrootcert)."
+        ),
+    )
+    verify_ssl: bool = Field(
+        True,
+        description=(
+            "Verify the store endpoint's TLS certificate. Honoured by pinecone and qdrant; "
+            "milvus/weaviate/pgvector configure TLS through their own mechanism (see ca_bundle)."
+        ),
+    )
+    pinecone: Pinecone = Field(
+        default_factory=Pinecone, description="Pinecone settings; used when backend is pinecone."
+    )
+    qdrant: Qdrant = Field(
+        default_factory=Qdrant, description="Qdrant settings; used when backend is qdrant."
+    )
+    milvus: Milvus = Field(
+        default_factory=Milvus, description="Milvus settings; used when backend is milvus."
+    )
+    weaviate: Weaviate = Field(
+        default_factory=Weaviate, description="Weaviate settings; used when backend is weaviate."
+    )
+    pgvector: PgVector = Field(
+        default_factory=PgVector, description="pgvector settings; used when backend is pgvector."
+    )
+
+    @model_validator(mode="after")
+    def _backend_required_when_enabled(self) -> "MemoryConfig":
+        """Refuse an enabled store with no backend chosen.
+
+        Returns:
+            Self, unchanged.
+
+        Raises:
+            ValueError: If ``enabled`` is true but ``backend`` is unset — guessing a
+                vendor would silently pick the wrong store.
+        """
+        if self.enabled and self.backend is None:
+            raise ValueError("memory.enabled is true but memory.backend is not set")
+        return self
+
+
 class Config(_Strict):
     """The full ``.ci-doctor.yml`` document. Every key is optional."""
 
@@ -241,6 +364,9 @@ class Config(_Strict):
     denoise: DenoiseConfig = Field(default_factory=DenoiseConfig, description="Log cleanup.")
     output: OutputConfig = Field(default_factory=OutputConfig, description="Report destinations.")
     redaction: RedactionConfig = Field(default_factory=RedactionConfig, description="Secret scrubbing.")
+    memory: MemoryConfig = Field(
+        default_factory=MemoryConfig, description="Vector store for remembering past runs. Off by default."
+    )
 
     @model_validator(mode="after")
     def _fold_deprecated_provider(self) -> "Config":

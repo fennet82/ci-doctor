@@ -8,7 +8,7 @@ provider name over core/ must return nothing (keep this file free of them too).
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 #: Output before the first section marker, and after the last one. Every segmenter
 #: emits both so no line is lost; part of the :class:`Section` contract, which is why
@@ -222,3 +222,37 @@ class Run:
     web_url: str = ""
     mr: MergeRequestRef | None = None
     jobs: list[Job] = field(default_factory=list)
+
+
+@dataclass
+class VectorRecord:
+    """One item to store in a vector store: an embedding plus its metadata.
+
+    Attributes:
+        id: Stable identifier. Re-storing the same id upserts rather than
+            duplicates, and a search hit reports this id back unchanged.
+        vector: The embedding. Its length must match the store's configured
+            dimension — the store never embeds anything itself.
+        payload: Arbitrary metadata kept alongside the vector and returned on a
+            hit. Its contents are the caller's concern, not the store's.
+    """
+
+    id: str
+    vector: list[float]
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class VectorHit:
+    """One similarity-search result from a vector store.
+
+    Attributes:
+        id: The stored record's id, exactly as it was added.
+        score: Similarity to the query; higher is nearer. Each backend normalises
+            its own metric onto that convention.
+        payload: The metadata stored with the record.
+    """
+
+    id: str
+    score: float
+    payload: dict[str, Any] = field(default_factory=dict)

@@ -35,6 +35,18 @@ run = "uv run pytest -q"
 description = "Run the suite with coverage, against the floor CI enforces"
 run = "uv run pytest -q --cov"
 
+[tasks."test:e2e"]
+description = "Boot the vector stores in docker and run the e2e suite against them"
+run = '''
+set -e
+compose="docker compose -f e2e/docker-compose.yml"
+$compose up -d
+trap "$compose down -v" EXIT
+# --extra all pulls every vector-store SDK into the run env; the suite skips any
+# backend whose container is not up, so a partial boot narrows it rather than failing.
+uv run --extra all pytest e2e -q
+'''
+
 # UV_PROJECT_ENVIRONMENT gives each version its own cached .venv-3.x; without it
 # `uv run --python 3.11` rebuilds the default .venv and leaves you on whichever
 # version ran last. Versions are pinned to ci.yml by tests/test_python_versions.py.

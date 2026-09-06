@@ -40,7 +40,22 @@ Changelog = "https://github.com/fennet82/ci-doctor/blob/master/CHANGELOG.md"
 # Optional LLM backends (base install stays lean/air-gap-clean). openai is included
 # in the base deps; claude_code needs only the `claude` CLI on PATH.
 litellm = ["litellm>=1.40"]
-all = ["litellm>=1.40"]
+# Optional run-memory (E10) vector-store backends, each lazy-imported in memory/backends.py.
+pinecone = ["pinecone>=5"]
+qdrant = ["qdrant-client>=1.7"]
+milvus = ["pymilvus>=2.4"]
+weaviate = ["weaviate-client>=4.16"]  # vector_config / Configure.Vectors (older uses deprecated args)
+pgvector = ["psycopg[binary]>=3.1", "psycopg-pool>=3.2", "pgvector>=0.3"]
+all = [
+    "litellm>=1.40",
+    "pinecone>=5",
+    "qdrant-client>=1.7",
+    "pymilvus>=2.4",
+    "weaviate-client>=4.16",
+    "psycopg[binary]>=3.1",
+    "psycopg-pool>=3.2",
+    "pgvector>=0.3",
+]
 
 [project.scripts]
 ci-doctor = "ci_doctor.cli:main"
@@ -84,6 +99,7 @@ convention = "google"
 # ANN off for tests: a test function returns None and says so by being a test.
 # `support.py` and `conftest.py` are annotated anyway — they are shared code.
 "tests/**" = ["S101", "S603", "ANN"]  # assert is the test; subprocess there is fixture setup
+"e2e/**" = ["S101", "S603", "ANN"]  # opt-in e2e suite: assert is the test, same as tests/
 "ci_doctor/cli.py" = ["B008"]  # typer declares options as call-valued defaults, by design
 
 [tool.pytest.ini_options]

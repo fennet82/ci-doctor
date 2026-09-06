@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ci_doctor.core.models import Job, MergeRequestRef, Run, Section
+    from ci_doctor.core.models import Job, MergeRequestRef, Run, Section, VectorHit, VectorRecord
     from ci_doctor.llm.schema import Report
 
 
@@ -108,6 +108,69 @@ class LLMClient(ABC):
         Raises:
             Exception: Any backend failure. Callers degrade to the deterministic
                 report rather than failing the run.
+        """
+
+
+class VectorStore(ABC):
+    """Store and similarity-search embedding vectors.
+
+    Neutral by design (invariant #2): no vector-DB vendor name appears here.
+    Concrete backends live in ``ci_doctor/memory/backends.py`` and lazy-import
+    their SDKs, exactly as the LLM backends do for :class:`LLMClient`. The port
+    speaks *vectors*, never text — embedding is the caller's concern, kept out so
+    the store depends on no model.
+
+    A hit reports the same ``id`` the record was stored under, whatever the backend
+    uses internally as a key.
+    """
+
+    @abstractmethod
+    def ensure_collection(self, dimension: int) -> None:
+        """Create the collection/index/table if absent; a no-op if it exists.
+
+        Args:
+            dimension: Length every stored vector will have. Most backends fix this
+                at creation, so it is set here rather than inferred per add.
+        """
+
+    @abstractmethod
+    def add(self, records: "list[VectorRecord]") -> None:
+        """Upsert records by id.
+
+        Args:
+            records: Vectors plus metadata. Re-adding an existing id overwrites it,
+                so a re-analyzed run does not accumulate duplicates.
+        """
+
+    @abstractmethod
+    def search(
+        self, vector: "list[float]", k: int, filter: "dict[str, Any] | None" = None
+    ) -> "list[VectorHit]":
+        """Return the k nearest records to a query vector.
+
+        Args:
+            vector: The query embedding.
+            k: Maximum number of hits to return.
+            filter: Optional exact-match metadata constraints (e.g. ``{"repo": "x"}``);
+                each backend translates it to its own filter language.
+
+        Returns:
+            Up to k hits, nearest first (highest score first).
+        """
+
+    @abstractmethod
+    def delete(self, ids: "list[str]") -> None:
+        """Delete records by id.
+
+        Args:
+            ids: Ids to remove. Ids that are absent are ignored, not an error.
+        """
+
+    def close(self) -> None:  # noqa: B027 - optional lifecycle hook; no-op default backends may override
+        """Release any open connection. A no-op for backends that hold none.
+
+        Safe to call more than once. A long-lived host must call this; a one-shot
+        process may rely on exit to reclaim the connection instead.
         """
 
 

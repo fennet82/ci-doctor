@@ -93,7 +93,34 @@ output:
 
 redaction:
   enabled: true
-  extra_patterns: []             # additional regexes to scrub`;
+  extra_patterns: []             # additional regexes to scrub
+
+memory:                          # vector store for run history — scaffolding, no consumer yet
+  enabled: false                 # nothing runs until enabled
+  backend: null                  # pinecone | qdrant | milvus | weaviate | pgvector
+  collection: ci_doctor_runs     # collection / index / table name
+  dimension: 1536                # must match the embedding model that produces the vectors
+  timeout_seconds: 30
+  ca_bundle: null                # TLS CA for the endpoint (pinecone/qdrant/milvus)
+  verify_ssl: true               # pinecone/qdrant; others use their own TLS mechanism
+  pinecone:                      # backend: pinecone
+    api_key_env: null            # env var name holding the API key
+    cloud: aws                   # aws | gcp | azure
+    region: us-east-1
+  qdrant:                        # backend: qdrant
+    url: null                    # e.g. http://localhost:6333
+    api_key_env: null            # cloud only
+  milvus:                        # backend: milvus
+    url: null                    # e.g. http://localhost:19530
+    api_key_env: null            # token
+  weaviate:                      # backend: weaviate
+    url: null                    # e.g. http://localhost:8080
+    api_key_env: null
+    grpc_host: null              # gRPC host if it differs from the URL host
+    grpc_port: 50051
+  pgvector:                      # backend: pgvector
+    dsn_env: null                # env var name holding the Postgres DSN
+    dsn_file: null               # or a file holding it (wins over dsn_env)`;
 ---
 
 <Base title="Configuration">
@@ -205,6 +232,22 @@ redaction:
         repository it is analyzing. One consequence:
         <code>llm.temperature</code> has no effect on this backend, because
         <code>claude -p</code> exposes no temperature flag.
+    </div>
+
+    <h2>Run memory (vector stores)</h2>
+    <p>
+        <code>memory.*</code> configures a vector store for remembering past runs, with
+        a backend per store: <code>pinecone</code>, <code>qdrant</code>,
+        <code>milvus</code>, <code>weaviate</code> or <code>pgvector</code>. Each ships
+        as an optional extra (e.g. <code>pip install ci-doctorr[qdrant]</code>) and its
+        SDK loads only when selected, so the base install stays lean. Secrets are named
+        by env var (<code>api_key_env</code>, pgvector's <code>dsn_env</code>), never
+        stored in config.
+    </p>
+    <div class="note">
+        <strong>Scaffolding.</strong> The store is <code>disabled</code> by default and
+        nothing reads or writes it yet — it is the storage layer a later feature builds
+        on, documented here because the config surface already exists.
     </div>
 
     <h2>Full reference</h2>
