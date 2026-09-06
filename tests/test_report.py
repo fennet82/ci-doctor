@@ -1,7 +1,7 @@
 """LLM report tests.
 
-Deterministic path, LLM path with recorded responses, degraded fallback, and
-the end-to-end secret round-trip. No network.
+Deterministic path, LLM path with recorded responses, repair retry, degraded
+fallback, and the end-to-end secret round-trip. No network.
 """
 
 import pytest
@@ -130,13 +130,13 @@ def test_the_llm_cannot_overrule_the_attributed_phase():
     assert report.summary == _GOOD["summary"]  # only the phase is overruled
 
 
-def test_invalid_reply_degrades_without_a_second_call_here():
-    """An invalid reply degrades directly — the retry lives in the backend, not here."""
+def test_repair_retry_on_invalid_then_valid():
+    """An invalid reply triggers exactly one repair retry, which then succeeds."""
     job, attr, bundle, cfg = _pipeline(_SIMPLE_LOG, overrides=_LLM_ON)
     client = FakeClient([{"not": "a valid report"}, _GOOD])
     report = produce_report(job, attr, bundle, cfg, client=client)
-    assert client.calls == 1  # no retry issued from report.py itself
-    assert any("deterministic fallback" in f for f in report.contributing_factors)
+    assert report.summary == "unit tests failed on assert"
+    assert client.calls == 2  # one repair retry happened
 
 
 def test_infer_category_from_evidence():

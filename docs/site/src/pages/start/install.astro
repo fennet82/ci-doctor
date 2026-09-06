@@ -15,17 +15,7 @@ docker run --rm ci-doctor:latest --version`;
 const action = `# GitHub Actions — nothing to install at all
 - uses: fennet82/ci-doctor@master`;
 
-const extras = `# openai backend (Ollama, vLLM, llama.cpp, most gateways, OpenAI itself)
-pip install "ci-doctorr[openai]"
-
-# anthropic backend (the Anthropic Messages API directly)
-pip install "ci-doctorr[anthropic]"
-
-# bedrock backend (Amazon Bedrock, AWS IAM auth)
-pip install "ci-doctorr[bedrock]"
-
-# litellm backend (everything else — Vertex, Cohere, watsonx, ~100 providers)
-# mutually exclusive with [openai]/[azure] — see Configuration for why
+const extras = `# litellm backend (Bedrock, Vertex, Azure — the clouds OpenAI's shape can't reach)
 pip install "ci-doctorr[litellm]"`;
 ---
 
@@ -61,14 +51,15 @@ pip install "ci-doctorr[litellm]"`;
 
     <h2>Optional extras</h2>
     <p>
-        There is no default LLM SDK in the base install — pick the extra for
-        the provider you're using:
+        The base install covers the <code>openai</code> LLM backend, which is what
+        Ollama, vLLM, llama.cpp and most gateways already speak. Only the cloud providers
+        with their own auth need more:
     </p>
     <Code code={extras} lang="bash" theme="github-dark" />
     <p>
         <code>litellm</code> may pull <code>tiktoken</code>, which fetches its
         vocabulary at runtime — so it is unfit for a strict air gap. The
-        backends, including which extras are mutually exclusive, are compared on
+        backends are compared on
         <a href={url("/reference/configuration/")}>Configuration</a>.
     </p>
 
