@@ -7,6 +7,7 @@ schema is covered end-to-end in tests/test_report.py.
 """
 
 import asyncio
+import os
 import sys
 import time
 import types
@@ -456,15 +457,35 @@ def test_bedrock_builds_with_only_a_region(aws_env):
     assert model.model_name == "anthropic.claude-opus-4-6-v1:0"
 
 
-def test_bedrock_ca_bundle_reaches_the_boto_client(aws_env):
-    """Bedrock has no `http_client`; a CA bundle becomes `verify=` on the boto client it is handed."""
+def test_bedrock_ca_bundle_reaches_the_boto_client(aws_env, monkeypatch):
+    """Bedrock has no `http_client`; the bundle reaches boto via AWS_CA_BUNDLE, then is removed again."""
     pytest.importorskip("boto3")
+    monkeypatch.delenv("AWS_CA_BUNDLE", raising=False)
     model = backends._generic_model(
         _llm(backend="bedrock", model="m", aws_region="us-east-1", ca_bundle=certifi.where()), {}
     )
-    boto_client = model.client
-    assert boto_client.meta.region_name == "us-east-1"
-    assert boto_client._endpoint.http_session._verify == certifi.where()
+    assert model.client._endpoint.http_session._verify == certifi.where()
+    assert "AWS_CA_BUNDLE" not in os.environ
+
+
+def test_bedrock_ca_bundle_restores_a_preexisting_variable(monkeypatch):
+    """A caller's own AWS_CA_BUNDLE survives, even when the build fails."""
+    monkeypatch.setenv("AWS_CA_BUNDLE", "/mine.pem")
+    with pytest.raises(RuntimeError), backends._aws_ca_bundle("/ours.pem"):
+        assert os.environ["AWS_CA_BUNDLE"] == "/ours.pem"
+        raise RuntimeError
+    assert os.environ["AWS_CA_BUNDLE"] == "/mine.pem"
+
+
+def test_bedrock_keeps_the_providers_own_setup_with_a_ca_bundle(aws_env, monkeypatch):
+    """A bearer token still works alongside a CA bundle (a pre-built boto client would skip it)."""
+    pytest.importorskip("boto3")
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "tok")
+    model = backends._generic_model(
+        _llm(backend="bedrock", model="m", aws_region="us-east-1", ca_bundle=certifi.where()), {}
+    )
+    assert model.client.meta.config.signature_version == "bearer"
+    assert model.client.meta.config.read_timeout == 300
 
 
 def test_bedrock_falls_back_to_the_aws_region_env_var(aws_env, monkeypatch):

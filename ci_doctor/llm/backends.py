@@ -21,11 +21,12 @@ costs nothing on a run that never reaches a model.
 """
 
 import asyncio
+import contextlib
 import inspect
 import os
 import ssl
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from typing import TYPE_CHECKING, Any, get_args
 
 from ci_doctor.config.schema import LLMConfig
@@ -71,14 +72,26 @@ def _provider_kwargs(provider_class: type, cfg: LLMConfig, environ: Mapping[str,
     return kwargs
 
 
-def _bedrock_kwargs(cfg: LLMConfig) -> dict[str, Any]:
-    """Region, plus a boto client when a CA bundle is set — the provider has no `http_client`."""
-    if not cfg.ca_bundle:
-        return {"region_name": cfg.aws_region}
-    import boto3
+@contextlib.contextmanager
+def _aws_ca_bundle(path: str | None) -> Iterator[None]:
+    """Expose `llm.ca_bundle` to boto as `AWS_CA_BUNDLE` while the Bedrock provider builds its client.
 
-    region = cfg.aws_region or os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION")
-    return {"bedrock_client": boto3.client("bedrock-runtime", region_name=region, verify=cfg.ca_bundle)}
+    The provider has no `http_client`, and handing it a ready-made boto client would skip its
+    own setup (bearer-token auth, 300s read timeout). boto reads the variable once, at client
+    creation, so it is restored straight after.
+    """
+    if not path:
+        yield
+        return
+    previous = os.environ.get("AWS_CA_BUNDLE")
+    os.environ["AWS_CA_BUNDLE"] = path
+    try:
+        yield
+    finally:
+        if previous is None:
+            del os.environ["AWS_CA_BUNDLE"]
+        else:
+            os.environ["AWS_CA_BUNDLE"] = previous
 
 
 #: Arguments a provider needs beyond the generic three. Each takes the config and the
@@ -88,7 +101,7 @@ _EXTRA_KWARGS: dict[str, Callable[[LLMConfig, dict[str, Any]], dict[str, Any]]] 
     "openai": lambda cfg, kw: {"api_key": kw.get("api_key") or "no-key"},
     "azure": lambda cfg, kw: {"azure_endpoint": cfg.azure_endpoint, "api_version": cfg.azure_api_version},
     # AWS auth comes from the environment/IAM (boto3's chain), not an API key.
-    "bedrock": lambda cfg, kw: _bedrock_kwargs(cfg),
+    "bedrock": lambda cfg, kw: {"region_name": cfg.aws_region},
     "bedrock-mantle": lambda cfg, kw: {"region_name": cfg.aws_region},
     "google-cloud": lambda cfg, kw: {
         k: v for k, v in {"project": cfg.gcp_project, "location": cfg.gcp_location}.items() if v
@@ -119,7 +132,8 @@ def _generic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     kwargs = _provider_kwargs(provider_class, cfg, environ)
     if extra := _EXTRA_KWARGS.get(cfg.backend):
         kwargs.update(extra(cfg, kwargs))
-    provider = provider_class(**kwargs)
+    with _aws_ca_bundle(cfg.ca_bundle if cfg.backend == "bedrock" else None):
+        provider = provider_class(**kwargs)
     _apply_max_retries(provider, cfg)
     return infer_model(f"{kind}:{model_name}", provider_factory=lambda _: provider)
 
