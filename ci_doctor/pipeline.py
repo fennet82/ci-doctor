@@ -158,14 +158,18 @@ def _analyze(jobs: list[Job], cfg: Config, segmenter: LogSegmenter | None = None
     from ci_doctor.llm.report import client_for_run
 
     client = client_for_run(cfg)
-    workers = min(cfg.analysis.max_parallel_jobs, len(jobs))
-    if workers <= 1:
-        return [process_job(job, cfg, segmenter, client) for job in jobs]
-    log.debug("analyzing %d job(s) across %d workers", len(jobs), workers)
-    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="ci-doctor") as pool:
-        # `map` yields in submission order, so the report reads chronologically even
-        # though the jobs finished in whatever order the endpoint answered them.
-        return list(pool.map(lambda job: process_job(job, cfg, segmenter, client), jobs))
+    try:
+        workers = min(cfg.analysis.max_parallel_jobs, len(jobs))
+        if workers <= 1:
+            return [process_job(job, cfg, segmenter, client) for job in jobs]
+        log.debug("analyzing %d job(s) across %d workers", len(jobs), workers)
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="ci-doctor") as pool:
+            # `map` yields in submission order, so the report reads chronologically even
+            # though the jobs finished in whatever order the endpoint answered them.
+            return list(pool.map(lambda job: process_job(job, cfg, segmenter, client), jobs))
+    finally:
+        if client is not None:
+            client.close()
 
 
 def analyze_log(path: Path, cfg: Config) -> list[JobResult]:

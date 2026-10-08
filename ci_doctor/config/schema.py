@@ -75,21 +75,58 @@ class LLMConfig(_Strict):
     """
 
     enabled: bool = Field(True, description="Set false for a deterministic-only report with no LLM call.")
-    backend: Literal["openai", "litellm", "claude_code"] = Field(
+    backend: Literal[
+        "openai",
+        "anthropic",
+        "azure",
+        "bedrock",
+        "bedrock-mantle",
+        "google",
+        "google-cloud",
+        "groq",
+        "mistral",
+        "cohere",
+        "xai",
+        "huggingface",
+        "litellm",
+    ] = Field(
         "openai",
         description=(
-            "openai: any OpenAI-compatible endpoint (needs api_base). litellm: providers the "
-            "OpenAI shape cannot reach — Bedrock, Vertex, Azure. claude_code: the local `claude` CLI."
+            "Which provider to call. openai: any OpenAI-compatible endpoint (needs api_base), "
+            "self-hosted Ollama/vLLM/LM Studio included. azure: needs azure_endpoint. bedrock, "
+            "bedrock-mantle: AWS IAM auth, not an API key. google: Gemini API. google-cloud: "
+            "Vertex AI (project/location, or an API key). anthropic, groq, mistral, cohere, xai, "
+            "huggingface: the provider's own API. litellm: any other provider litellm reaches, "
+            'by its own model-string convention, e.g. model: "vertex_ai/gemini-1.5-pro".'
         ),
     )
     model: str | None = Field(None, description='Model identifier, e.g. "qwen2.5-coder:32b".')
     api_base: str | None = Field(None, description="Base URL of the OpenAI-compatible / litellm endpoint.")
     api_key_env: str | None = Field(
         None,
-        description="Name of the env var holding the LLM API key. Often unset — local servers need no key.",
+        description="Name of the env var holding the LLM API key. Often unset — local servers need no key, "
+        "and a hosted backend without this set falls back to its own default env var (e.g. ANTHROPIC_API_KEY).",
     )
     ca_bundle: str | None = Field(
         None, description="CA bundle for the LLM endpoint, independent of the CI provider's."
+    )
+    azure_endpoint: str | None = Field(
+        None, description="Azure OpenAI resource endpoint URL. Required for the azure backend."
+    )
+    azure_api_version: str | None = Field(
+        None, description="Azure OpenAI API version, e.g. 2024-10-21. Required for the azure backend."
+    )
+    aws_region: str | None = Field(
+        None,
+        description="AWS region for the bedrock and bedrock-mantle backends. Falls back to "
+        "AWS_DEFAULT_REGION/AWS_REGION if unset; one of the two must resolve to something.",
+    )
+    gcp_project: str | None = Field(
+        None,
+        description="Google Cloud project for the google-cloud backend. Falls back to the environment's.",
+    )
+    gcp_location: str | None = Field(
+        None, description="Google Cloud location for the google-cloud backend, e.g. us-central1 or global."
     )
     max_input_tokens: int = Field(
         12000,
@@ -98,14 +135,18 @@ class LLMConfig(_Strict):
     temperature: float = Field(
         0.1, description="Sampling temperature. Low keeps the postmortem reproducible."
     )
-    timeout_seconds: int = Field(120, description="Timeout for the single LLM call.")
+    timeout_seconds: int = Field(
+        120,
+        description="Wall-clock budget for one LLM call, schema-repair retry and SDK retries included. "
+        "Also the per-request timeout.",
+    )
     max_retries: int = Field(
         1,
         ge=0,
-        description=(
-            "HTTP-level retries per request, handed to the SDK. Kept low on purpose: the "
-            "repair retry in llm/report.py already retries, and the two multiply."
-        ),
+        description="HTTP-transport retries per request, set on the provider's SDK client. Applies to "
+        "providers whose SDK has the setting (openai, azure, anthropic, groq, ...); bedrock and "
+        "litellm keep their own. Kept low: Pydantic AI's own Agent already retries once on a "
+        "schema-invalid reply, and the two multiply.",
     )
 
 

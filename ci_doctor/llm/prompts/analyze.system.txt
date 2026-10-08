@@ -4,6 +4,3 @@ The failing phase is: $phase
 (decided by rule "$rule_id", confidence: $confidence)
 
 Explain the cause WITHIN that phase. Use only the evidence provided; do not invent file names, line numbers, or facts that are not present in the log. If the failure is infrastructure rather than the user's code, say so via is_infra_not_code.
-
-Respond with a SINGLE JSON object — no markdown, no prose, no code fences — matching this JSON schema:
-$schema
