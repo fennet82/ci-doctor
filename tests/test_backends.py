@@ -6,8 +6,10 @@ installed. `PydanticAILLMClient` runs against a stub output model — the real `
 schema is covered end-to-end in tests/test_report.py.
 """
 
+import asyncio
 import sys
 import types
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import certifi
@@ -108,6 +110,46 @@ def test_generic_path_leaves_an_unset_key_to_the_provider(fake_pydantic_ai):
     """No api_key_env -> None, so the provider reads its own default env var."""
     backends._generic_model(_llm(backend="groq", model="m"), {})
     assert _FakeProvider.built["api_key"] is None
+
+
+class _SdkClient:
+    """Stands in for an SDK client that exposes `max_retries` (openai, anthropic, groq)."""
+
+    max_retries = 2
+
+
+class _ClientProvider:
+    """A provider holding an SDK client, like `OpenAIProvider.client`."""
+
+    last: "_ClientProvider"
+
+    def __init__(self, **kwargs):
+        self.client = _SdkClient()
+        type(self).last = self
+
+
+def test_max_retries_reaches_the_sdk_client(fake_pydantic_ai):
+    """`llm.max_retries` is applied to a provider's SDK client, not just declared in the schema."""
+    fake_pydantic_ai["provider_class"] = _ClientProvider
+    backends._generic_model(_llm(backend="groq", model="m", max_retries=0), {})
+    assert _ClientProvider.last.client.max_retries == 0
+
+
+def test_max_retries_skips_providers_without_the_knob():
+    """A provider with no SDK client (bedrock via boto) is left alone, not crashed on."""
+    backends._apply_max_retries(_AnyProvider(), _llm(model="m", max_retries=0))
+    backends._apply_max_retries(SimpleNamespace(client=object()), _llm(model="m", max_retries=0))
+
+
+def test_a_missing_sdk_names_the_extra_to_install(monkeypatch):
+    """The ImportError points at ci-doctorr's extra, not at pydantic-ai-slim's."""
+
+    def boom(cfg, environ):
+        raise ImportError("No module named 'openai'")
+
+    monkeypatch.setattr(backends, "_generic_model", boom)
+    with pytest.raises(ImportError, match=r"ci-doctorr\[openai\]"):
+        make_client(_llm(backend="azure", model="m", azure_endpoint="https://x"))
 
 
 def test_ca_bundle_becomes_an_http_client_only_where_accepted(fake_pydantic_ai):
@@ -255,6 +297,24 @@ def test_agent_is_built_once_and_reused():
     client.complete_structured("second")
     assert client._agent_for() is first
     assert calls["n"] == 2
+
+
+def test_parallel_calls_share_one_event_loop():
+    """Every thread-pool call lands on one loop; `run_sync` would use a fresh one each time.
+
+    Pooled keep-alive connections are bound to the loop that opened them.
+    """
+    loops = set()
+
+    async def fake_llm(messages, info):
+        loops.add(id(asyncio.get_running_loop()))
+        return _reply('{"summary": "ok", "score": 1}')
+
+    client = PydanticAILLMClient(FunctionModel(fake_llm), _llm(model="m"))
+    with ThreadPoolExecutor(6) as pool:
+        results = list(pool.map(client.complete_structured, ["p"] * 12))
+    assert all(r == {"summary": "ok", "score": 1} for r in results)
+    assert len(loops) == 1
 
 
 def test_one_repair_retry_on_invalid_then_valid_reply():

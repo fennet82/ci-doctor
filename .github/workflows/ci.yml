@@ -90,6 +90,28 @@ jobs:
           echo "### Coverage — Python ${{ matrix.python-version }}" >> "$GITHUB_STEP_SUMMARY"
           uv run coverage report --format=markdown --fail-under=0 >> "$GITHUB_STEP_SUMMARY" || true
 
+  # The plain `test` job installs no backend SDK, so the tests that build each real
+  # provider skip there. This one installs every extra that can coexist (all but
+  # `litellm`, which conflicts with `openai`), so a Pydantic AI release that renames a
+  # provider constructor argument fails here instead of in a user's run.
+  providers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: >-
+          uv sync --extra openai --extra anthropic --extra bedrock --extra bedrock-mantle
+          --extra google --extra groq --extra mistral --extra cohere --extra xai --extra huggingface
+      - name: No provider test may skip
+        shell: bash   # -e -o pipefail, so a failing pytest is not masked by tee
+        run: |
+          uv run pytest -q tests/test_backends.py -rs | tee "$RUNNER_TEMP/pytest.out"
+          ! grep -q SKIPPED "$RUNNER_TEMP/pytest.out"
+
   lint:
     runs-on: ubuntu-latest
     steps:

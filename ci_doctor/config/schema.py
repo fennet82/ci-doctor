@@ -139,8 +139,10 @@ class LLMConfig(_Strict):
     max_retries: int = Field(
         1,
         ge=0,
-        description="HTTP-transport retries per request. Kept low: Pydantic AI's own Agent "
-        "already retries once on a schema-invalid reply, and the two multiply.",
+        description="HTTP-transport retries per request, set on the provider's SDK client. Applies to "
+        "providers whose SDK has the setting (openai, azure, anthropic, groq, ...); bedrock and "
+        "litellm keep their own. Kept low: Pydantic AI's own Agent already retries once on a "
+        "schema-invalid reply, and the two multiply.",
     )
 
 

@@ -20,6 +20,7 @@ Every SDK is imported inside the builder that needs it, so importing this module
 costs nothing on a run that never reaches a model.
 """
 
+import asyncio
 import inspect
 import os
 import ssl
@@ -85,6 +86,19 @@ _EXTRA_KWARGS: dict[str, Callable[[LLMConfig, dict[str, Any]], dict[str, Any]]] 
 }
 
 
+def _apply_max_retries(provider: object, cfg: LLMConfig) -> None:
+    """Hand `llm.max_retries` to the provider's SDK client, where that SDK has the knob.
+
+    The openai/anthropic/groq SDKs retry 429s, 5xxs and connection errors themselves
+    (default 2); leaving that alone would multiply with the Agent's own repair retry.
+    Providers without a `max_retries` client attribute (bedrock via boto, litellm) keep
+    their own retry behavior.
+    """
+    client = getattr(provider, "client", None)
+    if client is not None and hasattr(client, "max_retries"):
+        client.max_retries = cfg.max_retries
+
+
 def _generic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     """Any Pydantic AI-native provider: Anthropic, Google, Groq, Mistral, Cohere, xAI, Bedrock, ..."""
     from pydantic_ai.models import infer_model, infer_provider_class
@@ -96,6 +110,7 @@ def _generic_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     if extra := _EXTRA_KWARGS.get(cfg.backend):
         kwargs.update(extra(cfg, kwargs))
     provider = provider_class(**kwargs)
+    _apply_max_retries(provider, cfg)
     return infer_model(f"{kind}:{model_name}", provider_factory=lambda _: provider)
 
 
@@ -116,6 +131,10 @@ _NEEDS: dict[str, Callable[[LLMConfig], bool]] = {
 }
 
 
+#: The pip extra for a backend whose name differs from it.
+_EXTRA = {"azure": "openai", "google-cloud": "google"}
+
+
 def make_client(cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> LLMClient:
     """Build the client for the configured backend.
 
@@ -133,7 +152,14 @@ def make_client(cfg: LLMConfig, environ: Mapping[str, str] | None = None) -> LLM
         raise ValueError(f"unknown llm.backend: {cfg.backend}")
     build = _OVERRIDES.get(cfg.backend, _generic_model)
     resolved_environ = os.environ if environ is None else environ
-    return PydanticAILLMClient(build(cfg, resolved_environ), cfg)
+    try:
+        model = build(cfg, resolved_environ)
+    except ImportError as exc:
+        extra = _EXTRA.get(cfg.backend, cfg.backend)
+        raise ImportError(
+            f"llm.backend {cfg.backend!r} needs its SDK: pip install 'ci-doctorr[{extra}]' ({exc})"
+        ) from exc
+    return PydanticAILLMClient(model, cfg)
 
 
 def backend_ready(cfg: LLMConfig) -> bool:
@@ -153,20 +179,24 @@ def backend_ready(cfg: LLMConfig) -> bool:
 class PydanticAILLMClient(LLMClient):
     """Wraps one `pydantic_ai.models.Model` behind the `LLMClient` port.
 
-    One `Agent` is built lazily and reused for the client's lifetime (one
-    client per run, per `llm/report.py::client_for_run`).
+    One `Agent` is built lazily and reused for the client's lifetime (one client per
+    run, per `llm/report.py::client_for_run`). Jobs call in from a thread pool, but every
+    call runs on one shared event loop in a daemon thread: the SDK's async client pools
+    keep-alive connections, and a pooled connection is bound to the loop that opened it,
+    so `run_sync` (a fresh loop per call) drops some calls with "Connection error".
     """
 
     def __init__(self, model: "Model", cfg: LLMConfig) -> None:
-        """Store the model and config; no Agent is built until a call is made."""
+        """Store the model and config; no Agent or loop is built until a call is made."""
         self._model = model
         self.cfg = cfg
         self._agent: Agent[None, Report] | None = None
-        self._agent_lock = threading.Lock()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._lock = threading.Lock()
 
     def _agent_for(self) -> "Agent[None, Report]":
         """Build the Agent once, thread-safely (jobs run on a thread pool)."""
-        with self._agent_lock:
+        with self._lock:
             if self._agent is None:
                 from pydantic_ai import Agent
                 from pydantic_ai.output import PromptedOutput
@@ -182,6 +212,15 @@ class PydanticAILLMClient(LLMClient):
                 )
         return self._agent
 
+    def _loop_for(self) -> asyncio.AbstractEventLoop:
+        """Start the shared event loop once, thread-safely."""
+        with self._lock:
+            if self._loop is None:
+                loop = asyncio.new_event_loop()
+                threading.Thread(target=loop.run_forever, name="ci-doctor-llm", daemon=True).start()
+                self._loop = loop
+        return self._loop
+
     def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion and return the validated reply as a dict.
 
@@ -195,5 +234,5 @@ class PydanticAILLMClient(LLMClient):
             Exception: Any transport, API, or exhausted-retry failure.
         """
         agent = self._agent_for()
-        result = agent.run_sync(prompt)
+        result = asyncio.run_coroutine_threadsafe(agent.run(prompt), self._loop_for()).result()
         return result.output.model_dump(mode="json")
