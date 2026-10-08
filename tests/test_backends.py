@@ -8,6 +8,7 @@ schema is covered end-to-end in tests/test_report.py.
 
 import asyncio
 import sys
+import time
 import types
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -350,6 +351,35 @@ def test_temperature_and_timeout_reach_the_agent():
     assert agent.model_settings["timeout"] == 42
 
 
+def test_litellm_ca_bundle_sets_its_ssl_verify(monkeypatch):
+    """Litellm's only CA knob is the module-level `ssl_verify`; an unset bundle leaves it alone."""
+    fake_litellm = types.ModuleType("litellm")
+    fake_litellm.ssl_verify = True
+    fake_bridge = types.ModuleType("pydantic_ai_litellm")
+    fake_bridge.LiteLLMModel = lambda *a, **k: TestModel()
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+    monkeypatch.setitem(sys.modules, "pydantic_ai_litellm", fake_bridge)
+
+    backends._litellm_model(_llm(backend="litellm", model="m"), {})
+    assert fake_litellm.ssl_verify is True
+    backends._litellm_model(_llm(backend="litellm", model="m", ca_bundle="/etc/ca.pem"), {})
+    assert fake_litellm.ssl_verify == "/etc/ca.pem"
+
+
+def test_timeout_is_a_wall_clock_budget_for_the_whole_call():
+    """A slow reply is cut off at `timeout_seconds`, repair retry and SDK retries included."""
+
+    async def slow(messages, info):
+        await asyncio.sleep(10)
+        return _reply('{"summary": "ok", "score": 1}')
+
+    client = PydanticAILLMClient(FunctionModel(slow), _llm(model="m", timeout_seconds=1))
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        client.complete_structured("prompt")
+    assert time.monotonic() - started < 5
+
+
 def test_litellm_model_string_reaches_litellm_model(monkeypatch):
     """Litellm's own model-string convention passes straight through (fake module: the real one conflicts)."""
     captured = {}
@@ -424,6 +454,17 @@ def test_bedrock_builds_with_only_a_region(aws_env):
     )
     assert type(model).__name__ == "BedrockConverseModel"
     assert model.model_name == "anthropic.claude-opus-4-6-v1:0"
+
+
+def test_bedrock_ca_bundle_reaches_the_boto_client(aws_env):
+    """Bedrock has no `http_client`; a CA bundle becomes `verify=` on the boto client it is handed."""
+    pytest.importorskip("boto3")
+    model = backends._generic_model(
+        _llm(backend="bedrock", model="m", aws_region="us-east-1", ca_bundle=certifi.where()), {}
+    )
+    boto_client = model.client
+    assert boto_client.meta.region_name == "us-east-1"
+    assert boto_client._endpoint.http_session._verify == certifi.where()
 
 
 def test_bedrock_falls_back_to_the_aws_region_env_var(aws_env, monkeypatch):

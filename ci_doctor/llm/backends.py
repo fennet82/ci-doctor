@@ -71,6 +71,16 @@ def _provider_kwargs(provider_class: type, cfg: LLMConfig, environ: Mapping[str,
     return kwargs
 
 
+def _bedrock_kwargs(cfg: LLMConfig) -> dict[str, Any]:
+    """Region, plus a boto client when a CA bundle is set — the provider has no `http_client`."""
+    if not cfg.ca_bundle:
+        return {"region_name": cfg.aws_region}
+    import boto3
+
+    region = cfg.aws_region or os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION")
+    return {"bedrock_client": boto3.client("bedrock-runtime", region_name=region, verify=cfg.ca_bundle)}
+
+
 #: Arguments a provider needs beyond the generic three. Each takes the config and the
 #: kwargs built so far, and returns what to add or replace.
 _EXTRA_KWARGS: dict[str, Callable[[LLMConfig, dict[str, Any]], dict[str, Any]]] = {
@@ -78,7 +88,7 @@ _EXTRA_KWARGS: dict[str, Callable[[LLMConfig, dict[str, Any]], dict[str, Any]]] 
     "openai": lambda cfg, kw: {"api_key": kw.get("api_key") or "no-key"},
     "azure": lambda cfg, kw: {"azure_endpoint": cfg.azure_endpoint, "api_version": cfg.azure_api_version},
     # AWS auth comes from the environment/IAM (boto3's chain), not an API key.
-    "bedrock": lambda cfg, kw: {"region_name": cfg.aws_region},
+    "bedrock": lambda cfg, kw: _bedrock_kwargs(cfg),
     "bedrock-mantle": lambda cfg, kw: {"region_name": cfg.aws_region},
     "google-cloud": lambda cfg, kw: {
         k: v for k, v in {"project": cfg.gcp_project, "location": cfg.gcp_location}.items() if v
@@ -119,6 +129,13 @@ def _litellm_model(cfg: LLMConfig, environ: Mapping[str, str]) -> "Model":
     from pydantic_ai_litellm import LiteLLMModel  # ty: ignore[unresolved-import]
 
     model_name = _require_model(cfg)
+    if cfg.ca_bundle:
+        import litellm  # ty: ignore[unresolved-import]
+
+        litellm.ssl_verify = (
+            cfg.ca_bundle
+        )  # litellm's only CA knob; a module global, but we are the only caller
+
     return LiteLLMModel(model_name, api_key=_api_key(cfg, environ), api_base=cfg.api_base or None)
 
 
@@ -231,8 +248,11 @@ class PydanticAILLMClient(LLMClient):
             The reply, already schema-valid.
 
         Raises:
-            Exception: Any transport, API, or exhausted-retry failure.
+            Exception: Any transport, API, or exhausted-retry failure, or `TimeoutError`
+                when the call — repair retry and SDK retries included — outlasts
+                `llm.timeout_seconds`.
         """
         agent = self._agent_for()
-        result = asyncio.run_coroutine_threadsafe(agent.run(prompt), self._loop_for()).result()
+        budget = asyncio.wait_for(agent.run(prompt), self.cfg.timeout_seconds)
+        result = asyncio.run_coroutine_threadsafe(budget, self._loop_for()).result()
         return result.output.model_dump(mode="json")

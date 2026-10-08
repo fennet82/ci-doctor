@@ -135,7 +135,11 @@ class LLMConfig(_Strict):
     temperature: float = Field(
         0.1, description="Sampling temperature. Low keeps the postmortem reproducible."
     )
-    timeout_seconds: int = Field(120, description="Timeout for the single LLM call.")
+    timeout_seconds: int = Field(
+        120,
+        description="Wall-clock budget for one LLM call, schema-repair retry and SDK retries included. "
+        "Also the per-request timeout.",
+    )
     max_retries: int = Field(
         1,
         ge=0,
