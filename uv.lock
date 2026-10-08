@@ -487,7 +487,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.40" },
     { name = "pydantic", specifier = ">=2.5" },
-    { name = "pydantic-ai-litellm", marker = "extra == 'litellm'", specifier = ">=0.2.8" },
+    { name = "pydantic-ai-litellm", marker = "extra == 'litellm'", specifier = ">=0.2.8,<0.3" },
     { name = "pydantic-ai-slim", specifier = ">=2.40" },
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = ">=2.40" },
     { name = "pydantic-ai-slim", extras = ["bedrock"], marker = "extra == 'bedrock'", specifier = ">=2.40" },

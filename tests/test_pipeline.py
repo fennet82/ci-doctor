@@ -2,6 +2,7 @@
 
 from ci_doctor.config.loader import load_config
 from ci_doctor.core.models import Job, Run
+from ci_doctor.core.ports import LLMClient
 from ci_doctor.pipeline import _ordered, analyze_run
 from tests import support
 
@@ -85,13 +86,18 @@ def test_analyze_run_analyzes_every_job_when_sequential(monkeypatch):
 
 
 def test_analyze_run_builds_one_llm_client_for_the_whole_run(monkeypatch):
-    """One client per run, not one per job — a pool per job was the old cost."""
+    """One client per run, not one per job — a pool per job was the old cost — closed at the end."""
     built = []
+    closed = []
 
-    class _Client:
+    class _Client(LLMClient):
         def complete_structured(self, prompt):
             """Answer with something the schema rejects, so the run degrades cleanly."""
             return {}
+
+        def close(self):
+            """Record the release."""
+            closed.append(self)
 
     def counting_make_client(cfg, environ=None):
         """Stand in for the real factory, counting constructions."""
@@ -107,3 +113,4 @@ def test_analyze_run_builds_one_llm_client_for_the_whole_run(monkeypatch):
     _run, _provider, results = analyze_run("42", cfg)
     assert len(results) == 4
     assert len(built) == 1
+    assert len(closed) == 1

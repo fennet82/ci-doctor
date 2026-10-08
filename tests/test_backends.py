@@ -9,6 +9,7 @@ schema is covered end-to-end in tests/test_report.py.
 import asyncio
 import os
 import sys
+import threading
 import time
 import types
 from concurrent.futures import ThreadPoolExecutor
@@ -317,6 +318,71 @@ def test_parallel_calls_share_one_event_loop():
         results = list(pool.map(client.complete_structured, ["p"] * 12))
     assert all(r == {"summary": "ok", "score": 1} for r in results)
     assert len(loops) == 1
+
+
+class _ClosableModel(TestModel):
+    """A model exposing an async-closable SDK client, as the real ones do."""
+
+    closed = False
+
+    @property
+    def client(self):
+        """Hand out an object whose `close` records the call."""
+        model = self
+
+        class _Sdk:
+            async def close(self):
+                model.closed = True
+
+        return _Sdk()
+
+
+def test_close_closes_the_sdk_client_and_stops_the_loop_thread():
+    """After a call, `close()` shuts the SDK client and ends the loop thread; twice is fine."""
+    model = _ClosableModel(custom_output_text='{"summary": "ok", "score": 1}')
+    client = PydanticAILLMClient(model, _llm(model="m"))
+    before = set(threading.enumerate())  # other tests leave their own loop threads running
+    client.complete_structured("prompt")
+    (thread,) = set(threading.enumerate()) - before
+    client.close()
+    thread.join(timeout=5)
+    assert model.closed is True
+    assert not thread.is_alive()
+    client.close()
+
+
+def test_close_before_any_call_is_a_no_op():
+    """Nothing was opened, so there is nothing to close — and no loop thread is started for it."""
+    client = PydanticAILLMClient(_ClosableModel(), _llm(model="m"))
+    client.close()
+    assert client._loop is None
+
+
+def test_close_never_raises():
+    """A client that fails to close must not fail the run whose report is already built."""
+
+    class _Exploding(TestModel):
+        @property
+        def client(self):
+            raise RuntimeError("boom")
+
+    client = PydanticAILLMClient(
+        _Exploding(custom_output_text='{"summary": "ok", "score": 1}'), _llm(model="m")
+    )
+    client.complete_structured("prompt")
+    client.close()
+
+
+def test_close_shuts_a_real_sdk_client_built_with_a_ca_bundle():
+    """The `httpx` client `ca_bundle` creates is closed through the SDK client that owns it."""
+    pytest.importorskip("openai")
+    cfg = _llm(backend="openai", model="m", api_base="http://127.0.0.1:1/v1", ca_bundle=certifi.where())
+    client = make_client(cfg)
+    http_client = client._model.client._client
+    assert not http_client.is_closed
+    client._loop_for()  # close() is a no-op until a call has started the loop
+    client.close()
+    assert http_client.is_closed
 
 
 def test_one_repair_retry_on_invalid_then_valid_reply():

@@ -23,6 +23,19 @@ not in `.mise.toml`: uv installs it from `requires-python`, and pinning it twice
 one more thing to drift. Neither is ruff, for the same reason — it is a dev
 dependency, so `uv.lock` pins it and `uv run ruff` is identical locally and in CI.
 
+The LLM backends are pip extras (`openai`, `anthropic`, `bedrock`, ...), and the base
+install has none of their SDKs, so the provider tests skip under a plain `uv sync`. To run
+them, sync every extra that can coexist (CI's `providers` job does exactly this):
+
+```sh
+uv sync --extra openai --extra anthropic --extra bedrock --extra bedrock-mantle \
+  --extra google --extra groq --extra mistral --extra cohere --extra xai --extra huggingface
+```
+
+`uv sync --all-extras` fails by design: `litellm` pins `openai<3.0` while Pydantic AI's
+OpenAI integration needs `openai>=3.8`, so `litellm` is a separate install track
+(`--extra litellm`), never combined with `openai` or `bedrock-mantle`.
+
 `codegraph` comes with it but is not run for you — indexing this repo into
 `.codegraph/` is your call, and the index is local to your machine (the directory
 ignores its own contents).

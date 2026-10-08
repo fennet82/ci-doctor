@@ -23,6 +23,7 @@ costs nothing on a run that never reaches a model.
 import asyncio
 import contextlib
 import inspect
+import logging
 import os
 import ssl
 import threading
@@ -32,6 +33,8 @@ from typing import TYPE_CHECKING, Any, get_args
 from ci_doctor.config.schema import LLMConfig
 from ci_doctor.core.ports import LLMClient
 from ci_doctor.llm.schema import Report
+
+log = logging.getLogger("ci_doctor.llm")
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
@@ -207,6 +210,18 @@ def backend_ready(cfg: LLMConfig) -> bool:
     return _NEEDS.get(cfg.backend, lambda c: bool(c.model))(cfg)
 
 
+#: How long `close()` waits for the SDK client to shut down before stopping the loop anyway.
+_CLOSE_WAIT_SECONDS = 5
+
+
+def _run_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Thread body: run `loop` until it is stopped, then release it."""
+    try:
+        loop.run_forever()
+    finally:
+        loop.close()
+
+
 class PydanticAILLMClient(LLMClient):
     """Wraps one `pydantic_ai.models.Model` behind the `LLMClient` port.
 
@@ -248,9 +263,35 @@ class PydanticAILLMClient(LLMClient):
         with self._lock:
             if self._loop is None:
                 loop = asyncio.new_event_loop()
-                threading.Thread(target=loop.run_forever, name="ci-doctor-llm", daemon=True).start()
+                threading.Thread(target=_run_loop, args=(loop,), name="ci-doctor-llm", daemon=True).start()
                 self._loop = loop
         return self._loop
+
+    async def _close_sdk_client(self) -> None:
+        """Close the model's SDK client — and with it the `httpx` client `ca_bundle` built."""
+        client = getattr(self._model, "client", None)
+        closer = getattr(client, "aclose", None) or getattr(client, "close", None)
+        if closer is not None:
+            result = closer()
+            if inspect.isawaitable(result):
+                await result
+
+    def close(self) -> None:
+        """Close the SDK client and stop the loop thread. The client is done after this.
+
+        Best-effort: a failure to close is logged, never raised — the run's report is
+        already built by the time this is called.
+        """
+        with self._lock:
+            loop, self._loop = self._loop, None
+        if loop is None:  # no call was ever made, so nothing was opened
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self._close_sdk_client(), loop).result(_CLOSE_WAIT_SECONDS)
+        except Exception as exc:  # noqa: BLE001 - closing must never fail the run
+            log.debug("closing the LLM client failed: %s", exc)
+        finally:
+            loop.call_soon_threadsafe(loop.stop)
 
     def complete_structured(self, prompt: str) -> dict[str, Any]:
         """Run one completion and return the validated reply as a dict.

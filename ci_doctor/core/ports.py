@@ -104,11 +104,17 @@ class LLMClient(ABC):
 
         Returns:
             The parsed response. Callers validate it — a backend may return
-            something schema-invalid, and the repair retry lives in `llm/report.py`.
+            something schema-invalid; the schema-repair retry is the backend's own.
 
         Raises:
             Exception: Any backend failure. Callers degrade to the deterministic
                 report rather than failing the run.
+        """
+
+    def close(self) -> None:  # noqa: B027 - a deliberate no-op default, not a forgotten abstract
+        """Release what the client holds (connections, threads). The client is done after this.
+
+        Safe to call more than once, and on a client that never made a call.
         """
 
 

@@ -53,7 +53,7 @@ mistral = ["pydantic-ai-slim[mistral]>=2.40"]
 cohere = ["pydantic-ai-slim[cohere]>=2.40"]
 xai = ["pydantic-ai-slim[xai]>=2.40"]
 huggingface = ["pydantic-ai-slim[huggingface]>=2.40"]
-litellm = ["litellm>=1.40", "pydantic-ai-litellm>=0.2.8"]
+litellm = ["litellm>=1.40", "pydantic-ai-litellm>=0.2.8,<0.3"]  # community bridge, 0.x: a minor bump can break
 
 [tool.uv]
 conflicts = [
